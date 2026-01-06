@@ -7,9 +7,9 @@ import (
 )
 
 type ConnectivityItem struct {
-	OK      bool              `json:"ok"`
-	Details map[string]any    `json:"details,omitempty"`
-	Error   string            `json:"error,omitempty"`
+	OK      bool           `json:"ok"`
+	Details map[string]any `json:"details,omitempty"`
+	Error   string         `json:"error,omitempty"`
 }
 
 type ConnectivityResponse struct {

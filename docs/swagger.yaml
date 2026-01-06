@@ -1,5 +1,31 @@
 basePath: /api/v1
 definitions:
+  apierror.Envelope:
+    properties:
+      error:
+        $ref: '#/definitions/apierror.Error'
+    type: object
+  apierror.Error:
+    properties:
+      code:
+        type: string
+      details:
+        additionalProperties: {}
+        type: object
+      message:
+        type: string
+    type: object
+  handlers.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/storage.User'
+    type: object
   handlers.ConnectivityItem:
     properties:
       details:
@@ -37,6 +63,41 @@ definitions:
       time:
         type: string
     type: object
+  handlers.SigninRequest:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.SignupRequest:
+    properties:
+      display_name:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+    type: object
+  storage.User:
+    properties:
+      created_at:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      phone:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
 info:
   contact: {}
   description: Goen REST API (MVP scaffold). Includes health checks and connectivity
@@ -44,6 +105,97 @@ info:
   title: Goen API
   version: "0.1"
 paths:
+  /auth/me:
+    get:
+      description: Returns the current authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/storage.User'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - auth
+  /auth/signin:
+    post:
+      consumes:
+      - application/json
+      description: Sign in with email or phone.
+      parameters:
+      - description: Signin request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SigninRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Signin
+      tags:
+      - auth
+  /auth/signup:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account (email or phone required).
+      parameters:
+      - description: Signup request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SignupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Signup
+      tags:
+      - auth
   /connectivity:
     get:
       description: Probes Postgres and Redis and returns diagnostic info.
@@ -107,4 +259,10 @@ paths:
 schemes:
 - http
 - https
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer {token}" to authenticate.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

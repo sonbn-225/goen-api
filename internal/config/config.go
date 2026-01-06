@@ -11,13 +11,15 @@ import (
 )
 
 type Config struct {
-	Env       string
-	Host      string
-	Port      int
-	LogLevel  slog.Level
-	DatabaseURL string
-	RedisURL    string
-	CORSOrigins []string
+	Env                 string
+	Host                string
+	Port                int
+	LogLevel            slog.Level
+	DatabaseURL         string
+	RedisURL            string
+	CORSOrigins         []string
+	JWTSecret           string
+	JWTAccessTTLMinutes int
 }
 
 func Load() (*Config, error) {
@@ -25,6 +27,7 @@ func Load() (*Config, error) {
 	cfg.Env = getenvDefault("GOEN_ENV", "development")
 	cfg.Host = getenvDefault("HOST", "0.0.0.0")
 	cfg.Port = getenvIntDefault("PORT", 8080)
+	cfg.JWTAccessTTLMinutes = getenvIntDefault("JWT_ACCESS_TTL_MINUTES", 60)
 
 	levelStr := strings.ToLower(getenvDefault("LOG_LEVEL", "info"))
 	switch levelStr {
@@ -42,6 +45,18 @@ func Load() (*Config, error) {
 
 	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
 	cfg.RedisURL = os.Getenv("REDIS_URL")
+
+	cfg.JWTSecret = os.Getenv("JWT_SECRET")
+	if cfg.JWTSecret == "" {
+		if cfg.Env == "development" {
+			cfg.JWTSecret = "dev-insecure-secret"
+		} else {
+			return nil, errors.New("JWT_SECRET is required in non-development environments")
+		}
+	}
+	if cfg.JWTAccessTTLMinutes < 1 {
+		return nil, errors.New("JWT_ACCESS_TTL_MINUTES must be >= 1")
+	}
 	if origins := os.Getenv("CORS_ORIGINS"); origins != "" {
 		cfg.CORSOrigins = splitCSV(origins)
 	} else if cfg.Env == "development" {
