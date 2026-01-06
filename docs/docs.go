@@ -67,6 +67,12 @@ const docTemplate = `{
                 "summary": "Signin",
                 "parameters": [
                     {
+                        "type": "string",
+                        "description": "Client instance ID (recommended)",
+                        "name": "X-Client-Id",
+                        "in": "header"
+                    },
+                    {
                         "description": "Signin request",
                         "name": "body",
                         "in": "body",
@@ -118,6 +124,12 @@ const docTemplate = `{
                 ],
                 "summary": "Signup",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Client instance ID (recommended)",
+                        "name": "X-Client-Id",
+                        "in": "header"
+                    },
                     {
                         "description": "Signup request",
                         "name": "body",
