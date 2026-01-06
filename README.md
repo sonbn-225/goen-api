@@ -79,3 +79,29 @@ Steps:
 
 - Configure `.env` (set `API_DOMAIN`, `DATABASE_URL`, `REDIS_URL`)
 - Start: `docker compose --env-file .env -f docker-compose.prod.yml up -d --build`
+
+## Database Migrations
+
+This project uses [goose](https://github.com/pressly/goose) for database migrations. Goose is installed in the Docker container.
+
+### Create a new migration
+
+```bash
+docker exec goen-api goose -dir ./migrations create migration_name sql
+```
+
+This will create a new SQL file in the `migrations/` directory.
+
+### Run migrations
+
+To apply all available migrations:
+
+```bash
+docker exec goen-api sh -c 'export GOOSE_DRIVER=postgres && export GOOSE_DBSTRING=$DATABASE_URL && goose -dir ./migrations up'
+```
+
+### Check migration status
+
+```bash
+docker exec goen-api sh -c 'export GOOSE_DRIVER=postgres && export GOOSE_DBSTRING=$DATABASE_URL && goose -dir ./migrations status'
+```

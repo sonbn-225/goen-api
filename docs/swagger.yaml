@@ -15,16 +15,22 @@ definitions:
       message:
         type: string
     type: object
-  handlers.AuthResponse:
+  domain.User:
     properties:
-      access_token:
+      created_at:
         type: string
-      expires_in:
-        type: integer
-      token_type:
+      display_name:
         type: string
-      user:
-        $ref: '#/definitions/storage.User'
+      email:
+        type: string
+      id:
+        type: string
+      phone:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
     type: object
   handlers.ConnectivityItem:
     properties:
@@ -63,39 +69,33 @@ definitions:
       time:
         type: string
     type: object
-  handlers.SigninRequest:
+  services.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/domain.User'
+    type: object
+  services.SigninRequest:
     properties:
       login:
         type: string
       password:
         type: string
     type: object
-  handlers.SignupRequest:
+  services.SignupRequest:
     properties:
-      display_name:
+      displayName:
         type: string
       email:
         type: string
       password:
         type: string
       phone:
-        type: string
-    type: object
-  storage.User:
-    properties:
-      created_at:
-        type: string
-      display_name:
-        type: string
-      email:
-        type: string
-      id:
-        type: string
-      phone:
-        type: string
-      status:
-        type: string
-      updated_at:
         type: string
     type: object
 info:
@@ -107,14 +107,16 @@ info:
 paths:
   /auth/me:
     get:
-      description: Returns the current authenticated user.
+      consumes:
+      - application/json
+      description: Get current logged in user information.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/storage.User'
+            $ref: '#/definitions/domain.User'
         "401":
           description: Unauthorized
           schema:
@@ -123,8 +125,6 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/apierror.Envelope'
-      security:
-      - BearerAuth: []
       summary: Get current user
       tags:
       - auth
@@ -132,7 +132,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Sign in with email or phone.
+      description: Sign in with email/phone and password.
       parameters:
       - description: Client instance ID (recommended)
         in: header
@@ -143,14 +143,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.SigninRequest'
+          $ref: '#/definitions/services.SigninRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.AuthResponse'
+            $ref: '#/definitions/services.AuthResponse'
         "400":
           description: Bad Request
           schema:
@@ -181,14 +181,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.SignupRequest'
+          $ref: '#/definitions/services.SignupRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.AuthResponse'
+            $ref: '#/definitions/services.AuthResponse'
         "400":
           description: Bad Request
           schema:

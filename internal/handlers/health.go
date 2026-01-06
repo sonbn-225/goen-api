@@ -7,13 +7,15 @@ import (
 	"time"
 
 	"github.com/sonbn-225/goen-api/internal/config"
+	"github.com/sonbn-225/goen-api/internal/services"
 	"github.com/sonbn-225/goen-api/internal/storage"
 )
 
 type Deps struct {
-	Cfg   *config.Config
-	DB    *storage.Postgres
-	Redis *storage.Redis
+	Cfg         *config.Config
+	DB          *storage.Postgres
+	Redis       *storage.Redis
+	AuthService services.AuthService
 }
 
 type HealthResponse struct {

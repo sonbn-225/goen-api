@@ -8,6 +8,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/auth"
 	"github.com/sonbn-225/goen-api/internal/config"
 	"github.com/sonbn-225/goen-api/internal/handlers"
+	"github.com/sonbn-225/goen-api/internal/services"
 	"github.com/sonbn-225/goen-api/internal/storage"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
@@ -20,10 +21,16 @@ func NewRouter(cfg *config.Config) http.Handler {
 	r.Use(CORSMiddleware(cfg))
 	r.Use(middleware.Heartbeat("/healthz"))
 
+	db := storage.NewPostgres(cfg.DatabaseURL)
+	redis := storage.NewRedis(cfg.RedisURL)
+	userRepo := storage.NewUserRepo(db)
+	authService := services.NewAuthService(userRepo, cfg)
+
 	deps := handlers.Deps{
-		Cfg:   cfg,
-		DB:    storage.NewPostgres(cfg.DatabaseURL),
-		Redis: storage.NewRedis(cfg.RedisURL),
+		Cfg:         cfg,
+		DB:          db,
+		Redis:       redis,
+		AuthService: authService,
 	}
 
 	r.Get("/swagger", func(w http.ResponseWriter, r *http.Request) {
