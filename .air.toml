@@ -1,0 +1,29 @@
+# Air hot-reload configuration for goen-api (dev only)
+# Docs: https://github.com/air-verse/air
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "swag init -q -g cmd/api/main.go -o docs && go build -o ./tmp/goen-api ./cmd/api"
+  entrypoint = "./tmp/goen-api"
+  include_ext = ["go"]
+  exclude_dir = ["tmp", "docs", ".git"]
+  delay = 500
+  log = "air-build.log"
+  # Bind mounts on Docker Desktop (Windows/macOS) can be flaky with fsnotify.
+  # Polling makes reloads much more reliable.
+  poll = true
+  poll_interval = 500
+
+[color]
+  main = "yellow"
+  watcher = "cyan"
+  build = "green"
+  runner = "magenta"
+
+[misc]
+  clean_on_exit = true
+
+[log]
+  time = true

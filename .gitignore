@@ -1,0 +1,28 @@
+/bin/
+/dist/
+/tmp/
+*.exe
+*.log
+*.out
+
+# Go build/test artifacts
+*.test
+*.prof
+coverage.out
+
+# Go workspace
+/.idea/
+/.vscode/
+
+# OS junk
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Air
+air-build.log
