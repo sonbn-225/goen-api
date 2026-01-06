@@ -1,0 +1,12 @@
+.git
+.vscode
+.idea
+
+.env
+.env.*
+
+bin
+
+dist
+
+**/*_test.go

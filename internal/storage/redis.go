@@ -1,0 +1,57 @@
+package storage
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+)
+
+type Redis struct {
+	client *redis.Client
+}
+
+func NewRedis(redisURL string) *Redis {
+	if redisURL == "" {
+		return nil
+	}
+	opts, err := redis.ParseURL(redisURL)
+	if err != nil {
+		return nil
+	}
+	return &Redis{client: redis.NewClient(opts)}
+}
+
+func (r *Redis) Ping(ctx context.Context) error {
+	if r == nil || r.client == nil {
+		return nil
+	}
+	return r.client.Ping(ctx).Err()
+}
+
+func (r *Redis) Probe(ctx context.Context) (map[string]any, error) {
+	if r == nil || r.client == nil {
+		return nil, nil
+	}
+
+	if err := r.client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("redis ping: %w", err)
+	}
+
+	key := "goen_api_probe"
+	value := time.Now().UTC().Format(time.RFC3339Nano)
+	if err := r.client.Set(ctx, key, value, 30*time.Second).Err(); err != nil {
+		return nil, fmt.Errorf("redis set: %w", err)
+	}
+	got, err := r.client.Get(ctx, key).Result()
+	if err != nil {
+		return nil, fmt.Errorf("redis get: %w", err)
+	}
+
+	return map[string]any{
+		"ping": "PONG",
+		"key":  key,
+		"value": got,
+	}, nil
+}

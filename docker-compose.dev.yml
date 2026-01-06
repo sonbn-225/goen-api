@@ -1,0 +1,36 @@
+services:
+  goen-api:
+    container_name: ${CONTAINER_NAME:-goen-api}
+    platform: ${PLATFORM:-linux/amd64}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    environment:
+      - GOEN_ENV=development
+      - TZ=${SUNFLOWER_TZ:-Asia/Ho_Chi_Minh}
+      - PORT=${PORT:-8080}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - REDIS_URL=${REDIS_URL:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+    volumes:
+      - .:/app
+    networks:
+      - traefik_network
+      - sunflower_data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-proxy_network}"
+      - "traefik.http.routers.goen-api.rule=Host(`${API_DOMAIN:-api.localhost}`)"
+      - "traefik.http.routers.goen-api.entrypoints=web"
+      - "traefik.http.services.goen-api.loadbalancer.server.port=8080"
+    restart: unless-stopped
+
+networks:
+  traefik_network:
+    name: ${TRAEFIK_NETWORK:-proxy_network}
+    external: true
+  sunflower_data:
+    name: ${DATA_NETWORK:-sunflower-data}
+    external: true
