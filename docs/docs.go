@@ -17,12 +17,10 @@ const docTemplate = `{
     "paths": {
         "/auth/me": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
+                "description": "Get current logged in user information.",
+                "consumes": [
+                    "application/json"
                 ],
-                "description": "Returns the current authenticated user.",
                 "produces": [
                     "application/json"
                 ],
@@ -34,7 +32,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/storage.User"
+                            "$ref": "#/definitions/domain.User"
                         }
                     },
                     "401": {
@@ -54,7 +52,7 @@ const docTemplate = `{
         },
         "/auth/signin": {
             "post": {
-                "description": "Sign in with email or phone.",
+                "description": "Sign in with email/phone and password.",
                 "consumes": [
                     "application/json"
                 ],
@@ -78,7 +76,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.SigninRequest"
+                            "$ref": "#/definitions/services.SigninRequest"
                         }
                     }
                 ],
@@ -86,7 +84,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.AuthResponse"
+                            "$ref": "#/definitions/services.AuthResponse"
                         }
                     },
                     "400": {
@@ -136,7 +134,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.SignupRequest"
+                            "$ref": "#/definitions/services.SignupRequest"
                         }
                     }
                 ],
@@ -144,7 +142,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.AuthResponse"
+                            "$ref": "#/definitions/services.AuthResponse"
                         }
                     },
                     "400": {
@@ -285,20 +283,29 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.AuthResponse": {
+        "domain.User": {
             "type": "object",
             "properties": {
-                "access_token": {
+                "created_at": {
                     "type": "string"
                 },
-                "expires_in": {
-                    "type": "integer"
-                },
-                "token_type": {
+                "display_name": {
                     "type": "string"
                 },
-                "user": {
-                    "$ref": "#/definitions/storage.User"
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -359,7 +366,24 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.SigninRequest": {
+        "services.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "token_type": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/domain.User"
+                }
+            }
+        },
+        "services.SigninRequest": {
             "type": "object",
             "properties": {
                 "login": {
@@ -370,10 +394,10 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.SignupRequest": {
+        "services.SignupRequest": {
             "type": "object",
             "properties": {
-                "display_name": {
+                "displayName": {
                     "type": "string"
                 },
                 "email": {
@@ -383,32 +407,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "phone": {
-                    "type": "string"
-                }
-            }
-        },
-        "storage.User": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "display_name": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "phone": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "updated_at": {
                     "type": "string"
                 }
             }
