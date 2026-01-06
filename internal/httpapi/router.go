@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/sonbn-225/goen-api/internal/auth"
 	"github.com/sonbn-225/goen-api/internal/config"
 	"github.com/sonbn-225/goen-api/internal/handlers"
 	"github.com/sonbn-225/goen-api/internal/storage"
@@ -34,6 +35,12 @@ func NewRouter(cfg *config.Config) http.Handler {
 	))
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/signup", handlers.Signup(deps))
+			r.Post("/signin", handlers.Signin(deps))
+			r.With(auth.Middleware(cfg)).Get("/me", handlers.Me(deps))
+		})
+
 		r.Get("/healthz", handlers.Healthz(deps))
 		r.Get("/readyz", handlers.Readyz(deps))
 		r.Get("/ping", handlers.Ping(deps))

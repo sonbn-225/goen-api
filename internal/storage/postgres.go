@@ -8,7 +8,7 @@ import (
 )
 
 type Postgres struct {
-	pool *pgxpool.Pool
+	pool        *pgxpool.Pool
 	databaseURL string
 }
 
@@ -68,4 +68,11 @@ func (p *Postgres) ensurePool(ctx context.Context) (*pgxpool.Pool, error) {
 	}
 	p.pool = pool
 	return p.pool, nil
+}
+
+func (p *Postgres) Pool(ctx context.Context) (*pgxpool.Pool, error) {
+	if p == nil {
+		return nil, nil
+	}
+	return p.ensurePool(ctx)
 }

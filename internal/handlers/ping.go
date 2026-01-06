@@ -31,4 +31,3 @@ func Ping(d Deps) http.HandlerFunc {
 		})
 	}
 }
- 

@@ -50,8 +50,8 @@ func (r *Redis) Probe(ctx context.Context) (map[string]any, error) {
 	}
 
 	return map[string]any{
-		"ping": "PONG",
-		"key":  key,
+		"ping":  "PONG",
+		"key":   key,
 		"value": got,
 	}, nil
 }
