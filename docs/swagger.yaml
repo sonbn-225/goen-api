@@ -134,6 +134,10 @@ paths:
       - application/json
       description: Sign in with email or phone.
       parameters:
+      - description: Client instance ID (recommended)
+        in: header
+        name: X-Client-Id
+        type: string
       - description: Signin request
         in: body
         name: body
@@ -168,6 +172,10 @@ paths:
       - application/json
       description: Create a new user account (email or phone required).
       parameters:
+      - description: Client instance ID (recommended)
+        in: header
+        name: X-Client-Id
+        type: string
       - description: Signup request
         in: body
         name: body

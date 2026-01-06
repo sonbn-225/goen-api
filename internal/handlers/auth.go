@@ -40,6 +40,7 @@ type AuthResponse struct {
 // @Tags auth
 // @Accept json
 // @Produce json
+// @Param X-Client-Id header string false "Client instance ID (recommended)"
 // @Param body body SignupRequest true "Signup request"
 // @Success 200 {object} AuthResponse
 // @Failure 400 {object} apierror.Envelope
@@ -144,6 +145,7 @@ func Signup(d Deps) http.HandlerFunc {
 // @Tags auth
 // @Accept json
 // @Produce json
+// @Param X-Client-Id header string false "Client instance ID (recommended)"
 // @Param body body SigninRequest true "Signin request"
 // @Success 200 {object} AuthResponse
 // @Failure 400 {object} apierror.Envelope
@@ -173,8 +175,12 @@ func Signin(d Deps) http.HandlerFunc {
 			return
 		}
 		login := strings.TrimSpace(req.Login)
-		if login == "" || req.Password == "" {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "login and password are required", nil)
+		if login == "" {
+			apierror.Write(w, http.StatusBadRequest, "validation_error", "login is required", map[string]any{"field": "login"})
+			return
+		}
+		if req.Password == "" {
+			apierror.Write(w, http.StatusBadRequest, "validation_error", "password is required", map[string]any{"field": "password"})
 			return
 		}
 
