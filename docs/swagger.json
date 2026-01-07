@@ -12,6 +12,150 @@
     },
     "basePath": "/api/v1",
     "paths": {
+        "/accounts": {
+            "get": {
+                "description": "List accounts that the current user can access.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "accounts"
+                ],
+                "summary": "List accounts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/domain.Account"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a new financial account for the current user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "accounts"
+                ],
+                "summary": "Create account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Client instance ID (recommended)",
+                        "name": "X-Client-Id",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Create account request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.CreateAccountRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/domain.Account"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{accountId}": {
+            "get": {
+                "description": "Get a single account (must be accessible to current user).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "accounts"
+                ],
+                "summary": "Get account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Account ID",
+                        "name": "accountId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/domain.Account"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/me": {
             "get": {
                 "description": "Get current logged in user information.",
@@ -280,6 +424,50 @@
                 }
             }
         },
+        "domain.Account": {
+            "type": "object",
+            "properties": {
+                "account_type": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "closed_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_account_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "string"
+                }
+            }
+        },
         "domain.User": {
             "type": "object",
             "properties": {
@@ -377,6 +565,23 @@
                 },
                 "user": {
                     "$ref": "#/definitions/domain.User"
+                }
+            }
+        },
+        "services.CreateAccountRequest": {
+            "type": "object",
+            "properties": {
+                "account_type": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_account_id": {
+                    "type": "string"
                 }
             }
         },

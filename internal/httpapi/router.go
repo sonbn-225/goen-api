@@ -24,13 +24,16 @@ func NewRouter(cfg *config.Config) http.Handler {
 	db := storage.NewPostgres(cfg.DatabaseURL)
 	redis := storage.NewRedis(cfg.RedisURL)
 	userRepo := storage.NewUserRepo(db)
+	accountRepo := storage.NewAccountRepo(db)
 	authService := services.NewAuthService(userRepo, cfg)
+	accountService := services.NewAccountService(accountRepo)
 
 	deps := handlers.Deps{
 		Cfg:         cfg,
 		DB:          db,
 		Redis:       redis,
 		AuthService: authService,
+		AccountService: accountService,
 	}
 
 	r.Get("/swagger", func(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +50,13 @@ func NewRouter(cfg *config.Config) http.Handler {
 			r.Post("/signin", handlers.Signin(deps))
 			r.With(auth.Middleware(cfg)).Get("/me", handlers.Me(deps))
 		})
+
+		accountsAuth := auth.Middleware(cfg)
+		r.With(accountsAuth).Get("/accounts", handlers.ListAccounts(deps))
+		r.With(accountsAuth).Get("/accounts/", handlers.ListAccounts(deps))
+		r.With(accountsAuth).Post("/accounts", handlers.CreateAccount(deps))
+		r.With(accountsAuth).Post("/accounts/", handlers.CreateAccount(deps))
+		r.With(accountsAuth).Get("/accounts/{accountId}", handlers.GetAccount(deps))
 
 		r.Get("/healthz", handlers.Healthz(deps))
 		r.Get("/readyz", handlers.Readyz(deps))

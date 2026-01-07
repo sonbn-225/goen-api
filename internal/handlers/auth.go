@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/sonbn-225/goen-api/internal/auth"
 	"github.com/sonbn-225/goen-api/internal/apierror"
 	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/services"
@@ -96,9 +97,8 @@ func Signin(d Deps) http.HandlerFunc {
 // @Router /auth/me [get]
 func Me(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Middleware injects "user_id" string into context
-		uid, ok := r.Context().Value("user_id").(string)
-		if !ok || uid == "" {
+		uid, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
 			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
