@@ -21,6 +21,8 @@ type Deps struct {
 	CategoryService services.CategoryService
 	TagService services.TagService
 	BudgetService services.BudgetService
+	SavingsService services.SavingsService
+	RotatingSavingsService services.RotatingSavingsService
 }
 
 type HealthResponse struct {
