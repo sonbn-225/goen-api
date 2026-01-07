@@ -29,12 +29,16 @@ func NewRouter(cfg *config.Config) http.Handler {
 	categoryRepo := storage.NewCategoryRepo(db)
 	tagRepo := storage.NewTagRepo(db)
 	budgetRepo := storage.NewBudgetRepo(db)
+	savingsRepo := storage.NewSavingsRepo(db)
+	rotatingSavingsRepo := storage.NewRotatingSavingsRepo(db)
 	authService := services.NewAuthService(userRepo, cfg)
 	accountService := services.NewAccountService(accountRepo)
 	transactionService := services.NewTransactionService(txRepo)
 	categoryService := services.NewCategoryService(categoryRepo)
 	tagService := services.NewTagService(tagRepo)
 	budgetService := services.NewBudgetService(budgetRepo, categoryRepo)
+	savingsService := services.NewSavingsService(accountRepo, savingsRepo)
+	rotatingSavingsService := services.NewRotatingSavingsService(accountRepo, transactionService, rotatingSavingsRepo)
 
 	deps := handlers.Deps{
 		Cfg:         cfg,
@@ -46,6 +50,8 @@ func NewRouter(cfg *config.Config) http.Handler {
 		CategoryService: categoryService,
 		TagService: tagService,
 		BudgetService: budgetService,
+		SavingsService: savingsService,
+		RotatingSavingsService: rotatingSavingsService,
 	}
 
 	r.Get("/swagger", func(w http.ResponseWriter, r *http.Request) {
@@ -99,6 +105,22 @@ func NewRouter(cfg *config.Config) http.Handler {
 		r.With(budgetAuth).Post("/budgets", handlers.CreateBudget(deps))
 		r.With(budgetAuth).Post("/budgets/", handlers.CreateBudget(deps))
 		r.With(budgetAuth).Get("/budgets/{budgetId}", handlers.GetBudget(deps))
+
+		savingsAuth := auth.Middleware(cfg)
+		r.With(savingsAuth).Get("/savings/instruments", handlers.ListSavingsInstruments(deps))
+		r.With(savingsAuth).Get("/savings/instruments/", handlers.ListSavingsInstruments(deps))
+		r.With(savingsAuth).Post("/savings/instruments", handlers.CreateSavingsInstrument(deps))
+		r.With(savingsAuth).Post("/savings/instruments/", handlers.CreateSavingsInstrument(deps))
+		r.With(savingsAuth).Get("/savings/instruments/{instrumentId}", handlers.GetSavingsInstrument(deps))
+
+		rotAuth := auth.Middleware(cfg)
+		r.With(rotAuth).Get("/rotating-savings/groups", handlers.ListRotatingSavingsGroups(deps))
+		r.With(rotAuth).Get("/rotating-savings/groups/", handlers.ListRotatingSavingsGroups(deps))
+		r.With(rotAuth).Post("/rotating-savings/groups", handlers.CreateRotatingSavingsGroup(deps))
+		r.With(rotAuth).Post("/rotating-savings/groups/", handlers.CreateRotatingSavingsGroup(deps))
+		r.With(rotAuth).Get("/rotating-savings/groups/{groupId}", handlers.GetRotatingSavingsGroup(deps))
+		r.With(rotAuth).Get("/rotating-savings/groups/{groupId}/contributions", handlers.ListRotatingSavingsContributions(deps))
+		r.With(rotAuth).Post("/rotating-savings/groups/{groupId}/contributions", handlers.CreateRotatingSavingsContribution(deps))
 
 		r.Get("/healthz", handlers.Healthz(deps))
 		r.Get("/readyz", handlers.Readyz(deps))
