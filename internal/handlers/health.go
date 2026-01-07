@@ -16,6 +16,7 @@ type Deps struct {
 	DB          *storage.Postgres
 	Redis       *storage.Redis
 	AuthService services.AuthService
+	AccountService services.AccountService
 }
 
 type HealthResponse struct {

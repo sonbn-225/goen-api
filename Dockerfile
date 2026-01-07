@@ -5,11 +5,14 @@ WORKDIR /app
 
 RUN apk add --no-cache ca-certificates git
 
+# Ensure go + go-installed tools are runnable in shells and docker exec sessions.
+ENV PATH=/usr/local/go/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 # Install air for hot reload (requires Go >= 1.25)
 RUN go install github.com/air-verse/air@v1.63.6
 
 # Install goose for migrations
-RUN go install github.com/pressly/goose/v3/cmd/goose@latest
+RUN go install github.com/pressly/goose/v3/cmd/goose@latest && test -x /go/bin/goose
 
 # Install swag CLI for Swagger docs generation (dev only)
 RUN go install github.com/swaggo/swag/cmd/swag@v1.16.6
