@@ -25,8 +25,16 @@ func NewRouter(cfg *config.Config) http.Handler {
 	redis := storage.NewRedis(cfg.RedisURL)
 	userRepo := storage.NewUserRepo(db)
 	accountRepo := storage.NewAccountRepo(db)
+	txRepo := storage.NewTransactionRepo(db)
+	categoryRepo := storage.NewCategoryRepo(db)
+	tagRepo := storage.NewTagRepo(db)
+	budgetRepo := storage.NewBudgetRepo(db)
 	authService := services.NewAuthService(userRepo, cfg)
 	accountService := services.NewAccountService(accountRepo)
+	transactionService := services.NewTransactionService(txRepo)
+	categoryService := services.NewCategoryService(categoryRepo)
+	tagService := services.NewTagService(tagRepo)
+	budgetService := services.NewBudgetService(budgetRepo, categoryRepo)
 
 	deps := handlers.Deps{
 		Cfg:         cfg,
@@ -34,6 +42,10 @@ func NewRouter(cfg *config.Config) http.Handler {
 		Redis:       redis,
 		AuthService: authService,
 		AccountService: accountService,
+		TransactionService: transactionService,
+		CategoryService: categoryService,
+		TagService: tagService,
+		BudgetService: budgetService,
 	}
 
 	r.Get("/swagger", func(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +69,36 @@ func NewRouter(cfg *config.Config) http.Handler {
 		r.With(accountsAuth).Post("/accounts", handlers.CreateAccount(deps))
 		r.With(accountsAuth).Post("/accounts/", handlers.CreateAccount(deps))
 		r.With(accountsAuth).Get("/accounts/{accountId}", handlers.GetAccount(deps))
+
+		txAuth := auth.Middleware(cfg)
+		r.With(txAuth).Get("/transactions", handlers.ListTransactions(deps))
+		r.With(txAuth).Get("/transactions/", handlers.ListTransactions(deps))
+		r.With(txAuth).Post("/transactions", handlers.CreateTransaction(deps))
+		r.With(txAuth).Post("/transactions/", handlers.CreateTransaction(deps))
+		r.With(txAuth).Get("/transactions/{transactionId}", handlers.GetTransaction(deps))
+		r.With(txAuth).Patch("/transactions/{transactionId}", handlers.PatchTransaction(deps))
+		r.With(txAuth).Delete("/transactions/{transactionId}", handlers.DeleteTransaction(deps))
+
+		catAuth := auth.Middleware(cfg)
+		r.With(catAuth).Get("/categories", handlers.ListCategories(deps))
+		r.With(catAuth).Get("/categories/", handlers.ListCategories(deps))
+		r.With(catAuth).Post("/categories", handlers.CreateCategory(deps))
+		r.With(catAuth).Post("/categories/", handlers.CreateCategory(deps))
+		r.With(catAuth).Get("/categories/{categoryId}", handlers.GetCategory(deps))
+
+		tagAuth := auth.Middleware(cfg)
+		r.With(tagAuth).Get("/tags", handlers.ListTags(deps))
+		r.With(tagAuth).Get("/tags/", handlers.ListTags(deps))
+		r.With(tagAuth).Post("/tags", handlers.CreateTag(deps))
+		r.With(tagAuth).Post("/tags/", handlers.CreateTag(deps))
+		r.With(tagAuth).Get("/tags/{tagId}", handlers.GetTag(deps))
+
+		budgetAuth := auth.Middleware(cfg)
+		r.With(budgetAuth).Get("/budgets", handlers.ListBudgets(deps))
+		r.With(budgetAuth).Get("/budgets/", handlers.ListBudgets(deps))
+		r.With(budgetAuth).Post("/budgets", handlers.CreateBudget(deps))
+		r.With(budgetAuth).Post("/budgets/", handlers.CreateBudget(deps))
+		r.With(budgetAuth).Get("/budgets/{budgetId}", handlers.GetBudget(deps))
 
 		r.Get("/healthz", handlers.Healthz(deps))
 		r.Get("/readyz", handlers.Readyz(deps))
