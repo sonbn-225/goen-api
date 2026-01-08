@@ -11,14 +11,6 @@ END $$;
 
 -- +goose StatementBegin
 DO $$ BEGIN
-  CREATE TYPE security_price_daily_source AS ENUM ('market_data_service');
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
-END $$;
--- +goose StatementEnd
-
--- +goose StatementBegin
-DO $$ BEGIN
   CREATE TYPE security_event_type AS ENUM ('dividend_cash','split','reverse_split','rights_issue','bonus_issue','additional_issue');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
@@ -89,12 +81,7 @@ CREATE TABLE IF NOT EXISTS security_price_dailies (
   high numeric(18,8),
   low numeric(18,8),
   close numeric(18,8) NOT NULL,
-  adj_close numeric(18,8),
   volume numeric(18,2),
-  currency varchar,
-  source security_price_daily_source NOT NULL,
-  source_row_id varchar,
-  fetched_at timestamptz,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
 
@@ -121,8 +108,7 @@ CREATE TABLE IF NOT EXISTS security_events (
   ratio_denominator numeric(18,8),
   subscription_price numeric(18,8),
   currency varchar,
-  source security_price_daily_source NOT NULL,
-  source_event_id varchar,
+  vnstock_event_id varchar,
   note varchar,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
@@ -135,6 +121,26 @@ CREATE INDEX IF NOT EXISTS idx_security_events_security_effective_date
 
 CREATE INDEX IF NOT EXISTS idx_security_events_security_ex_date
   ON security_events(security_id, ex_date);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_security_events_security_vnstock_event
+  ON security_events(security_id, vnstock_event_id)
+  WHERE vnstock_event_id IS NOT NULL;
+
+-- Market data sync state (read-only, used by market data service)
+CREATE TABLE IF NOT EXISTS market_data_sync_states (
+  sync_key text PRIMARY KEY,
+  min_interval_seconds integer NOT NULL DEFAULT 86400,
+  last_started_at timestamptz,
+  last_success_at timestamptz,
+  last_failure_at timestamptz,
+  last_status text NOT NULL DEFAULT 'never',
+  last_error text,
+  created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_market_data_sync_states_last_success_at
+  ON market_data_sync_states(last_success_at);
 
 -- Elections (user writable)
 CREATE TABLE IF NOT EXISTS security_event_elections (
@@ -233,10 +239,10 @@ DROP TABLE IF EXISTS security_events;
 DROP TABLE IF EXISTS security_price_dailies;
 DROP TABLE IF EXISTS securities;
 DROP TABLE IF EXISTS investment_accounts;
+DROP TABLE IF EXISTS market_data_sync_states;
 
 DROP TYPE IF EXISTS holding_source_of_truth;
 DROP TYPE IF EXISTS trade_side;
 DROP TYPE IF EXISTS security_event_election_status;
 DROP TYPE IF EXISTS security_event_type;
-DROP TYPE IF EXISTS security_price_daily_source;
 DROP TYPE IF EXISTS security_asset_class;
