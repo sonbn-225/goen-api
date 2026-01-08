@@ -32,4 +32,7 @@ type AccountRepository interface {
 	CreateAccountWithOwner(ctx context.Context, account Account, ownerUserID string) error
 	ListAccountsForUser(ctx context.Context, userID string) ([]Account, error)
 	GetAccountForUser(ctx context.Context, userID string, accountID string) (*Account, error)
+
+	// UC-007 Shared Account
+	AccountShareRepository
 }

@@ -25,20 +25,26 @@ func NewRouter(cfg *config.Config) http.Handler {
 	redis := storage.NewRedis(cfg.RedisURL)
 	userRepo := storage.NewUserRepo(db)
 	accountRepo := storage.NewAccountRepo(db)
+	auditRepo := storage.NewAuditRepo(db)
 	txRepo := storage.NewTransactionRepo(db)
 	categoryRepo := storage.NewCategoryRepo(db)
 	tagRepo := storage.NewTagRepo(db)
 	budgetRepo := storage.NewBudgetRepo(db)
 	savingsRepo := storage.NewSavingsRepo(db)
 	rotatingSavingsRepo := storage.NewRotatingSavingsRepo(db)
+	debtRepo := storage.NewDebtRepo(db)
+	investmentRepo := storage.NewInvestmentRepo(db)
 	authService := services.NewAuthService(userRepo, cfg)
-	accountService := services.NewAccountService(accountRepo)
+	accountService := services.NewAccountService(accountRepo, userRepo)
+	auditService := services.NewAuditService(auditRepo)
 	transactionService := services.NewTransactionService(txRepo)
 	categoryService := services.NewCategoryService(categoryRepo)
 	tagService := services.NewTagService(tagRepo)
 	budgetService := services.NewBudgetService(budgetRepo, categoryRepo)
 	savingsService := services.NewSavingsService(accountRepo, savingsRepo)
 	rotatingSavingsService := services.NewRotatingSavingsService(accountRepo, transactionService, rotatingSavingsRepo)
+	debtService := services.NewDebtService(transactionService, debtRepo)
+	investmentService := services.NewInvestmentService(accountService, transactionService, investmentRepo)
 
 	deps := handlers.Deps{
 		Cfg:         cfg,
@@ -46,12 +52,15 @@ func NewRouter(cfg *config.Config) http.Handler {
 		Redis:       redis,
 		AuthService: authService,
 		AccountService: accountService,
+		AuditService: auditService,
 		TransactionService: transactionService,
 		CategoryService: categoryService,
 		TagService: tagService,
 		BudgetService: budgetService,
 		SavingsService: savingsService,
 		RotatingSavingsService: rotatingSavingsService,
+		DebtService: debtService,
+		InvestmentService: investmentService,
 	}
 
 	r.Get("/swagger", func(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +84,10 @@ func NewRouter(cfg *config.Config) http.Handler {
 		r.With(accountsAuth).Post("/accounts", handlers.CreateAccount(deps))
 		r.With(accountsAuth).Post("/accounts/", handlers.CreateAccount(deps))
 		r.With(accountsAuth).Get("/accounts/{accountId}", handlers.GetAccount(deps))
+		r.With(accountsAuth).Get("/accounts/{accountId}/shares", handlers.ListAccountShares(deps))
+		r.With(accountsAuth).Post("/accounts/{accountId}/shares", handlers.UpsertAccountShare(deps))
+		r.With(accountsAuth).Delete("/accounts/{accountId}/shares/{userId}", handlers.RevokeAccountShare(deps))
+		r.With(accountsAuth).Get("/accounts/{accountId}/audit-events", handlers.ListAuditEvents(deps))
 
 		txAuth := auth.Middleware(cfg)
 		r.With(txAuth).Get("/transactions", handlers.ListTransactions(deps))
@@ -82,6 +95,7 @@ func NewRouter(cfg *config.Config) http.Handler {
 		r.With(txAuth).Post("/transactions", handlers.CreateTransaction(deps))
 		r.With(txAuth).Post("/transactions/", handlers.CreateTransaction(deps))
 		r.With(txAuth).Get("/transactions/{transactionId}", handlers.GetTransaction(deps))
+		r.With(txAuth).Get("/transactions/{transactionId}/debt-links", handlers.ListDebtLinksForTransaction(deps))
 		r.With(txAuth).Patch("/transactions/{transactionId}", handlers.PatchTransaction(deps))
 		r.With(txAuth).Delete("/transactions/{transactionId}", handlers.DeleteTransaction(deps))
 
@@ -121,6 +135,37 @@ func NewRouter(cfg *config.Config) http.Handler {
 		r.With(rotAuth).Get("/rotating-savings/groups/{groupId}", handlers.GetRotatingSavingsGroup(deps))
 		r.With(rotAuth).Get("/rotating-savings/groups/{groupId}/contributions", handlers.ListRotatingSavingsContributions(deps))
 		r.With(rotAuth).Post("/rotating-savings/groups/{groupId}/contributions", handlers.CreateRotatingSavingsContribution(deps))
+
+		debtAuth := auth.Middleware(cfg)
+		r.With(debtAuth).Get("/debts", handlers.ListDebts(deps))
+		r.With(debtAuth).Get("/debts/", handlers.ListDebts(deps))
+		r.With(debtAuth).Post("/debts", handlers.CreateDebt(deps))
+		r.With(debtAuth).Post("/debts/", handlers.CreateDebt(deps))
+		r.With(debtAuth).Get("/debts/{debtId}", handlers.GetDebt(deps))
+		r.With(debtAuth).Get("/debts/{debtId}/payments", handlers.ListDebtPayments(deps))
+		r.With(debtAuth).Post("/debts/{debtId}/payments", handlers.CreateDebtPayment(deps))
+		r.With(debtAuth).Get("/debts/{debtId}/installments", handlers.ListDebtInstallments(deps))
+		r.With(debtAuth).Post("/debts/{debtId}/installments", handlers.CreateDebtInstallment(deps))
+
+		invAuth := auth.Middleware(cfg)
+		r.With(invAuth).Get("/investment-accounts", handlers.ListInvestmentAccounts(deps))
+		r.With(invAuth).Get("/investment-accounts/", handlers.ListInvestmentAccounts(deps))
+		r.With(invAuth).Post("/investment-accounts", handlers.CreateInvestmentAccount(deps))
+		r.With(invAuth).Post("/investment-accounts/", handlers.CreateInvestmentAccount(deps))
+		r.With(invAuth).Get("/investment-accounts/{investmentAccountId}", handlers.GetInvestmentAccount(deps))
+		r.With(invAuth).Get("/investment-accounts/{investmentAccountId}/trades", handlers.ListTrades(deps))
+		r.With(invAuth).Post("/investment-accounts/{investmentAccountId}/trades", handlers.CreateTrade(deps))
+		r.With(invAuth).Get("/investment-accounts/{investmentAccountId}/holdings", handlers.ListHoldings(deps))
+		r.With(invAuth).Get("/investment-accounts/{investmentAccountId}/security-event-elections", handlers.ListSecurityEventElections(deps))
+		r.With(invAuth).Post("/investment-accounts/{investmentAccountId}/security-event-elections", handlers.UpsertSecurityEventElection(deps))
+
+		r.With(invAuth).Get("/securities", handlers.ListSecurities(deps))
+		r.With(invAuth).Get("/securities/", handlers.ListSecurities(deps))
+		r.With(invAuth).Post("/securities", handlers.CreateSecurity(deps))
+		r.With(invAuth).Post("/securities/", handlers.CreateSecurity(deps))
+		r.With(invAuth).Get("/securities/{securityId}", handlers.GetSecurity(deps))
+		r.With(invAuth).Get("/securities/{securityId}/prices-daily", handlers.ListSecurityPricesDaily(deps))
+		r.With(invAuth).Get("/securities/{securityId}/events", handlers.ListSecurityEvents(deps))
 
 		r.Get("/healthz", handlers.Healthz(deps))
 		r.Get("/readyz", handlers.Readyz(deps))

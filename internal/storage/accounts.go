@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"errors"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/google/uuid"
@@ -161,6 +163,235 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID string, acco
 		return nil, err
 	}
 	return &a, nil
+}
+
+func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID string, accountID string) ([]domain.AccountShare, error) {
+	if r.db == nil {
+		return nil, errors.New("database not ready")
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// require owner
+	err = withTx(ctx, pool, func(tx pgx.Tx) error {
+		return requireAccountOwner(ctx, tx, actorUserID, accountID)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT ua.id, ua.account_id, ua.user_id, ua.permission, ua.status, ua.revoked_at,
+		       ua.created_at, ua.updated_at, ua.created_by, ua.updated_by,
+		       u.email, u.phone, u.display_name
+		FROM user_accounts ua
+		JOIN users u ON u.id = ua.user_id
+		WHERE ua.account_id = $1
+		ORDER BY (ua.permission = 'owner') DESC, ua.created_at ASC
+	`, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]domain.AccountShare, 0)
+	for rows.Next() {
+		var it domain.AccountShare
+		if err := rows.Scan(
+			&it.ID,
+			&it.AccountID,
+			&it.UserID,
+			&it.Permission,
+			&it.Status,
+			&it.RevokedAt,
+			&it.CreatedAt,
+			&it.UpdatedAt,
+			&it.CreatedBy,
+			&it.UpdatedBy,
+			&it.UserEmail,
+			&it.UserPhone,
+			&it.UserDisplayName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, it)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
+func (r *AccountRepo) UpsertAccountShare(ctx context.Context, actorUserID string, accountID string, targetUserID string, permission string) (*domain.AccountShare, error) {
+	if r.db == nil {
+		return nil, errors.New("database not ready")
+	}
+	permission = strings.TrimSpace(permission)
+	if permission != "viewer" && permission != "editor" {
+		return nil, domain.ErrAccountShareInvalidInput
+	}
+	if strings.TrimSpace(accountID) == "" || strings.TrimSpace(targetUserID) == "" {
+		return nil, domain.ErrAccountShareInvalidInput
+	}
+	if targetUserID == actorUserID {
+		return nil, domain.ErrAccountShareInvalidInput
+	}
+
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	var out *domain.AccountShare
+
+	err = withTx(ctx, pool, func(tx pgx.Tx) error {
+		if err := requireAccountOwner(ctx, tx, actorUserID, accountID); err != nil {
+			return err
+		}
+
+		// prevent modifying owner
+		var existingPerm string
+		err := tx.QueryRow(ctx, `
+			SELECT permission
+			FROM user_accounts
+			WHERE account_id = $1 AND user_id = $2
+		`, accountID, targetUserID).Scan(&existingPerm)
+		if err == nil {
+			if existingPerm == "owner" {
+				return domain.ErrAccountShareInvalidInput
+			}
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+
+		uaID := uuid.NewString()
+		row := tx.QueryRow(ctx, `
+			INSERT INTO user_accounts (
+				id, account_id, user_id, permission, status, revoked_at,
+				created_at, updated_at, created_by, updated_by
+			) VALUES ($1,$2,$3,$4,'active',NULL,$5,$5,$6,$6)
+			ON CONFLICT (account_id, user_id) DO UPDATE
+			SET permission = EXCLUDED.permission,
+			    status = 'active',
+			    revoked_at = NULL,
+			    updated_at = $5,
+			    updated_by = $6
+			RETURNING id, account_id, user_id, permission, status, revoked_at, created_at, updated_at, created_by, updated_by
+		`, uaID, accountID, targetUserID, permission, now, actorUserID)
+
+		var it domain.AccountShare
+		if err := row.Scan(
+			&it.ID,
+			&it.AccountID,
+			&it.UserID,
+			&it.Permission,
+			&it.Status,
+			&it.RevokedAt,
+			&it.CreatedAt,
+			&it.UpdatedAt,
+			&it.CreatedBy,
+			&it.UpdatedBy,
+		); err != nil {
+			return err
+		}
+
+		// hydrate user fields
+		_ = tx.QueryRow(ctx, `SELECT email, phone, display_name FROM users WHERE id = $1`, targetUserID).Scan(&it.UserEmail, &it.UserPhone, &it.UserDisplayName)
+		out = &it
+
+		_ = insertAuditEvent(ctx, tx, accountID, actorUserID, "user_account.upsert", "user_account", it.ID, now, map[string]any{
+			"target_user_id": targetUserID,
+			"permission":     permission,
+			"status":         "active",
+		})
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func (r *AccountRepo) RevokeAccountShare(ctx context.Context, actorUserID string, accountID string, targetUserID string) error {
+	if r.db == nil {
+		return errors.New("database not ready")
+	}
+	if strings.TrimSpace(accountID) == "" || strings.TrimSpace(targetUserID) == "" {
+		return domain.ErrAccountShareInvalidInput
+	}
+	if targetUserID == actorUserID {
+		return domain.ErrAccountShareInvalidInput
+	}
+
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now().UTC()
+	return withTx(ctx, pool, func(tx pgx.Tx) error {
+		if err := requireAccountOwner(ctx, tx, actorUserID, accountID); err != nil {
+			return err
+		}
+
+		var uaID string
+		var perm string
+		err := tx.QueryRow(ctx, `
+			SELECT id, permission
+			FROM user_accounts
+			WHERE account_id = $1 AND user_id = $2
+		`, accountID, targetUserID).Scan(&uaID, &perm)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if perm == "owner" {
+			return domain.ErrAccountShareInvalidInput
+		}
+
+		_, err = tx.Exec(ctx, `
+			UPDATE user_accounts
+			SET status = 'revoked',
+			    revoked_at = $1,
+			    updated_at = $1,
+			    updated_by = $2
+			WHERE id = $3
+		`, now, actorUserID, uaID)
+		if err != nil {
+			return err
+		}
+
+		_ = insertAuditEvent(ctx, tx, accountID, actorUserID, "user_account.revoke", "user_account", uaID, now, map[string]any{
+			"target_user_id": targetUserID,
+			"status":         "revoked",
+		})
+
+		return nil
+	})
+}
+
+func requireAccountOwner(ctx context.Context, tx pgx.Tx, actorUserID string, accountID string) error {
+	var one int
+	err := tx.QueryRow(ctx, `
+		SELECT 1
+		FROM user_accounts ua
+		WHERE ua.user_id = $1 AND ua.account_id = $2 AND ua.status = 'active' AND ua.permission = 'owner'
+	`, actorUserID, accountID).Scan(&one)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrAccountShareForbidden
+		}
+		return err
+	}
+	return nil
 }
 
 func withTx(ctx context.Context, pool interface {
