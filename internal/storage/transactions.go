@@ -31,6 +31,13 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 	}
 
 	return withTx(ctx, pool, func(dbtx pgx.Tx) error {
+		auditAt := time.Now().UTC()
+		auditDiff := map[string]any{
+			"type":        tx.Type,
+			"amount":      tx.Amount,
+			"currency":    tx.Currency,
+			"occurred_at": tx.OccurredAt.UTC().Format(time.RFC3339Nano),
+		}
 		// Permission checks
 		switch tx.Type {
 		case "expense", "income":
@@ -124,6 +131,15 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 			if err != nil {
 				return err
 			}
+		}
+
+		// Audit (UC-007)
+		switch tx.Type {
+		case "expense", "income":
+			_ = insertAuditEvent(ctx, dbtx, *tx.AccountID, userID, "transaction.create", "transaction", tx.ID, auditAt, auditDiff)
+		case "transfer":
+			_ = insertAuditEvent(ctx, dbtx, *tx.FromAccountID, userID, "transaction.create", "transaction", tx.ID, auditAt, auditDiff)
+			_ = insertAuditEvent(ctx, dbtx, *tx.ToAccountID, userID, "transaction.create", "transaction", tx.ID, auditAt, auditDiff)
 		}
 
 		return nil
@@ -393,6 +409,7 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 
 	var updated *domain.Transaction
 	err = withTx(ctx, pool, func(dbtx pgx.Tx) error {
+		auditAt := time.Now().UTC()
 		// Fetch current (for permission check + existing values)
 		cur, err := r.GetTransaction(ctx, userID, transactionID)
 		if err != nil {
@@ -450,6 +467,27 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 		if err != nil {
 			return err
 		}
+
+		// Audit (UC-007)
+		auditDiff := map[string]any{
+			"description":  patch.Description,
+			"notes":        patch.Notes,
+			"counterparty": patch.Counterparty,
+		}
+		switch cur.Type {
+		case "expense", "income":
+			if cur.AccountID != nil {
+				_ = insertAuditEvent(ctx, dbtx, *cur.AccountID, userID, "transaction.update", "transaction", cur.ID, auditAt, auditDiff)
+			}
+		case "transfer":
+			if cur.FromAccountID != nil {
+				_ = insertAuditEvent(ctx, dbtx, *cur.FromAccountID, userID, "transaction.update", "transaction", cur.ID, auditAt, auditDiff)
+			}
+			if cur.ToAccountID != nil {
+				_ = insertAuditEvent(ctx, dbtx, *cur.ToAccountID, userID, "transaction.update", "transaction", cur.ID, auditAt, auditDiff)
+			}
+		}
+
 		updated = fetched
 		return nil
 	})
@@ -474,6 +512,7 @@ func (r *TransactionRepo) DeleteTransaction(ctx context.Context, userID string, 
 	now := time.Now().UTC()
 
 	return withTx(ctx, pool, func(dbtx pgx.Tx) error {
+		auditAt := time.Now().UTC()
 		cur, err := r.GetTransaction(ctx, userID, transactionID)
 		if err != nil {
 			return err
@@ -511,6 +550,21 @@ func (r *TransactionRepo) DeleteTransaction(ctx context.Context, userID string, 
 		}
 		if ct.RowsAffected() == 0 {
 			return domain.ErrTransactionNotFound
+		}
+
+		// Audit (UC-007)
+		switch cur.Type {
+		case "expense", "income":
+			if cur.AccountID != nil {
+				_ = insertAuditEvent(ctx, dbtx, *cur.AccountID, userID, "transaction.delete", "transaction", cur.ID, auditAt, nil)
+			}
+		case "transfer":
+			if cur.FromAccountID != nil {
+				_ = insertAuditEvent(ctx, dbtx, *cur.FromAccountID, userID, "transaction.delete", "transaction", cur.ID, auditAt, nil)
+			}
+			if cur.ToAccountID != nil {
+				_ = insertAuditEvent(ctx, dbtx, *cur.ToAccountID, userID, "transaction.delete", "transaction", cur.ID, auditAt, nil)
+			}
 		}
 		return nil
 	})

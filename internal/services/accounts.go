@@ -14,6 +14,11 @@ type AccountService interface {
 	CreateAccount(ctx context.Context, userID string, req CreateAccountRequest) (*domain.Account, error)
 	ListAccounts(ctx context.Context, userID string) ([]domain.Account, error)
 	GetAccount(ctx context.Context, userID string, accountID string) (*domain.Account, error)
+
+	// UC-007 Shared Account
+	ListAccountShares(ctx context.Context, userID string, accountID string) ([]domain.AccountShare, error)
+	UpsertAccountShare(ctx context.Context, userID string, accountID string, login string, permission string) (*domain.AccountShare, error)
+	RevokeAccountShare(ctx context.Context, userID string, accountID string, targetUserID string) error
 }
 
 type CreateAccountRequest struct {
@@ -25,10 +30,11 @@ type CreateAccountRequest struct {
 
 type accountService struct {
 	repo domain.AccountRepository
+	userRepo domain.UserRepository
 }
 
-func NewAccountService(repo domain.AccountRepository) AccountService {
-	return &accountService{repo: repo}
+func NewAccountService(repo domain.AccountRepository, userRepo domain.UserRepository) AccountService {
+	return &accountService{repo: repo, userRepo: userRepo}
 }
 
 func (s *accountService) ListAccounts(ctx context.Context, userID string) ([]domain.Account, error) {
@@ -103,6 +109,63 @@ func (s *accountService) CreateAccount(ctx context.Context, userID string, req C
 	}
 
 	return &account, nil
+}
+
+func (s *accountService) ListAccountShares(ctx context.Context, userID string, accountID string) ([]domain.AccountShare, error) {
+	// Ensure account exists & user can access it at all (avoid leaking)
+	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListAccountShares(ctx, userID, accountID)
+}
+
+func (s *accountService) UpsertAccountShare(ctx context.Context, userID string, accountID string, login string, permission string) (*domain.AccountShare, error) {
+	login = strings.TrimSpace(login)
+	permission = strings.TrimSpace(permission)
+	if login == "" {
+		return nil, domain.ErrAccountShareInvalidInput
+	}
+	if permission != "viewer" && permission != "editor" {
+		return nil, domain.ErrAccountShareInvalidInput
+	}
+
+	// Ensure account exists & user can access it at all (avoid leaking)
+	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+		return nil, err
+	}
+
+	// Lookup target user
+	var target *domain.UserWithPassword
+	var err error
+	if strings.Contains(login, "@") {
+		target, err = s.userRepo.FindUserByEmail(ctx, strings.ToLower(login))
+	} else {
+		target, err = s.userRepo.FindUserByPhone(ctx, login)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if target == nil {
+		return nil, domain.ErrUserNotFound
+	}
+	if target.ID == userID {
+		return nil, domain.ErrAccountShareInvalidInput
+	}
+
+	return s.repo.UpsertAccountShare(ctx, userID, accountID, target.ID, permission)
+}
+
+func (s *accountService) RevokeAccountShare(ctx context.Context, userID string, accountID string, targetUserID string) error {
+	if strings.TrimSpace(targetUserID) == "" {
+		return domain.ErrAccountShareInvalidInput
+	}
+
+	// Ensure account exists & user can access it at all (avoid leaking)
+	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+		return err
+	}
+
+	return s.repo.RevokeAccountShare(ctx, userID, accountID, targetUserID)
 }
 
 func isValidAccountType(t string) bool {

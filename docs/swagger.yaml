@@ -67,6 +67,122 @@ definitions:
       user_id:
         type: string
     type: object
+  domain.Debt:
+    properties:
+      accrued_interest:
+        type: string
+      client_id:
+        type: string
+      closed_at:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      direction:
+        type: string
+      due_date:
+        type: string
+      id:
+        type: string
+      interest_rate:
+        type: string
+      interest_rule:
+        type: string
+      name:
+        type: string
+      outstanding_principal:
+        type: string
+      principal:
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  domain.DebtInstallment:
+    properties:
+      amount_due:
+        type: string
+      amount_paid:
+        type: string
+      debt_id:
+        type: string
+      due_date:
+        type: string
+      id:
+        type: string
+      installment_no:
+        type: integer
+      status:
+        type: string
+    type: object
+  domain.DebtPaymentLink:
+    properties:
+      created_at:
+        type: string
+      debt_id:
+        type: string
+      id:
+        type: string
+      interest_paid:
+        type: string
+      principal_paid:
+        type: string
+      transaction_id:
+        type: string
+    type: object
+  domain.Holding:
+    properties:
+      as_of:
+        type: string
+      avg_cost:
+        type: string
+      broker_account_id:
+        type: string
+      cost_basis_total:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      market_price:
+        type: string
+      market_value:
+        type: string
+      quantity:
+        type: string
+      security_id:
+        type: string
+      source_of_truth:
+        type: string
+      unrealized_pnl:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.InvestmentAccount:
+    properties:
+      account_id:
+        type: string
+      broker_name:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      sync_enabled:
+        type: boolean
+      sync_settings: {}
+      updated_at:
+        type: string
+    type: object
   domain.RotatingSavingsContribution:
     properties:
       amount:
@@ -152,6 +268,124 @@ definitions:
       updated_at:
         type: string
     type: object
+  domain.Security:
+    properties:
+      asset_class:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      symbol:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.SecurityEvent:
+    properties:
+      cash_amount_per_share:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      effective_date:
+        type: string
+      event_type:
+        type: string
+      ex_date:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      pay_date:
+        type: string
+      ratio_denominator:
+        type: string
+      ratio_numerator:
+        type: string
+      record_date:
+        type: string
+      security_id:
+        type: string
+      source:
+        type: string
+      source_event_id:
+        type: string
+      subscription_price:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  domain.SecurityEventElection:
+    properties:
+      broker_account_id:
+        type: string
+      confirmed_at:
+        type: string
+      created_at:
+        type: string
+      elected_quantity:
+        type: string
+      entitled_quantity:
+        type: string
+      entitlement_date:
+        type: string
+      holding_quantity_at_entitlement_date:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      security_event_id:
+        type: string
+      security_id:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  domain.SecurityPriceDaily:
+    properties:
+      adj_close:
+        type: string
+      close:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      fetched_at:
+        type: string
+      high:
+        type: string
+      id:
+        type: string
+      low:
+        type: string
+      open:
+        type: string
+      price_date:
+        type: string
+      security_id:
+        type: string
+      source:
+        type: string
+      source_row_id:
+        type: string
+      updated_at:
+        type: string
+      volume:
+        type: string
+    type: object
   domain.Tag:
     properties:
       color:
@@ -165,6 +399,39 @@ definitions:
       updated_at:
         type: string
       user_id:
+        type: string
+    type: object
+  domain.Trade:
+    properties:
+      broker_account_id:
+        type: string
+      client_id:
+        type: string
+      created_at:
+        type: string
+      fee_transaction_id:
+        type: string
+      fees:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      price:
+        type: string
+      quantity:
+        type: string
+      security_id:
+        type: string
+      side:
+        type: string
+      tax_transaction_id:
+        type: string
+      taxes:
+        type: string
+      updated_at:
         type: string
     type: object
   domain.Transaction:
@@ -385,6 +652,63 @@ definitions:
       type:
         type: string
     type: object
+  services.CreateDebtInstallmentRequest:
+    properties:
+      amount_due:
+        type: string
+      amount_paid:
+        type: string
+      due_date:
+        type: string
+      installment_no:
+        type: integer
+      status:
+        type: string
+    type: object
+  services.CreateDebtPaymentRequest:
+    properties:
+      interest_paid:
+        type: string
+      principal_paid:
+        type: string
+      transaction_id:
+        type: string
+    type: object
+  services.CreateDebtRequest:
+    properties:
+      client_id:
+        type: string
+      currency:
+        type: string
+      direction:
+        type: string
+      due_date:
+        type: string
+      interest_rate:
+        type: string
+      interest_rule:
+        type: string
+      name:
+        type: string
+      principal:
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+    type: object
+  services.CreateInvestmentAccountRequest:
+    properties:
+      account_id:
+        type: string
+      broker_name:
+        type: string
+      currency:
+        type: string
+      sync_enabled:
+        type: boolean
+      sync_settings: {}
+    type: object
   services.CreateRotatingSavingsContributionRequest:
     properties:
       account_id:
@@ -448,11 +772,53 @@ definitions:
       term_months:
         type: integer
     type: object
+  services.CreateSecurityRequest:
+    properties:
+      asset_class:
+        type: string
+      currency:
+        type: string
+      name:
+        type: string
+      symbol:
+        type: string
+    type: object
   services.CreateTagRequest:
     properties:
       color:
         type: string
       name:
+        type: string
+    type: object
+  services.CreateTradeRequest:
+    properties:
+      client_id:
+        type: string
+      currency:
+        type: string
+      fee_transaction_id:
+        type: string
+      fees:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      occurred_date:
+        type: string
+      occurred_time:
+        type: string
+      price:
+        type: string
+      quantity:
+        type: string
+      security_id:
+        type: string
+      side:
+        type: string
+      tax_transaction_id:
+        type: string
+      taxes:
         type: string
     type: object
   services.CreateTransactionLineItemRequest:
@@ -530,6 +896,17 @@ definitions:
       password:
         type: string
       phone:
+        type: string
+    type: object
+  services.UpsertSecurityEventElectionRequest:
+    properties:
+      elected_quantity:
+        type: string
+      note:
+        type: string
+      security_event_id:
+        type: string
+      status:
         type: string
     type: object
 info:
@@ -933,6 +1310,244 @@ paths:
       summary: Connectivity probe
       tags:
       - meta
+  /debts:
+    get:
+      description: List debts owned by current user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Debt'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List debts
+      tags:
+      - debts
+    post:
+      consumes:
+      - application/json
+      description: Create a new debt owned by current user.
+      parameters:
+      - description: Create debt request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateDebtRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Debt'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Create debt
+      tags:
+      - debts
+  /debts/{debtId}:
+    get:
+      description: Get a single debt owned by current user.
+      parameters:
+      - description: Debt ID
+        in: path
+        name: debtId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Debt'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Get debt
+      tags:
+      - debts
+  /debts/{debtId}/installments:
+    get:
+      description: List installment schedule for a debt.
+      parameters:
+      - description: Debt ID
+        in: path
+        name: debtId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.DebtInstallment'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List debt installments
+      tags:
+      - debts
+    post:
+      consumes:
+      - application/json
+      description: Create a single installment schedule row for a debt.
+      parameters:
+      - description: Debt ID
+        in: path
+        name: debtId
+        required: true
+        type: string
+      - description: Create debt installment request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateDebtInstallmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.DebtInstallment'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Create debt installment
+      tags:
+      - debts
+  /debts/{debtId}/payments:
+    get:
+      description: List payment links for a debt.
+      parameters:
+      - description: Debt ID
+        in: path
+        name: debtId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.DebtPaymentLink'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List debt payments
+      tags:
+      - debts
+    post:
+      consumes:
+      - application/json
+      description: Link a transaction as a payment/collection for a debt and update
+        outstanding.
+      parameters:
+      - description: Debt ID
+        in: path
+        name: debtId
+        required: true
+        type: string
+      - description: Create debt payment request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateDebtPaymentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.DebtPaymentLink'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Create debt payment link
+      tags:
+      - debts
   /healthz:
     get:
       description: Liveness check for goen-api.
@@ -946,6 +1561,312 @@ paths:
       summary: Health check
       tags:
       - meta
+  /investment-accounts:
+    get:
+      description: List investment accounts accessible by current user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.InvestmentAccount'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List investment accounts
+      tags:
+      - investments
+    post:
+      consumes:
+      - application/json
+      description: Create a 1-1 investment extension for a broker account.
+      parameters:
+      - description: Create investment account request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateInvestmentAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.InvestmentAccount'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Create investment account
+      tags:
+      - investments
+  /investment-accounts/{investmentAccountId}:
+    get:
+      description: Get a single investment account.
+      parameters:
+      - description: Investment account ID
+        in: path
+        name: investmentAccountId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.InvestmentAccount'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Get investment account
+      tags:
+      - investments
+  /investment-accounts/{investmentAccountId}/holdings:
+    get:
+      description: List holdings for a broker investment account.
+      parameters:
+      - description: Investment account ID
+        in: path
+        name: investmentAccountId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Holding'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List holdings
+      tags:
+      - investments
+  /investment-accounts/{investmentAccountId}/security-event-elections:
+    get:
+      description: List elections for a broker investment account.
+      parameters:
+      - description: Investment account ID
+        in: path
+        name: investmentAccountId
+        required: true
+        type: string
+      - description: 'Filter by status: draft|confirmed|cancelled'
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.SecurityEventElection'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List security event elections
+      tags:
+      - investments
+    post:
+      consumes:
+      - application/json
+      description: Create or update an election for the given broker investment account.
+      parameters:
+      - description: Investment account ID
+        in: path
+        name: investmentAccountId
+        required: true
+        type: string
+      - description: Upsert election request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.UpsertSecurityEventElectionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.SecurityEventElection'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Upsert security event election
+      tags:
+      - investments
+  /investment-accounts/{investmentAccountId}/trades:
+    get:
+      description: List trades for a broker investment account.
+      parameters:
+      - description: Investment account ID
+        in: path
+        name: investmentAccountId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Trade'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List trades
+      tags:
+      - investments
+    post:
+      consumes:
+      - application/json
+      description: Create a trade; optionally auto-creates fee/tax expense transactions.
+      parameters:
+      - description: Investment account ID
+        in: path
+        name: investmentAccountId
+        required: true
+        type: string
+      - description: Create trade request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateTradeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Trade'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Create trade
+      tags:
+      - investments
   /ping:
     get:
       description: Lightweight endpoint for browser/app connectivity test.
@@ -1227,6 +2148,175 @@ paths:
       summary: Get savings instrument
       tags:
       - savings
+  /securities:
+    get:
+      description: List securities from global catalog.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Security'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List securities
+      tags:
+      - investments
+    post:
+      consumes:
+      - application/json
+      description: Create a security in global catalog (MVP).
+      parameters:
+      - description: Create security request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateSecurityRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Security'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Create security
+      tags:
+      - investments
+  /securities/{securityId}:
+    get:
+      description: Get a single security.
+      parameters:
+      - description: Security ID
+        in: path
+        name: securityId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Security'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Get security
+      tags:
+      - investments
+  /securities/{securityId}/events:
+    get:
+      description: Read-only security events (populated by market data service).
+      parameters:
+      - description: Security ID
+        in: path
+        name: securityId
+        required: true
+        type: string
+      - description: From date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: To date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.SecurityEvent'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List security events
+      tags:
+      - investments
+  /securities/{securityId}/prices-daily:
+    get:
+      description: Read-only daily prices (populated by market data service).
+      parameters:
+      - description: Security ID
+        in: path
+        name: securityId
+        required: true
+        type: string
+      - description: From date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: To date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.SecurityPriceDaily'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List daily prices for security
+      tags:
+      - investments
   /tags:
     get:
       description: List tags owned by current user.
@@ -1511,6 +2601,44 @@ paths:
       summary: Patch transaction
       tags:
       - transactions
+  /transactions/{transactionId}/debt-links:
+    get:
+      description: List debt payment links for a transaction accessible by current
+        user.
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: transactionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.DebtPaymentLink'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List debt links for transaction
+      tags:
+      - debts
 schemes:
 - http
 - https

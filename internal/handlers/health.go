@@ -17,12 +17,15 @@ type Deps struct {
 	Redis       *storage.Redis
 	AuthService services.AuthService
 	AccountService services.AccountService
+	AuditService services.AuditService
 	TransactionService services.TransactionService
 	CategoryService services.CategoryService
 	TagService services.TagService
 	BudgetService services.BudgetService
 	SavingsService services.SavingsService
 	RotatingSavingsService services.RotatingSavingsService
+	DebtService services.DebtService
+	InvestmentService services.InvestmentService
 }
 
 type HealthResponse struct {
