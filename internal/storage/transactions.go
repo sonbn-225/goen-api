@@ -47,6 +47,9 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 			if err := requireAccountPermission(ctx, dbtx, userID, *tx.AccountID, true); err != nil {
 				return err
 			}
+			if err := requireAccountActive(ctx, dbtx, *tx.AccountID); err != nil {
+				return err
+			}
 		case "transfer":
 			if tx.FromAccountID == nil || strings.TrimSpace(*tx.FromAccountID) == "" {
 				return errors.New("from_account_id is required")
@@ -58,6 +61,12 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 				return err
 			}
 			if err := requireAccountPermission(ctx, dbtx, userID, *tx.ToAccountID, true); err != nil {
+				return err
+			}
+			if err := requireAccountActive(ctx, dbtx, *tx.FromAccountID); err != nil {
+				return err
+			}
+			if err := requireAccountActive(ctx, dbtx, *tx.ToAccountID); err != nil {
 				return err
 			}
 		default:
@@ -144,6 +153,25 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 
 		return nil
 	})
+}
+
+func requireAccountActive(ctx context.Context, dbtx pgx.Tx, accountID string) error {
+	var status string
+	err := dbtx.QueryRow(ctx, `
+		SELECT status
+		FROM accounts
+		WHERE id = $1 AND deleted_at IS NULL
+	`, accountID).Scan(&status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errors.New("account not found")
+		}
+		return err
+	}
+	if status != "active" {
+		return errors.New("account is closed")
+	}
+	return nil
 }
 
 func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, transactionID string) (*domain.Transaction, error) {
