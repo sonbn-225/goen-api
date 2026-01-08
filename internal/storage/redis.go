@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -54,4 +55,14 @@ func (r *Redis) Probe(ctx context.Context) (map[string]any, error) {
 		"key":   key,
 		"value": got,
 	}, nil
+}
+
+func (r *Redis) XAdd(ctx context.Context, stream string, values map[string]any) (string, error) {
+	if r == nil || r.client == nil {
+		return "", errors.New("redis not ready")
+	}
+	if stream == "" {
+		return "", errors.New("stream is required")
+	}
+	return r.client.XAdd(ctx, &redis.XAddArgs{Stream: stream, Values: values}).Result()
 }

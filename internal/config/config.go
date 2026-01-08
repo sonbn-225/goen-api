@@ -20,6 +20,7 @@ type Config struct {
 	CORSOrigins         []string
 	JWTSecret           string
 	JWTAccessTTLMinutes int
+	MarketDataStatusURL string
 }
 
 func Load() (*Config, error) {
@@ -45,6 +46,10 @@ func Load() (*Config, error) {
 
 	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
 	cfg.RedisURL = os.Getenv("REDIS_URL")
+
+	// Optional: goen-python status endpoint for rate limit visibility.
+	// In docker-compose, goen-python service is typically reachable by name on the shared network.
+	cfg.MarketDataStatusURL = getenvDefault("MARKET_DATA_STATUS_URL", "http://goen-market-data:8090/status")
 
 	cfg.JWTSecret = os.Getenv("JWT_SECRET")
 	if cfg.JWTSecret == "" {

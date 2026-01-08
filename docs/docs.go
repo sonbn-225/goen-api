@@ -1601,6 +1601,243 @@ const docTemplate = `{
                 }
             }
         },
+        "/market-data/vnstock/status": {
+            "get": {
+                "description": "Returns global worker rate-limit remaining and market sync last timestamps.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "investments"
+                ],
+                "summary": "Global market-data worker status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.GlobalMarketDataStatusResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/market-data/vnstock/sync-all": {
+            "post": {
+                "description": "Enqueue a vnstock job; worker will sync securities catalog then fan-out daily prices and events jobs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "investments"
+                ],
+                "summary": "Enqueue market-wide sync (vnstock)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bypass caching (1/true)",
+                        "name": "force",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Full price history (only applies when include_prices=1)",
+                        "name": "full",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Include daily prices (default: 1)",
+                        "name": "include_prices",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Include events (default: 1)",
+                        "name": "include_events",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RefreshMarketDataResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/market-data/vnstock/sync-symbol/{symbol}": {
+            "post": {
+                "description": "Enqueue vnstock jobs for a ticker symbol (prices/events). Requires the symbol to exist in securities catalog.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "investments"
+                ],
+                "summary": "Enqueue vnstock refresh for a symbol",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Ticker symbol (e.g. FPT)",
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Include daily prices (default: 1)",
+                        "name": "include_prices",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Include events (default: 1)",
+                        "name": "include_events",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bypass caching (1/true)",
+                        "name": "force",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RefreshMarketDataManyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/market-data/vnstock/sync-symbols": {
+            "post": {
+                "description": "Enqueue vnstock jobs for a list of ticker symbols. Requires symbols to exist in securities catalog.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "investments"
+                ],
+                "summary": "Enqueue vnstock refresh for a list of symbols",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bypass caching (1/true)",
+                        "name": "force",
+                        "in": "query"
+                    },
+                    {
+                        "description": "Symbols request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.VnstockSyncSymbolsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RefreshMarketDataManyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            }
+        },
         "/ping": {
             "get": {
                 "description": "Lightweight endpoint for browser/app connectivity test.",
@@ -2218,6 +2455,118 @@ const docTemplate = `{
                 }
             }
         },
+        "/securities/{securityId}/events/refresh": {
+            "post": {
+                "description": "Enqueue a vnstock job; worker will fetch corporate actions/events and upsert into security_events.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "investments"
+                ],
+                "summary": "Enqueue refresh security events",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "securityId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RefreshSecurityEventsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/securities/{securityId}/market-data/status": {
+            "get": {
+                "description": "Returns last sync timestamps, cooldown to next allowed sync, and current worker rate-limit remaining (best-effort).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "investments"
+                ],
+                "summary": "Market data status for a security",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "securityId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SecurityMarketDataStatusResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            }
+        },
         "/securities/{securityId}/prices-daily": {
             "get": {
                 "description": "Read-only daily prices (populated by market data service).",
@@ -2273,6 +2622,83 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/securities/{securityId}/prices-daily/refresh": {
+            "post": {
+                "description": "Enqueue a vnstock job; worker will fetch OHLCV and upsert into security_price_dailies.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "investments"
+                ],
+                "summary": "Enqueue refresh daily prices for security",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "securityId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "From date (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To date (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch full history (1/true). If set and from is empty, worker uses VNSTOCK_FULL_HISTORY_START_DATE.",
+                        "name": "full",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RefreshPricesDailyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/apierror.Envelope"
                         }
@@ -3266,16 +3692,13 @@ const docTemplate = `{
                 "security_id": {
                     "type": "string"
                 },
-                "source": {
-                    "type": "string"
-                },
-                "source_event_id": {
-                    "type": "string"
-                },
                 "subscription_price": {
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                },
+                "vnstock_event_id": {
                     "type": "string"
                 }
             }
@@ -3330,19 +3753,10 @@ const docTemplate = `{
         "domain.SecurityPriceDaily": {
             "type": "object",
             "properties": {
-                "adj_close": {
-                    "type": "string"
-                },
                 "close": {
                     "type": "string"
                 },
                 "created_at": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "fetched_at": {
                     "type": "string"
                 },
                 "high": {
@@ -3361,12 +3775,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "security_id": {
-                    "type": "string"
-                },
-                "source": {
-                    "type": "string"
-                },
-                "source_row_id": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -3599,6 +4007,17 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.GlobalMarketDataStatusResponse": {
+            "type": "object",
+            "properties": {
+                "market_sync": {
+                    "$ref": "#/definitions/handlers.MarketDataSyncState"
+                },
+                "rate_limit": {
+                    "$ref": "#/definitions/handlers.MarketDataRateLimit"
+                }
+            }
+        },
         "handlers.HealthResponse": {
             "type": "object",
             "properties": {
@@ -3609,6 +4028,67 @@ const docTemplate = `{
                     }
                 },
                 "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.MarketDataRateLimit": {
+            "type": "object",
+            "properties": {
+                "hour_reset_in_seconds": {
+                    "type": "number"
+                },
+                "minute_reset_in_seconds": {
+                    "type": "number"
+                },
+                "per_hour": {
+                    "type": "integer"
+                },
+                "per_minute": {
+                    "type": "integer"
+                },
+                "remaining_hour": {
+                    "type": "integer"
+                },
+                "remaining_minute": {
+                    "type": "integer"
+                },
+                "used_hour": {
+                    "type": "integer"
+                },
+                "used_minute": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.MarketDataSyncState": {
+            "type": "object",
+            "properties": {
+                "cooldown_seconds": {
+                    "type": "integer"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "last_failure_at": {
+                    "type": "string"
+                },
+                "last_started_at": {
+                    "type": "string"
+                },
+                "last_status": {
+                    "type": "string"
+                },
+                "last_success_at": {
+                    "type": "string"
+                },
+                "min_interval_seconds": {
+                    "type": "integer"
+                },
+                "next_due_at": {
+                    "type": "string"
+                },
+                "sync_key": {
                     "type": "string"
                 }
             }
@@ -3630,6 +4110,79 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.RefreshMarketDataManyResponse": {
+            "type": "object",
+            "properties": {
+                "enqueued": {
+                    "type": "integer"
+                },
+                "message_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "not_found_symbols": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stream": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.RefreshMarketDataResponse": {
+            "type": "object",
+            "properties": {
+                "message_id": {
+                    "type": "string"
+                },
+                "stream": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.RefreshPricesDailyResponse": {
+            "type": "object",
+            "properties": {
+                "message_id": {
+                    "type": "string"
+                },
+                "stream": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.RefreshSecurityEventsResponse": {
+            "type": "object",
+            "properties": {
+                "message_id": {
+                    "type": "string"
+                },
+                "stream": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.SecurityMarketDataStatusResponse": {
+            "type": "object",
+            "properties": {
+                "prices_daily": {
+                    "$ref": "#/definitions/handlers.MarketDataSyncState"
+                },
+                "rate_limit": {
+                    "$ref": "#/definitions/handlers.MarketDataRateLimit"
+                },
+                "security_events": {
+                    "$ref": "#/definitions/handlers.MarketDataSyncState"
+                },
+                "security_id": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.TransactionListResponse": {
             "type": "object",
             "properties": {
@@ -3641,6 +4194,26 @@ const docTemplate = `{
                 },
                 "next_cursor": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.VnstockSyncSymbolsRequest": {
+            "type": "object",
+            "properties": {
+                "force": {
+                    "type": "boolean"
+                },
+                "include_events": {
+                    "type": "boolean"
+                },
+                "include_prices": {
+                    "type": "boolean"
+                },
+                "symbols": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },

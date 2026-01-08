@@ -7,24 +7,24 @@ import (
 )
 
 var (
-	ErrInvestmentAccountNotFound      = errors.New("investment account not found")
-	ErrSecurityNotFound               = errors.New("security not found")
-	ErrTradeNotFound                  = errors.New("trade not found")
-	ErrHoldingNotFound                = errors.New("holding not found")
-	ErrSecurityEventNotFound          = errors.New("security event not found")
-	ErrSecurityEventElectionNotFound  = errors.New("security event election not found")
-	ErrInvestmentForbidden            = errors.New("investment forbidden")
+	ErrInvestmentAccountNotFound     = errors.New("investment account not found")
+	ErrSecurityNotFound              = errors.New("security not found")
+	ErrTradeNotFound                 = errors.New("trade not found")
+	ErrHoldingNotFound               = errors.New("holding not found")
+	ErrSecurityEventNotFound         = errors.New("security event not found")
+	ErrSecurityEventElectionNotFound = errors.New("security event election not found")
+	ErrInvestmentForbidden           = errors.New("investment forbidden")
 )
 
 type InvestmentAccount struct {
-	ID          string     `json:"id"`
-	AccountID   string     `json:"account_id"`
-	BrokerName  *string    `json:"broker_name,omitempty"`
-	Currency    string     `json:"currency"`
-	SyncEnabled bool       `json:"sync_enabled"`
+	ID           string    `json:"id"`
+	AccountID    string    `json:"account_id"`
+	BrokerName   *string   `json:"broker_name,omitempty"`
+	Currency     string    `json:"currency"`
+	SyncEnabled  bool      `json:"sync_enabled"`
 	SyncSettings any       `json:"sync_settings,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type Security struct {
@@ -38,41 +38,35 @@ type Security struct {
 }
 
 type SecurityPriceDaily struct {
-	ID         string     `json:"id"`
-	SecurityID string     `json:"security_id"`
-	PriceDate  string     `json:"price_date"`
-	Open       *string    `json:"open,omitempty"`
-	High       *string    `json:"high,omitempty"`
-	Low        *string    `json:"low,omitempty"`
-	Close      string     `json:"close"`
-	AdjClose   *string    `json:"adj_close,omitempty"`
-	Volume     *string    `json:"volume,omitempty"`
-	Currency   *string    `json:"currency,omitempty"`
-	Source     string     `json:"source"`
-	SourceRowID *string   `json:"source_row_id,omitempty"`
-	FetchedAt  *time.Time `json:"fetched_at,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	ID         string    `json:"id"`
+	SecurityID string    `json:"security_id"`
+	PriceDate  string    `json:"price_date"`
+	Open       *string   `json:"open,omitempty"`
+	High       *string   `json:"high,omitempty"`
+	Low        *string   `json:"low,omitempty"`
+	Close      string    `json:"close"`
+	Volume     *string   `json:"volume,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type SecurityEvent struct {
 	ID                 string    `json:"id"`
-	SecurityID          string    `json:"security_id"`
-	EventType           string    `json:"event_type"`
-	ExDate              *string   `json:"ex_date,omitempty"`
-	RecordDate          *string   `json:"record_date,omitempty"`
-	PayDate             *string   `json:"pay_date,omitempty"`
-	EffectiveDate       *string   `json:"effective_date,omitempty"`
-	CashAmountPerShare  *string   `json:"cash_amount_per_share,omitempty"`
-	RatioNumerator      *string   `json:"ratio_numerator,omitempty"`
-	RatioDenominator    *string   `json:"ratio_denominator,omitempty"`
-	SubscriptionPrice   *string   `json:"subscription_price,omitempty"`
-	Currency            *string   `json:"currency,omitempty"`
-	Source              string    `json:"source"`
-	SourceEventID       *string   `json:"source_event_id,omitempty"`
-	Note                *string   `json:"note,omitempty"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	SecurityID         string    `json:"security_id"`
+	EventType          string    `json:"event_type"`
+	ExDate             *string   `json:"ex_date,omitempty"`
+	RecordDate         *string   `json:"record_date,omitempty"`
+	PayDate            *string   `json:"pay_date,omitempty"`
+	EffectiveDate      *string   `json:"effective_date,omitempty"`
+	CashAmountPerShare *string   `json:"cash_amount_per_share,omitempty"`
+	RatioNumerator     *string   `json:"ratio_numerator,omitempty"`
+	RatioDenominator   *string   `json:"ratio_denominator,omitempty"`
+	SubscriptionPrice  *string   `json:"subscription_price,omitempty"`
+	Currency           *string   `json:"currency,omitempty"`
+	VnstockEventID     *string   `json:"vnstock_event_id,omitempty"`
+	Note               *string   `json:"note,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type SecurityEventElection struct {
@@ -93,37 +87,37 @@ type SecurityEventElection struct {
 }
 
 type Trade struct {
-	ID               string     `json:"id"`
-	ClientID         *string    `json:"client_id,omitempty"`
-	BrokerAccountID  string     `json:"broker_account_id"`
-	SecurityID       string     `json:"security_id"`
-	FeeTransactionID *string    `json:"fee_transaction_id,omitempty"`
-	TaxTransactionID *string    `json:"tax_transaction_id,omitempty"`
-	Side             string     `json:"side"`
-	Quantity         string     `json:"quantity"`
-	Price            string     `json:"price"`
-	Fees             string     `json:"fees"`
-	Taxes            string     `json:"taxes"`
-	OccurredAt       time.Time  `json:"occurred_at"`
-	Note             *string    `json:"note,omitempty"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	ID               string    `json:"id"`
+	ClientID         *string   `json:"client_id,omitempty"`
+	BrokerAccountID  string    `json:"broker_account_id"`
+	SecurityID       string    `json:"security_id"`
+	FeeTransactionID *string   `json:"fee_transaction_id,omitempty"`
+	TaxTransactionID *string   `json:"tax_transaction_id,omitempty"`
+	Side             string    `json:"side"`
+	Quantity         string    `json:"quantity"`
+	Price            string    `json:"price"`
+	Fees             string    `json:"fees"`
+	Taxes            string    `json:"taxes"`
+	OccurredAt       time.Time `json:"occurred_at"`
+	Note             *string   `json:"note,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type Holding struct {
-	ID           string     `json:"id"`
-	BrokerAccountID string  `json:"broker_account_id"`
-	SecurityID    string    `json:"security_id"`
-	Quantity      string    `json:"quantity"`
-	CostBasisTotal *string  `json:"cost_basis_total,omitempty"`
-	AvgCost       *string   `json:"avg_cost,omitempty"`
-	MarketPrice   *string   `json:"market_price,omitempty"`
-	MarketValue   *string   `json:"market_value,omitempty"`
-	UnrealizedPnL *string   `json:"unrealized_pnl,omitempty"`
-	AsOf          *time.Time `json:"as_of,omitempty"`
-	SourceOfTruth string    `json:"source_of_truth"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID              string     `json:"id"`
+	BrokerAccountID string     `json:"broker_account_id"`
+	SecurityID      string     `json:"security_id"`
+	Quantity        string     `json:"quantity"`
+	CostBasisTotal  *string    `json:"cost_basis_total,omitempty"`
+	AvgCost         *string    `json:"avg_cost,omitempty"`
+	MarketPrice     *string    `json:"market_price,omitempty"`
+	MarketValue     *string    `json:"market_value,omitempty"`
+	UnrealizedPnL   *string    `json:"unrealized_pnl,omitempty"`
+	AsOf            *time.Time `json:"as_of,omitempty"`
+	SourceOfTruth   string     `json:"source_of_truth"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 type InvestmentRepository interface {

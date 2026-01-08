@@ -204,7 +204,7 @@ func (r *InvestmentRepo) ListSecurityPrices(ctx context.Context, securityID stri
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT id, security_id, price_date, open, high, low, close, adj_close, volume, currency, source, source_row_id, fetched_at, created_at, updated_at
+		SELECT id, security_id, price_date, open, high, low, close, volume, created_at, updated_at
 		FROM security_price_dailies
 		WHERE security_id = $1
 		  AND ($2::date IS NULL OR price_date >= $2::date)
@@ -220,7 +220,7 @@ func (r *InvestmentRepo) ListSecurityPrices(ctx context.Context, securityID stri
 	for rows.Next() {
 		var p domain.SecurityPriceDaily
 		var priceDate time.Time
-		var open, high, low, close, adjClose, volume sql.NullString
+		var open, high, low, close, volume sql.NullString
 		if err := rows.Scan(
 			&p.ID,
 			&p.SecurityID,
@@ -229,12 +229,7 @@ func (r *InvestmentRepo) ListSecurityPrices(ctx context.Context, securityID stri
 			&high,
 			&low,
 			&close,
-			&adjClose,
 			&volume,
-			&p.Currency,
-			&p.Source,
-			&p.SourceRowID,
-			&p.FetchedAt,
 			&p.CreatedAt,
 			&p.UpdatedAt,
 		); err != nil {
@@ -247,7 +242,6 @@ func (r *InvestmentRepo) ListSecurityPrices(ctx context.Context, securityID stri
 		if close.Valid {
 			p.Close = close.String
 		}
-		p.AdjClose = nullStringPtr(adjClose)
 		p.Volume = nullStringPtr(volume)
 		out = append(out, p)
 	}
@@ -266,7 +260,7 @@ func (r *InvestmentRepo) ListSecurityEvents(ctx context.Context, securityID stri
 	rows, err := pool.Query(ctx, `
 		SELECT id, security_id, event_type, ex_date, record_date, pay_date, effective_date,
 		       cash_amount_per_share, ratio_numerator, ratio_denominator, subscription_price,
-		       currency, source, source_event_id, note, created_at, updated_at
+		       currency, vnstock_event_id, note, created_at, updated_at
 		FROM security_events
 		WHERE security_id = $1
 		  AND ($2::date IS NULL OR COALESCE(effective_date, ex_date, record_date, pay_date) >= $2::date)
@@ -296,8 +290,7 @@ func (r *InvestmentRepo) ListSecurityEvents(ctx context.Context, securityID stri
 			&ratioDen,
 			&subPrice,
 			&e.Currency,
-			&e.Source,
-			&e.SourceEventID,
+			&e.VnstockEventID,
 			&e.Note,
 			&e.CreatedAt,
 			&e.UpdatedAt,
@@ -330,7 +323,7 @@ func (r *InvestmentRepo) GetSecurityEvent(ctx context.Context, securityEventID s
 	row := pool.QueryRow(ctx, `
 		SELECT id, security_id, event_type, ex_date, record_date, pay_date, effective_date,
 		       cash_amount_per_share, ratio_numerator, ratio_denominator, subscription_price,
-		       currency, source, source_event_id, note, created_at, updated_at
+		       currency, vnstock_event_id, note, created_at, updated_at
 		FROM security_events
 		WHERE id = $1
 	`, securityEventID)
@@ -351,8 +344,7 @@ func (r *InvestmentRepo) GetSecurityEvent(ctx context.Context, securityEventID s
 		&ratioDen,
 		&subPrice,
 		&e.Currency,
-		&e.Source,
-		&e.SourceEventID,
+		&e.VnstockEventID,
 		&e.Note,
 		&e.CreatedAt,
 		&e.UpdatedAt,
@@ -362,14 +354,14 @@ func (r *InvestmentRepo) GetSecurityEvent(ctx context.Context, securityEventID s
 		}
 		return nil, err
 	}
-		e.ExDate = nullTimeToDatePtr(exDate)
-		e.RecordDate = nullTimeToDatePtr(recordDate)
-		e.PayDate = nullTimeToDatePtr(payDate)
-		e.EffectiveDate = nullTimeToDatePtr(effectiveDate)
-		e.CashAmountPerShare = nullStringPtr(cashPerShare)
-		e.RatioNumerator = nullStringPtr(ratioNum)
-		e.RatioDenominator = nullStringPtr(ratioDen)
-		e.SubscriptionPrice = nullStringPtr(subPrice)
+	e.ExDate = nullTimeToDatePtr(exDate)
+	e.RecordDate = nullTimeToDatePtr(recordDate)
+	e.PayDate = nullTimeToDatePtr(payDate)
+	e.EffectiveDate = nullTimeToDatePtr(effectiveDate)
+	e.CashAmountPerShare = nullStringPtr(cashPerShare)
+	e.RatioNumerator = nullStringPtr(ratioNum)
+	e.RatioDenominator = nullStringPtr(ratioDen)
+	e.SubscriptionPrice = nullStringPtr(subPrice)
 	return &e, nil
 }
 
@@ -686,7 +678,7 @@ func (r *InvestmentRepo) GetHolding(ctx context.Context, userID string, brokerAc
 		}
 		return nil, err
 	}
-	
+
 	h.CostBasisTotal = nullStringPtr(costBasisTotal)
 	h.AvgCost = nullStringPtr(avgCost)
 	h.MarketPrice = nullStringPtr(marketPrice)

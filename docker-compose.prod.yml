@@ -13,6 +13,7 @@ services:
       - JWT_ACCESS_TTL_MINUTES=${JWT_ACCESS_TTL_MINUTES:-60}
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
+      - MARKET_DATA_STATUS_URL=${MARKET_DATA_STATUS_URL:-http://goen-market-data:8090/status}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - CORS_ORIGINS=${CORS_ORIGINS:-}
     networks:
