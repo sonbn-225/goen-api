@@ -18,6 +18,8 @@ func NewRouter(cfg *config.Config) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
+	r.Use(auth.OptionalMiddleware(cfg))
+	r.Use(RequestLogger())
 	r.Use(CORSMiddleware(cfg))
 	r.Use(middleware.Heartbeat("/healthz"))
 
@@ -47,20 +49,20 @@ func NewRouter(cfg *config.Config) http.Handler {
 	investmentService := services.NewInvestmentService(accountService, transactionService, investmentRepo)
 
 	deps := handlers.Deps{
-		Cfg:         cfg,
-		DB:          db,
-		Redis:       redis,
-		AuthService: authService,
-		AccountService: accountService,
-		AuditService: auditService,
-		TransactionService: transactionService,
-		CategoryService: categoryService,
-		TagService: tagService,
-		BudgetService: budgetService,
-		SavingsService: savingsService,
+		Cfg:                    cfg,
+		DB:                     db,
+		Redis:                  redis,
+		AuthService:            authService,
+		AccountService:         accountService,
+		AuditService:           auditService,
+		TransactionService:     transactionService,
+		CategoryService:        categoryService,
+		TagService:             tagService,
+		BudgetService:          budgetService,
+		SavingsService:         savingsService,
 		RotatingSavingsService: rotatingSavingsService,
-		DebtService: debtService,
-		InvestmentService: investmentService,
+		DebtService:            debtService,
+		InvestmentService:      investmentService,
 	}
 
 	r.Get("/swagger", func(w http.ResponseWriter, r *http.Request) {

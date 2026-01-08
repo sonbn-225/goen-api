@@ -6,48 +6,34 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/sonbn-225/goen-api/internal/apierror"
 	"github.com/sonbn-225/goen-api/internal/config"
 )
 
-type ctxKey int
-
-const ctxKeyUserID ctxKey = iota
-
-func UserIDFromContext(ctx context.Context) (string, bool) {
-	v := ctx.Value(ctxKeyUserID)
-	id, ok := v.(string)
-	return id, ok && id != ""
-}
-
-type Claims struct {
-	jwt.RegisteredClaims
-}
-
-func Middleware(cfg *config.Config) func(http.Handler) http.Handler {
+// OptionalMiddleware tries to extract user id from Authorization Bearer token.
+// If missing/invalid, it just continues without modifying context.
+// This is useful for request logging where we want user_id when available.
+func OptionalMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 	secret := []byte(cfg.JWTSecret)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// If an upstream middleware already validated the bearer token and
-			// populated the context, we can trust it.
 			if _, ok := UserIDFromContext(r.Context()); ok {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			auth := r.Header.Get("Authorization")
-			if auth == "" {
-				apierror.Write(w, http.StatusUnauthorized, "unauthorized", "missing Authorization header", nil)
+			authz := r.Header.Get("Authorization")
+			if authz == "" {
+				next.ServeHTTP(w, r)
 				return
 			}
-			parts := strings.SplitN(auth, " ", 2)
+			parts := strings.SplitN(authz, " ", 2)
 			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-				apierror.Write(w, http.StatusUnauthorized, "unauthorized", "invalid Authorization header", nil)
+				next.ServeHTTP(w, r)
 				return
 			}
 			tokStr := strings.TrimSpace(parts[1])
 			if tokStr == "" {
-				apierror.Write(w, http.StatusUnauthorized, "unauthorized", "empty bearer token", nil)
+				next.ServeHTTP(w, r)
 				return
 			}
 
@@ -56,7 +42,7 @@ func Middleware(cfg *config.Config) func(http.Handler) http.Handler {
 				return secret, nil
 			}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 			if err != nil || token == nil || !token.Valid || claims.Subject == "" {
-				apierror.Write(w, http.StatusUnauthorized, "unauthorized", "invalid token", nil)
+				next.ServeHTTP(w, r)
 				return
 			}
 
