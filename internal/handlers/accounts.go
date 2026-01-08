@@ -139,3 +139,134 @@ func GetAccount(d Deps) http.HandlerFunc {
 		writeJSON(w, http.StatusOK, acc)
 	}
 }
+
+// PatchAccount godoc
+// @Summary Patch account
+// @Description Update an account (owner-only). Supports name and status (active|closed).
+// @Tags accounts
+// @Accept json
+// @Produce json
+// @Param accountId path string true "Account ID"
+// @Param body body domain.AccountPatch true "Account patch"
+// @Success 200 {object} domain.Account
+// @Failure 400 {object} apierror.Envelope
+// @Failure 401 {object} apierror.Envelope
+// @Failure 403 {object} apierror.Envelope
+// @Failure 404 {object} apierror.Envelope
+// @Failure 500 {object} apierror.Envelope
+// @Router /accounts/{accountId} [patch]
+func PatchAccount(d Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+			return
+		}
+
+		accountID := chi.URLParam(r, "accountId")
+		if accountID == "" {
+			apierror.Write(w, http.StatusBadRequest, "validation_error", "accountId is required", map[string]any{"field": "accountId"})
+			return
+		}
+
+		var patch domain.AccountPatch
+		if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+			return
+		}
+
+		acc, err := d.AccountService.PatchAccount(r.Context(), uid, accountID, patch)
+		if err != nil {
+			switch {
+			case errors.Is(err, domain.ErrAccountInvalidInput):
+				apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid account input", nil)
+				return
+			case errors.Is(err, domain.ErrAccountForbidden):
+				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
+				return
+			case errors.Is(err, domain.ErrAccountNotFound):
+				apierror.Write(w, http.StatusNotFound, "not_found", "account not found", nil)
+				return
+			default:
+				apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+				return
+			}
+		}
+
+		writeJSON(w, http.StatusOK, acc)
+	}
+}
+
+// DeleteAccount godoc
+// @Summary Delete account
+// @Description Soft-delete an account (owner-only).
+// @Tags accounts
+// @Param accountId path string true "Account ID"
+// @Success 204
+// @Failure 401 {object} apierror.Envelope
+// @Failure 403 {object} apierror.Envelope
+// @Failure 404 {object} apierror.Envelope
+// @Failure 500 {object} apierror.Envelope
+// @Router /accounts/{accountId} [delete]
+func DeleteAccount(d Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+			return
+		}
+
+		accountID := chi.URLParam(r, "accountId")
+		if accountID == "" {
+			apierror.Write(w, http.StatusBadRequest, "validation_error", "accountId is required", map[string]any{"field": "accountId"})
+			return
+		}
+
+		err := d.AccountService.DeleteAccount(r.Context(), uid, accountID)
+		if err != nil {
+			switch {
+			case errors.Is(err, domain.ErrAccountForbidden):
+				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
+				return
+			case errors.Is(err, domain.ErrAccountNotFound):
+				apierror.Write(w, http.StatusNotFound, "not_found", "account not found", nil)
+				return
+			case errors.Is(err, domain.ErrAccountInvalidInput):
+				apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid account input", nil)
+				return
+			default:
+				apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// ListAccountBalances godoc
+// @Summary List account balances
+// @Description List computed balances per account for the current user.
+// @Tags accounts
+// @Produce json
+// @Success 200 {array} domain.AccountBalance
+// @Failure 401 {object} apierror.Envelope
+// @Failure 500 {object} apierror.Envelope
+// @Router /accounts/balances [get]
+func ListAccountBalances(d Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+			return
+		}
+
+		items, err := d.AccountService.ListAccountBalances(r.Context(), uid)
+		if err != nil {
+			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, items)
+	}
+}

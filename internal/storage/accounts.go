@@ -165,6 +165,174 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID string, acco
 	return &a, nil
 }
 
+func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID string, accountID string, patch domain.AccountPatch) (*domain.Account, error) {
+	if r.db == nil {
+		return nil, errors.New("database not ready")
+	}
+	if strings.TrimSpace(accountID) == "" {
+		return nil, domain.ErrAccountInvalidInput
+	}
+
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	var out *domain.Account
+
+	err = withTx(ctx, pool, func(tx pgx.Tx) error {
+		if err := requireAccountOwnerForAccount(ctx, tx, actorUserID, accountID); err != nil {
+			return err
+		}
+
+		cur, err := r.GetAccountForUser(ctx, actorUserID, accountID)
+		if err != nil {
+			return err
+		}
+
+		name := cur.Name
+		if patch.Name != nil {
+			name = strings.TrimSpace(*patch.Name)
+			if name == "" {
+				return domain.ErrAccountInvalidInput
+			}
+		}
+
+		status := cur.Status
+		closedAt := cur.ClosedAt
+		if patch.Status != nil {
+			s := strings.TrimSpace(*patch.Status)
+			if s != "active" && s != "closed" {
+				return domain.ErrAccountInvalidInput
+			}
+			status = s
+			if status == "closed" {
+				if closedAt == nil {
+					closedAt = &now
+				}
+			} else {
+				closedAt = nil
+			}
+		}
+
+		ct, err := tx.Exec(ctx, `
+			UPDATE accounts
+			SET name = $1,
+			    status = $2,
+			    closed_at = $3,
+			    updated_at = $4,
+			    updated_by = $5
+			WHERE id = $6 AND deleted_at IS NULL
+		`, name, status, closedAt, now, actorUserID, accountID)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrAccountNotFound
+		}
+
+		updated, err := r.GetAccountForUser(ctx, actorUserID, accountID)
+		if err != nil {
+			return err
+		}
+		out = updated
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func (r *AccountRepo) DeleteAccount(ctx context.Context, actorUserID string, accountID string) error {
+	if r.db == nil {
+		return errors.New("database not ready")
+	}
+	if strings.TrimSpace(accountID) == "" {
+		return domain.ErrAccountInvalidInput
+	}
+
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now().UTC()
+	return withTx(ctx, pool, func(tx pgx.Tx) error {
+		if err := requireAccountOwnerForAccount(ctx, tx, actorUserID, accountID); err != nil {
+			return err
+		}
+
+		ct, err := tx.Exec(ctx, `
+			UPDATE accounts
+			SET deleted_at = $1,
+			    updated_at = $1,
+			    updated_by = $2
+			WHERE id = $3 AND deleted_at IS NULL
+		`, now, actorUserID, accountID)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrAccountNotFound
+		}
+		return nil
+	})
+}
+
+func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID string) ([]domain.AccountBalance, error) {
+	if r.db == nil {
+		return nil, errors.New("database not ready")
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT a.id AS account_id,
+		       a.currency,
+		       COALESCE(SUM(
+		         CASE
+		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
+		           WHEN t.type = 'expense' AND t.account_id = a.id THEN -t.amount
+		           WHEN t.type = 'transfer' AND t.to_account_id = a.id THEN t.amount
+		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -t.amount
+		           ELSE 0
+		         END
+		       ), 0)::text AS balance
+		FROM accounts a
+		JOIN user_accounts ua ON ua.account_id = a.id
+		LEFT JOIN transactions t
+		  ON t.deleted_at IS NULL
+		 AND t.status = 'posted'
+		 AND (
+		   t.account_id = a.id
+		   OR t.from_account_id = a.id
+		   OR t.to_account_id = a.id
+		 )
+		WHERE ua.user_id = $1 AND ua.status = 'active' AND a.deleted_at IS NULL
+		GROUP BY a.id, a.currency
+		ORDER BY a.created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]domain.AccountBalance, 0)
+	for rows.Next() {
+		var b domain.AccountBalance
+		if err := rows.Scan(&b.AccountID, &b.Currency, &b.Balance); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
 func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID string, accountID string) ([]domain.AccountShare, error) {
 	if r.db == nil {
 		return nil, errors.New("database not ready")
@@ -388,6 +556,22 @@ func requireAccountOwner(ctx context.Context, tx pgx.Tx, actorUserID string, acc
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrAccountShareForbidden
+		}
+		return err
+	}
+	return nil
+}
+
+func requireAccountOwnerForAccount(ctx context.Context, tx pgx.Tx, actorUserID string, accountID string) error {
+	var one int
+	err := tx.QueryRow(ctx, `
+		SELECT 1
+		FROM user_accounts ua
+		WHERE ua.user_id = $1 AND ua.account_id = $2 AND ua.status = 'active' AND ua.permission = 'owner'
+	`, actorUserID, accountID).Scan(&one)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrAccountForbidden
 		}
 		return err
 	}
