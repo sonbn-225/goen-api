@@ -28,10 +28,24 @@ type Account struct {
 	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
 }
 
+type AccountPatch struct {
+	Name   *string `json:"name,omitempty"`
+	Status *string `json:"status,omitempty"`
+}
+
+type AccountBalance struct {
+	AccountID string `json:"account_id"`
+	Currency  string `json:"currency"`
+	Balance   string `json:"balance"`
+}
+
 type AccountRepository interface {
 	CreateAccountWithOwner(ctx context.Context, account Account, ownerUserID string) error
 	ListAccountsForUser(ctx context.Context, userID string) ([]Account, error)
 	GetAccountForUser(ctx context.Context, userID string, accountID string) (*Account, error)
+	PatchAccount(ctx context.Context, actorUserID string, accountID string, patch AccountPatch) (*Account, error)
+	DeleteAccount(ctx context.Context, actorUserID string, accountID string) error
+	ListAccountBalancesForUser(ctx context.Context, userID string) ([]AccountBalance, error)
 
 	// UC-007 Shared Account
 	AccountShareRepository

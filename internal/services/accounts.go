@@ -14,6 +14,9 @@ type AccountService interface {
 	CreateAccount(ctx context.Context, userID string, req CreateAccountRequest) (*domain.Account, error)
 	ListAccounts(ctx context.Context, userID string) ([]domain.Account, error)
 	GetAccount(ctx context.Context, userID string, accountID string) (*domain.Account, error)
+	PatchAccount(ctx context.Context, userID string, accountID string, patch domain.AccountPatch) (*domain.Account, error)
+	DeleteAccount(ctx context.Context, userID string, accountID string) error
+	ListAccountBalances(ctx context.Context, userID string) ([]domain.AccountBalance, error)
 
 	// UC-007 Shared Account
 	ListAccountShares(ctx context.Context, userID string, accountID string) ([]domain.AccountShare, error)
@@ -109,6 +112,27 @@ func (s *accountService) CreateAccount(ctx context.Context, userID string, req C
 	}
 
 	return &account, nil
+}
+
+func (s *accountService) PatchAccount(ctx context.Context, userID string, accountID string, patch domain.AccountPatch) (*domain.Account, error) {
+	if strings.TrimSpace(accountID) == "" {
+		return nil, domain.ErrAccountInvalidInput
+	}
+	if patch.Name == nil && patch.Status == nil {
+		return nil, domain.ErrAccountInvalidInput
+	}
+	return s.repo.PatchAccount(ctx, userID, accountID, patch)
+}
+
+func (s *accountService) DeleteAccount(ctx context.Context, userID string, accountID string) error {
+	if strings.TrimSpace(accountID) == "" {
+		return domain.ErrAccountInvalidInput
+	}
+	return s.repo.DeleteAccount(ctx, userID, accountID)
+}
+
+func (s *accountService) ListAccountBalances(ctx context.Context, userID string) ([]domain.AccountBalance, error) {
+	return s.repo.ListAccountBalancesForUser(ctx, userID)
 }
 
 func (s *accountService) ListAccountShares(ctx context.Context, userID string, accountID string) ([]domain.AccountShare, error) {

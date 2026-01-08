@@ -44,6 +44,22 @@ definitions:
       updated_by:
         type: string
     type: object
+  domain.AccountBalance:
+    properties:
+      account_id:
+        type: string
+      balance:
+        type: string
+      currency:
+        type: string
+    type: object
+  domain.AccountPatch:
+    properties:
+      name:
+        type: string
+      status:
+        type: string
+    type: object
   domain.Category:
     properties:
       created_at:
@@ -981,6 +997,36 @@ paths:
       tags:
       - accounts
   /accounts/{accountId}:
+    delete:
+      description: Soft-delete an account (owner-only).
+      parameters:
+      - description: Account ID
+        in: path
+        name: accountId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Delete account
+      tags:
+      - accounts
     get:
       description: Get a single account (must be accessible to current user).
       parameters:
@@ -1009,6 +1055,75 @@ paths:
           schema:
             $ref: '#/definitions/apierror.Envelope'
       summary: Get account
+      tags:
+      - accounts
+    patch:
+      consumes:
+      - application/json
+      description: Update an account (owner-only). Supports name and status (active|closed).
+      parameters:
+      - description: Account ID
+        in: path
+        name: accountId
+        required: true
+        type: string
+      - description: Account patch
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/domain.AccountPatch'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Account'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Patch account
+      tags:
+      - accounts
+  /accounts/balances:
+    get:
+      description: List computed balances per account for the current user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.AccountBalance'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: List account balances
       tags:
       - accounts
   /auth/me:
