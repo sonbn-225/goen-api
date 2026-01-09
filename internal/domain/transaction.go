@@ -49,6 +49,7 @@ type Transaction struct {
 	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
 	LineItems    []TransactionLineItem `json:"line_items,omitempty"`
 	TagIDs       []string `json:"tag_ids,omitempty"`
+	CategoryIDs  []string `json:"category_ids,omitempty"`
 }
 
 type TransactionListFilter struct {

@@ -77,8 +77,9 @@ func (r *SavingsRepo) GetSavingsInstrument(ctx context.Context, userID string, s
 			si.created_at,
 			si.updated_at
 		FROM savings_instruments si
+		JOIN accounts a ON a.id = si.savings_account_id
 		JOIN user_accounts ua ON ua.account_id = si.savings_account_id
-		WHERE si.id = $1 AND ua.user_id = $2 AND ua.status = 'active'
+		WHERE si.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
 	`, savingsInstrumentID, userID)
 
 	var s domain.SavingsInstrument
@@ -152,8 +153,9 @@ func (r *SavingsRepo) ListSavingsInstruments(ctx context.Context, userID string)
 			si.created_at,
 			si.updated_at
 		FROM savings_instruments si
+		JOIN accounts a ON a.id = si.savings_account_id
 		JOIN user_accounts ua ON ua.account_id = si.savings_account_id
-		WHERE ua.user_id = $1 AND ua.status = 'active'
+		WHERE ua.user_id = $1 AND ua.status = 'active' AND a.deleted_at IS NULL
 		ORDER BY si.created_at DESC, si.id DESC
 	`, userID)
 	if err != nil {
