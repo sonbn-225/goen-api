@@ -62,6 +62,16 @@ func (s *budgetService) Create(ctx context.Context, userID string, req CreateBud
 	if categoryID == nil {
 		return nil, errors.New("category_id is required")
 	}
+	cat, err := s.categoryRepo.GetCategory(ctx, userID, *categoryID)
+	if err != nil {
+		return nil, err
+	}
+	if cat == nil || !cat.IsActive {
+		return nil, errors.New("category_id is invalid")
+	}
+	if cat.IsSystem {
+		return nil, errors.New("category_id is invalid")
+	}
 	if _, err := s.categoryRepo.GetCategory(ctx, userID, *categoryID); err != nil {
 		return nil, err
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain"
@@ -18,42 +17,6 @@ func NewCategoryRepo(db *Postgres) *CategoryRepo {
 	return &CategoryRepo{db: db}
 }
 
-func (r *CategoryRepo) CreateCategory(ctx context.Context, userID string, c domain.Category) error {
-	if r.db == nil {
-		return errors.New("database not ready")
-	}
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(userID) == "" {
-		return errors.New("userID is required")
-	}
-	if c.UserID == nil || strings.TrimSpace(*c.UserID) == "" {
-		uid := userID
-		c.UserID = &uid
-	}
-
-	_, err = pool.Exec(ctx, `
-		INSERT INTO categories (
-			id, user_id, name, parent_category_id, type, sort_order, is_active, created_at, updated_at, deleted_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-	`,
-		c.ID,
-		c.UserID,
-		c.Name,
-		c.ParentCategoryID,
-		c.Type,
-		c.SortOrder,
-		c.IsActive,
-		c.CreatedAt,
-		c.UpdatedAt,
-		c.DeletedAt,
-	)
-	return err
-}
-
 func (r *CategoryRepo) GetCategory(ctx context.Context, userID string, categoryID string) (*domain.Category, error) {
 	if r.db == nil {
 		return nil, errors.New("database not ready")
@@ -64,24 +27,27 @@ func (r *CategoryRepo) GetCategory(ctx context.Context, userID string, categoryI
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, user_id, name, parent_category_id, type, sort_order, is_active, created_at, updated_at, deleted_at
+		SELECT id, name, parent_category_id, type, sort_order, is_active, is_system, icon, color, created_at, updated_at, deleted_at
 		FROM categories
-		WHERE id = $1 AND (user_id = $2 OR user_id IS NULL) AND deleted_at IS NULL
-	`, categoryID, userID)
+		WHERE id = $1 AND deleted_at IS NULL
+	`, categoryID)
 
 	var c domain.Category
-	var userIDNull sql.NullString
 	var parentIDNull sql.NullString
 	var typeNull sql.NullString
+	var iconNull sql.NullString
+	var colorNull sql.NullString
 	var deletedAtNull sql.NullTime
 	if err := row.Scan(
 		&c.ID,
-		&userIDNull,
 		&c.Name,
 		&parentIDNull,
 		&typeNull,
 		&c.SortOrder,
 		&c.IsActive,
+		&c.IsSystem,
+		&iconNull,
+		&colorNull,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 		&deletedAtNull,
@@ -91,14 +57,17 @@ func (r *CategoryRepo) GetCategory(ctx context.Context, userID string, categoryI
 		}
 		return nil, err
 	}
-	if userIDNull.Valid {
-		c.UserID = &userIDNull.String
-	}
 	if parentIDNull.Valid {
 		c.ParentCategoryID = &parentIDNull.String
 	}
 	if typeNull.Valid {
 		c.Type = &typeNull.String
+	}
+	if iconNull.Valid {
+		c.Icon = &iconNull.String
+	}
+	if colorNull.Valid {
+		c.Color = &colorNull.String
 	}
 	if deletedAtNull.Valid {
 		c.DeletedAt = &deletedAtNull.Time
@@ -117,11 +86,11 @@ func (r *CategoryRepo) ListCategories(ctx context.Context, userID string) ([]dom
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT id, user_id, name, parent_category_id, type, sort_order, is_active, created_at, updated_at, deleted_at
+		SELECT id, name, parent_category_id, type, sort_order, is_active, is_system, icon, color, created_at, updated_at, deleted_at
 		FROM categories
-		WHERE (user_id = $1 OR user_id IS NULL) AND deleted_at IS NULL
+		WHERE deleted_at IS NULL AND is_system = false
 		ORDER BY COALESCE(sort_order, 0) ASC, name ASC
-	`, userID)
+	`)
 	if err != nil {
 		return nil, err
 	}
@@ -130,32 +99,38 @@ func (r *CategoryRepo) ListCategories(ctx context.Context, userID string) ([]dom
 	out := make([]domain.Category, 0)
 	for rows.Next() {
 		var c domain.Category
-		var userIDNull sql.NullString
 		var parentIDNull sql.NullString
 		var typeNull sql.NullString
+		var iconNull sql.NullString
+		var colorNull sql.NullString
 		var deletedAtNull sql.NullTime
 		if err := rows.Scan(
 			&c.ID,
-			&userIDNull,
 			&c.Name,
 			&parentIDNull,
 			&typeNull,
 			&c.SortOrder,
 			&c.IsActive,
+			&c.IsSystem,
+			&iconNull,
+			&colorNull,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 			&deletedAtNull,
 		); err != nil {
 			return nil, err
 		}
-		if userIDNull.Valid {
-			c.UserID = &userIDNull.String
-		}
 		if parentIDNull.Valid {
 			c.ParentCategoryID = &parentIDNull.String
 		}
 		if typeNull.Valid {
 			c.Type = &typeNull.String
+		}
+		if iconNull.Valid {
+			c.Icon = &iconNull.String
+		}
+		if colorNull.Valid {
+			c.Color = &colorNull.String
 		}
 		if deletedAtNull.Valid {
 			c.DeletedAt = &deletedAtNull.Time

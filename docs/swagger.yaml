@@ -68,13 +68,19 @@ definitions:
     type: object
   domain.Category:
     properties:
+      color:
+        type: string
       created_at:
         type: string
       deleted_at:
         type: string
+      icon:
+        type: string
       id:
         type: string
       is_active:
+        type: boolean
+      is_system:
         type: boolean
       name:
         type: string
@@ -85,8 +91,6 @@ definitions:
       type:
         type: string
       updated_at:
-        type: string
-      user_id:
         type: string
     type: object
   domain.Debt:
@@ -455,6 +459,10 @@ definitions:
         type: string
       amount:
         type: string
+      category_ids:
+        items:
+          type: string
+        type: array
       client_id:
         type: string
       counterparty:
@@ -767,19 +775,6 @@ definitions:
       period_start:
         type: string
       rollover_mode:
-        type: string
-    type: object
-  services.CreateCategoryRequest:
-    properties:
-      is_active:
-        type: boolean
-      name:
-        type: string
-      parent_category_id:
-        type: string
-      sort_order:
-        type: integer
-      type:
         type: string
     type: object
   services.CreateDebtInstallmentRequest:
@@ -1507,43 +1502,6 @@ paths:
           schema:
             $ref: '#/definitions/apierror.Envelope'
       summary: List categories
-      tags:
-      - categories
-    post:
-      consumes:
-      - application/json
-      description: Create a new category owned by current user.
-      parameters:
-      - description: Create category request
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/services.CreateCategoryRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.Category'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: Create category
       tags:
       - categories
   /categories/{categoryId}:

@@ -43,7 +43,7 @@ func NewRouter(cfg *config.Config) http.Handler {
 	categoryService := services.NewCategoryService(categoryRepo)
 	tagService := services.NewTagService(tagRepo)
 	budgetService := services.NewBudgetService(budgetRepo, categoryRepo)
-	savingsService := services.NewSavingsService(accountService, savingsRepo)
+	savingsService := services.NewSavingsService(accountService, transactionService, savingsRepo)
 	rotatingSavingsService := services.NewRotatingSavingsService(accountRepo, transactionService, rotatingSavingsRepo)
 	debtService := services.NewDebtService(transactionService, debtRepo)
 	investmentService := services.NewInvestmentService(accountService, transactionService, investmentRepo)
@@ -108,8 +108,6 @@ func NewRouter(cfg *config.Config) http.Handler {
 		catAuth := auth.Middleware(cfg)
 		r.With(catAuth).Get("/categories", handlers.ListCategories(deps))
 		r.With(catAuth).Get("/categories/", handlers.ListCategories(deps))
-		r.With(catAuth).Post("/categories", handlers.CreateCategory(deps))
-		r.With(catAuth).Post("/categories/", handlers.CreateCategory(deps))
 		r.With(catAuth).Get("/categories/{categoryId}", handlers.GetCategory(deps))
 
 		tagAuth := auth.Middleware(cfg)

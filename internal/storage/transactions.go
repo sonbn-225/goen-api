@@ -118,7 +118,7 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 				from_amount, to_amount,
 				account_id, from_account_id, to_account_id, exchange_rate,
 				counterparty, notes, status, created_at, updated_at, created_by, updated_by, deleted_at
-			) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7,$8::numeric,$9::numeric,$10,$11,$12,$13::numeric,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+			) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7,$8::numeric,$9::numeric,$10,$11,$12,$13::numeric,$14,$15,$16,$17,$18,$19,$20,$21)
 		`,
 			tx.ID,
 			tx.ClientID,
@@ -149,6 +149,25 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 		for _, li := range lineItems {
 			if li.ID == "" {
 				li.ID = uuid.NewString()
+			}
+			if li.CategoryID != nil && strings.TrimSpace(*li.CategoryID) != "" {
+				var ok bool
+				err := dbtx.QueryRow(ctx, `
+					SELECT EXISTS (
+						SELECT 1
+						FROM categories
+						WHERE id = $1
+						  AND deleted_at IS NULL
+						  AND is_active = true
+						  AND is_system = false
+					)
+				`, strings.TrimSpace(*li.CategoryID)).Scan(&ok)
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return errors.New("category_id is invalid")
+				}
 			}
 			_, err := dbtx.Exec(ctx, `
 				INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note)
@@ -443,7 +462,12 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 			t.created_by,
 			t.updated_by,
 			t.deleted_at,
-			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::text[]) AS tag_ids
+			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::text[]) AS tag_ids,
+			COALESCE((
+				SELECT array_agg(DISTINCT tli.category_id ORDER BY tli.category_id)
+				FROM transaction_line_items tli
+				WHERE tli.transaction_id = t.id AND tli.category_id IS NOT NULL
+			), '{}'::text[]) AS category_ids
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN accounts fa ON fa.id = t.from_account_id
@@ -502,6 +526,7 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 			&t.UpdatedBy,
 			&t.DeletedAt,
 			&t.TagIDs,
+			&t.CategoryIDs,
 		); err != nil {
 			return nil, nil, err
 		}

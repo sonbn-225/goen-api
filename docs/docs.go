@@ -682,62 +682,6 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "post": {
-                "description": "Create a new category owned by current user.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "categories"
-                ],
-                "summary": "Create category",
-                "parameters": [
-                    {
-                        "description": "Create category request",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.CreateCategoryRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/domain.Category"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
             }
         },
         "/categories/{categoryId}": {
@@ -3459,16 +3403,25 @@ const docTemplate = `{
         "domain.Category": {
             "type": "object",
             "properties": {
+                "color": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
                 "deleted_at": {
                     "type": "string"
                 },
+                "icon": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
                 "is_active": {
+                    "type": "boolean"
+                },
+                "is_system": {
                     "type": "boolean"
                 },
                 "name": {
@@ -3484,9 +3437,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
                     "type": "string"
                 }
             }
@@ -4046,6 +3996,12 @@ const docTemplate = `{
                 "amount": {
                     "type": "string"
                 },
+                "category_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "client_id": {
                     "type": "string"
                 },
@@ -4522,26 +4478,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "rollover_mode": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.CreateCategoryRequest": {
-            "type": "object",
-            "properties": {
-                "is_active": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "parent_category_id": {
-                    "type": "string"
-                },
-                "sort_order": {
-                    "type": "integer"
-                },
-                "type": {
                     "type": "string"
                 }
             }

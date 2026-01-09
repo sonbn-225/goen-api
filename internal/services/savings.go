@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"math/big"
 	"strings"
 	"time"
 
@@ -45,11 +46,12 @@ type PatchSavingsInstrumentRequest struct {
 
 type savingsService struct {
 	accounts AccountService
+	tx       TransactionService
 	repo     domain.SavingsRepository
 }
 
-func NewSavingsService(accounts AccountService, repo domain.SavingsRepository) SavingsService {
-	return &savingsService{accounts: accounts, repo: repo}
+func NewSavingsService(accounts AccountService, tx TransactionService, repo domain.SavingsRepository) SavingsService {
+	return &savingsService{accounts: accounts, tx: tx, repo: repo}
 }
 
 func (s *savingsService) CreateInstrument(ctx context.Context, userID string, req CreateSavingsInstrumentRequest) (*domain.SavingsInstrument, error) {
@@ -110,6 +112,7 @@ func (s *savingsService) CreateInstrument(ctx context.Context, userID string, re
 	}
 
 	var acc *domain.Account
+	autoCreatedAccount := false
 	if savingsAccountID == "" {
 		parent, err := s.accounts.GetAccount(ctx, userID, *parentAccountID)
 		if err != nil {
@@ -135,6 +138,7 @@ func (s *savingsService) CreateInstrument(ctx context.Context, userID string, re
 		}
 		savingsAccountID = createdAcc.ID
 		acc = createdAcc
+		autoCreatedAccount = true
 	} else {
 		cur, err := s.accounts.GetAccount(ctx, userID, savingsAccountID)
 		if err != nil {
@@ -176,6 +180,41 @@ func (s *savingsService) CreateInstrument(ctx context.Context, userID string, re
 
 	if err := s.repo.CreateSavingsInstrument(ctx, userID, item); err != nil {
 		return nil, err
+	}
+
+	// Move money from parent -> savings when opening a new instrument.
+	// Only do this when the savings account was auto-created (opening flow).
+	if autoCreatedAccount {
+		if amt, ok := new(big.Rat).SetString(principal); ok && amt.Cmp(new(big.Rat)) > 0 {
+			occurredDate := now.Format("2006-01-02")
+			if startDate != nil && strings.TrimSpace(*startDate) != "" {
+				occurredDate = strings.TrimSpace(*startDate)
+			}
+
+			desc := "Savings deposit"
+			if acc != nil {
+				name := strings.TrimSpace(acc.Name)
+				if name != "" {
+					desc = "Savings deposit: " + name
+				}
+			}
+
+			fromID := *acc.ParentAccountID
+			toID := acc.ID
+			if _, err := s.tx.Create(ctx, userID, CreateTransactionRequest{
+				Type:          "transfer",
+				OccurredDate:  &occurredDate,
+				Amount:        principal,
+				Description:   &desc,
+				FromAccountID: &fromID,
+				ToAccountID:   &toID,
+			}); err != nil {
+				// Best-effort rollback: remove created instrument and account.
+				_ = s.repo.DeleteSavingsInstrument(ctx, userID, id)
+				_ = s.accounts.DeleteAccount(ctx, userID, acc.ID)
+				return nil, err
+			}
+		}
 	}
 
 	created, err := s.repo.GetSavingsInstrument(ctx, userID, id)

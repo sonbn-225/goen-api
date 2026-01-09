@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -9,7 +8,6 @@ import (
 	"github.com/sonbn-225/goen-api/internal/apierror"
 	"github.com/sonbn-225/goen-api/internal/auth"
 	"github.com/sonbn-225/goen-api/internal/domain"
-	"github.com/sonbn-225/goen-api/internal/services"
 )
 
 // ListCategories godoc
@@ -36,47 +34,6 @@ func ListCategories(d Deps) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusOK, items)
-	}
-}
-
-// CreateCategory godoc
-// @Summary Create category
-// @Description Create a new category owned by current user.
-// @Tags categories
-// @Accept json
-// @Produce json
-// @Param body body services.CreateCategoryRequest true "Create category request"
-// @Success 200 {object} domain.Category
-// @Failure 400 {object} apierror.Envelope
-// @Failure 401 {object} apierror.Envelope
-// @Failure 404 {object} apierror.Envelope
-// @Failure 500 {object} apierror.Envelope
-// @Router /categories [post]
-func CreateCategory(d Deps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
-		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
-			return
-		}
-
-		var req services.CreateCategoryRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
-			return
-		}
-
-		c, err := d.CategoryService.Create(r.Context(), uid, req)
-		if err != nil {
-			if errors.Is(err, domain.ErrCategoryNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "category not found", nil)
-				return
-			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
-			return
-		}
-
-		writeJSON(w, http.StatusOK, c)
 	}
 }
 
