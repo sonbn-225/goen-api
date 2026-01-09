@@ -43,7 +43,7 @@ func NewRouter(cfg *config.Config) http.Handler {
 	categoryService := services.NewCategoryService(categoryRepo)
 	tagService := services.NewTagService(tagRepo)
 	budgetService := services.NewBudgetService(budgetRepo, categoryRepo)
-	savingsService := services.NewSavingsService(accountRepo, savingsRepo)
+	savingsService := services.NewSavingsService(accountService, savingsRepo)
 	rotatingSavingsService := services.NewRotatingSavingsService(accountRepo, transactionService, rotatingSavingsRepo)
 	debtService := services.NewDebtService(transactionService, debtRepo)
 	investmentService := services.NewInvestmentService(accountService, transactionService, investmentRepo)
@@ -78,6 +78,7 @@ func NewRouter(cfg *config.Config) http.Handler {
 			r.Post("/signup", handlers.Signup(deps))
 			r.Post("/signin", handlers.Signin(deps))
 			r.With(auth.Middleware(cfg)).Get("/me", handlers.Me(deps))
+			r.With(auth.Middleware(cfg)).Patch("/me/settings", handlers.PatchMySettings(deps))
 		})
 
 		accountsAuth := auth.Middleware(cfg)
@@ -131,6 +132,8 @@ func NewRouter(cfg *config.Config) http.Handler {
 		r.With(savingsAuth).Post("/savings/instruments", handlers.CreateSavingsInstrument(deps))
 		r.With(savingsAuth).Post("/savings/instruments/", handlers.CreateSavingsInstrument(deps))
 		r.With(savingsAuth).Get("/savings/instruments/{instrumentId}", handlers.GetSavingsInstrument(deps))
+		r.With(savingsAuth).Patch("/savings/instruments/{instrumentId}", handlers.PatchSavingsInstrument(deps))
+		r.With(savingsAuth).Delete("/savings/instruments/{instrumentId}", handlers.DeleteSavingsInstrument(deps))
 
 		rotAuth := auth.Middleware(cfg)
 		r.With(rotAuth).Get("/rotating-savings/groups", handlers.ListRotatingSavingsGroups(deps))

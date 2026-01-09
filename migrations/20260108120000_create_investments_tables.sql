@@ -11,7 +11,7 @@ END $$;
 
 -- +goose StatementBegin
 DO $$ BEGIN
-  CREATE TYPE security_event_type AS ENUM ('dividend_cash','split','reverse_split','rights_issue','bonus_issue','additional_issue');
+  CREATE TYPE security_event_type AS ENUM ('dividend_cash','split','reverse_split','rights_issue','bonus_issue','additional_issue','listing');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;

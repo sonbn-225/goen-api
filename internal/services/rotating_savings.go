@@ -22,9 +22,8 @@ type RotatingSavingsService interface {
 
 type CreateRotatingSavingsGroupRequest struct {
 	SelfLabel          *string `json:"self_label,omitempty"`
-	AccountID          *string `json:"account_id,omitempty"`
+	AccountID          string  `json:"account_id"`
 	Name               string  `json:"name"`
-	Currency           string  `json:"currency"`
 	MemberCount        int     `json:"member_count"`
 	ContributionAmount string  `json:"contribution_amount"`
 	EarlyPayoutFeeRate *string `json:"early_payout_fee_rate,omitempty"`
@@ -60,10 +59,11 @@ func (s *rotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 		return nil, errors.New("name is required")
 	}
 
-	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
-	if len(currency) != 3 {
-		return nil, errors.New("currency must be ISO4217")
+	accountIDRaw := strings.TrimSpace(req.AccountID)
+	if accountIDRaw == "" {
+		return nil, errors.New("account_id is required")
 	}
+	accountID := accountIDRaw
 
 	if req.MemberCount <= 0 {
 		return nil, errors.New("member_count must be > 0")
@@ -106,12 +106,9 @@ func (s *rotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 		}
 	}
 
-	accountID := normalizeOptionalString(req.AccountID)
-	if accountID != nil {
-		// Validate user has access.
-		if _, err := s.accounts.GetAccountForUser(ctx, userID, *accountID); err != nil {
-			return nil, err
-		}
+	// Validate user has access.
+	if _, err := s.accounts.GetAccountForUser(ctx, userID, accountID); err != nil {
+		return nil, err
 	}
 
 	now := time.Now().UTC()
@@ -123,7 +120,6 @@ func (s *rotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 		SelfLabel:          normalizeOptionalString(req.SelfLabel),
 		AccountID:          accountID,
 		Name:               name,
-		Currency:           currency,
 		MemberCount:        req.MemberCount,
 		ContributionAmount: contributionAmount,
 		EarlyPayoutFeeRate: earlyFee,
@@ -189,10 +185,7 @@ func (s *rotatingSavingsService) CreateContribution(ctx context.Context, userID 
 
 	accountID := normalizeOptionalString(req.AccountID)
 	if accountID == nil {
-		accountID = group.AccountID
-	}
-	if accountID == nil {
-		return nil, errors.New("account_id is required")
+		accountID = &group.AccountID
 	}
 
 	// Validate account access.
@@ -211,7 +204,6 @@ desc := fmt.Sprintf("RotatingSavings: %s", group.Name)
 		OccurredDate: &occurredDate,
 		OccurredTime: normalizeOptionalString(req.OccurredTime),
 		Amount:       amount,
-		Currency:     &group.Currency,
 		Description:  &desc,
 		AccountID:    accountID,
 		Notes:        normalizeOptionalString(req.Note),

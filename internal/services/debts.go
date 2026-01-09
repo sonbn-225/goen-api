@@ -26,10 +26,10 @@ type DebtService interface {
 
 type CreateDebtRequest struct {
 	ClientID      *string `json:"client_id,omitempty"`
+	AccountID     string  `json:"account_id"`
 	Direction     string  `json:"direction"`
 	Name          *string `json:"name,omitempty"`
 	Principal     string  `json:"principal"`
-	Currency      string  `json:"currency"`
 	StartDate     string  `json:"start_date"`
 	DueDate       string  `json:"due_date"`
 	InterestRate  *string `json:"interest_rate,omitempty"`
@@ -74,12 +74,9 @@ func (s *debtService) Create(ctx context.Context, userID string, req CreateDebtR
 		return nil, errors.New("principal must be a decimal string")
 	}
 
-	currency := strings.TrimSpace(req.Currency)
-	if currency == "" {
-		return nil, errors.New("currency is required")
-	}
-	if len(currency) != 3 {
-		return nil, errors.New("currency must be ISO4217 (3 letters)")
+	accountID := strings.TrimSpace(req.AccountID)
+	if accountID == "" {
+		return nil, errors.New("account_id is required")
 	}
 
 	startDate := strings.TrimSpace(req.StartDate)
@@ -144,10 +141,10 @@ func (s *debtService) Create(ctx context.Context, userID string, req CreateDebtR
 		ID:                  uuid.NewString(),
 		ClientID:            clientID,
 		UserID:              userID,
+		AccountID:           &accountID,
 		Direction:           direction,
 		Name:                name,
 		Principal:           principal,
-		Currency:            strings.ToUpper(currency),
 		StartDate:           startDate,
 		DueDate:             dueDate,
 		InterestRate:        interestRate,

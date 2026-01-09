@@ -14,7 +14,7 @@ type RotatingSavingsGroup struct {
 	ID                 string   `json:"id"`
 	UserID             string   `json:"user_id"`
 	SelfLabel          *string  `json:"self_label,omitempty"`
-	AccountID          *string  `json:"account_id,omitempty"`
+	AccountID          string   `json:"account_id"`
 	Name               string   `json:"name"`
 	Currency           string   `json:"currency"`
 	MemberCount        int      `json:"member_count"`

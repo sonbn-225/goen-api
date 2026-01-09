@@ -27,7 +27,13 @@ type Transaction struct {
 	OccurredAt   time.Time `json:"occurred_at"`
 	OccurredDate string  `json:"occurred_date"`
 	Amount       string  `json:"amount"`
-	Currency     *string `json:"currency,omitempty"`
+	// For FX transfers, amounts can differ per side.
+	FromAmount   *string `json:"from_amount,omitempty"`
+	ToAmount     *string `json:"to_amount,omitempty"`
+	// Currencies are derived from linked accounts (not stored on transactions).
+	AccountCurrency *string `json:"account_currency,omitempty"`
+	FromCurrency    *string `json:"from_currency,omitempty"`
+	ToCurrency      *string `json:"to_currency,omitempty"`
 	Description  *string `json:"description,omitempty"`
 	AccountID    *string `json:"account_id,omitempty"`
 	FromAccountID *string `json:"from_account_id,omitempty"`

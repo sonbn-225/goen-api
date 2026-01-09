@@ -208,3 +208,75 @@ func (r *SavingsRepo) ListSavingsInstruments(ctx context.Context, userID string)
 	}
 	return out, nil
 }
+
+func (r *SavingsRepo) UpdateSavingsInstrument(ctx context.Context, userID string, s domain.SavingsInstrument) error {
+	if r.db == nil {
+		return errors.New("database not ready")
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	cmd, err := pool.Exec(ctx, `
+		UPDATE savings_instruments si
+		SET
+			principal = $3,
+			interest_rate = $4,
+			term_months = $5,
+			start_date = $6,
+			maturity_date = $7,
+			auto_renew = $8,
+			accrued_interest = $9,
+			status = $10,
+			closed_at = $11,
+			updated_at = $12
+		FROM user_accounts ua
+		WHERE ua.account_id = si.savings_account_id AND ua.user_id = $2 AND ua.status = 'active'
+			AND si.id = $1
+	`,
+		s.ID,
+		userID,
+		s.Principal,
+		s.InterestRate,
+		s.TermMonths,
+		s.StartDate,
+		s.MaturityDate,
+		s.AutoRenew,
+		s.AccruedInterest,
+		s.Status,
+		s.ClosedAt,
+		s.UpdatedAt,
+	)
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() == 0 {
+		return domain.ErrSavingsInstrumentNotFound
+	}
+	return nil
+}
+
+func (r *SavingsRepo) DeleteSavingsInstrument(ctx context.Context, userID string, savingsInstrumentID string) error {
+	if r.db == nil {
+		return errors.New("database not ready")
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	cmd, err := pool.Exec(ctx, `
+		DELETE FROM savings_instruments si
+		USING user_accounts ua
+		WHERE ua.account_id = si.savings_account_id AND ua.user_id = $2 AND ua.status = 'active'
+			AND si.id = $1
+	`, savingsInstrumentID, userID)
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() == 0 {
+		return domain.ErrSavingsInstrumentNotFound
+	}
+	return nil
+}

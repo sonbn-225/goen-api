@@ -33,7 +33,8 @@ type CreateTransactionRequest struct {
 	OccurredDate *string `json:"occurred_date,omitempty"`
 	OccurredTime *string `json:"occurred_time,omitempty"`
 	Amount       string  `json:"amount"`
-	Currency     *string `json:"currency,omitempty"`
+	FromAmount   *string `json:"from_amount,omitempty"`
+	ToAmount     *string `json:"to_amount,omitempty"`
 	Description  *string `json:"description,omitempty"`
 	AccountID    *string `json:"account_id,omitempty"`
 	FromAccountID *string `json:"from_account_id,omitempty"`
@@ -79,6 +80,34 @@ func (s *transactionService) Create(ctx context.Context, userID string, req Crea
 	}
 	if !isValidDecimal(amount) {
 		return nil, errors.New("amount must be a decimal string")
+	}
+
+	fromAmount := normalizeOptionalString(req.FromAmount)
+	toAmount := normalizeOptionalString(req.ToAmount)
+	if fromAmount != nil {
+		v := strings.TrimSpace(*fromAmount)
+		if v == "" {
+			fromAmount = nil
+		} else {
+			if !isValidDecimal(v) {
+				return nil, errors.New("from_amount must be a decimal string")
+			}
+			fromAmount = &v
+		}
+	}
+	if toAmount != nil {
+		v := strings.TrimSpace(*toAmount)
+		if v == "" {
+			toAmount = nil
+		} else {
+			if !isValidDecimal(v) {
+				return nil, errors.New("to_amount must be a decimal string")
+			}
+			toAmount = &v
+		}
+	}
+	if (fromAmount != nil) != (toAmount != nil) {
+		return nil, errors.New("from_amount and to_amount must be provided together")
 	}
 
 	occurredAt, occurredDate, err := normalizeOccurredAt(req.OccurredAt, req.OccurredDate, req.OccurredTime)
@@ -131,7 +160,8 @@ func (s *transactionService) Create(ctx context.Context, userID string, req Crea
 		OccurredAt:   occurredAt,
 		OccurredDate: occurredDate,
 		Amount:       amount,
-		Currency:     normalizeOptionalString(req.Currency),
+		FromAmount:   fromAmount,
+		ToAmount:     toAmount,
 		Description:  normalizeOptionalString(req.Description),
 		AccountID:    normalizeOptionalString(req.AccountID),
 		FromAccountID: normalizeOptionalString(req.FromAccountID),

@@ -26,9 +26,45 @@ type AccountService interface {
 
 type CreateAccountRequest struct {
 	Name            string  `json:"name"`
+	AccountNumber   *string `json:"account_number,omitempty"`
+	Color           *string `json:"color,omitempty"`
 	AccountType     string  `json:"account_type"`
 	Currency        string  `json:"currency"`
 	ParentAccountID *string `json:"parent_account_id,omitempty"`
+}
+
+func normalizeAccountColor(in *string) (*string, error) {
+	v := strings.ToLower(strings.TrimSpace(toString(in)))
+	if v == "" {
+		return nil, nil
+	}
+	// Keep server-side allowlist in sync with the web predefined list.
+	allowed := map[string]struct{}{
+		"gray":   {},
+		"red":    {},
+		"pink":   {},
+		"grape":  {},
+		"violet": {},
+		"indigo": {},
+		"blue":   {},
+		"cyan":   {},
+		"teal":   {},
+		"green":  {},
+		"lime":   {},
+		"yellow": {},
+		"orange": {},
+	}
+	if _, ok := allowed[v]; !ok {
+		return nil, errors.New("color is invalid")
+	}
+	return &v, nil
+}
+
+func toString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 type accountService struct {
@@ -60,8 +96,18 @@ func (s *accountService) CreateAccount(ctx context.Context, userID string, req C
 	}
 
 	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
+	if currency == "" {
+		currency = s.defaultCurrencyForUser(ctx, userID)
+	}
 	if len(currency) != 3 {
 		return nil, errors.New("currency must be ISO4217")
+	}
+
+	accountNumber := normalizeOptionalString(req.AccountNumber)
+
+	color, err := normalizeAccountColor(req.Color)
+	if err != nil {
+		return nil, err
 	}
 
 	parentID := normalizeOptionalString(req.ParentAccountID)
@@ -97,6 +143,8 @@ func (s *accountService) CreateAccount(ctx context.Context, userID string, req C
 	account := domain.Account{
 		ID:              id,
 		Name:            name,
+		AccountNumber:   accountNumber,
+		Color:           color,
 		AccountType:     accountType,
 		Currency:        currency,
 		ParentAccountID: parentID,
@@ -114,12 +162,46 @@ func (s *accountService) CreateAccount(ctx context.Context, userID string, req C
 	return &account, nil
 }
 
+func (s *accountService) defaultCurrencyForUser(ctx context.Context, userID string) string {
+	// Fallbacks are intentionally conservative: always return a 3-letter code.
+	const fallback = "VND"
+	if s.userRepo == nil {
+		return fallback
+	}
+	u, err := s.userRepo.FindUserByID(ctx, userID)
+	if err != nil || u == nil || u.Settings == nil {
+		return fallback
+	}
+	settings, ok := u.Settings.(map[string]any)
+	if !ok {
+		return fallback
+	}
+	v, ok := settings["default_currency"]
+	if !ok {
+		return fallback
+	}
+	cur, ok := v.(string)
+	if !ok {
+		return fallback
+	}
+	cur = strings.ToUpper(strings.TrimSpace(cur))
+	if len(cur) != 3 {
+		return fallback
+	}
+	return cur
+}
+
 func (s *accountService) PatchAccount(ctx context.Context, userID string, accountID string, patch domain.AccountPatch) (*domain.Account, error) {
 	if strings.TrimSpace(accountID) == "" {
 		return nil, domain.ErrAccountInvalidInput
 	}
-	if patch.Name == nil && patch.Status == nil {
+	if patch.Name == nil && patch.Status == nil && patch.Color == nil {
 		return nil, domain.ErrAccountInvalidInput
+	}
+	if patch.Color != nil {
+		if _, err := normalizeAccountColor(patch.Color); err != nil {
+			return nil, domain.ErrAccountInvalidInput
+		}
 	}
 	return s.repo.PatchAccount(ctx, userID, accountID, patch)
 }
