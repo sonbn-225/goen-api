@@ -39,9 +39,9 @@ type InvestmentService interface {
 }
 
 type CreateInvestmentAccountRequest struct {
-	AccountID     string  `json:"account_id"`
+	AccountID      *string `json:"account_id,omitempty"`
+	ParentAccountID *string `json:"parent_account_id,omitempty"`
 	BrokerName    *string `json:"broker_name,omitempty"`
-	Currency      string  `json:"currency"`
 	SyncEnabled   *bool   `json:"sync_enabled,omitempty"`
 	SyncSettings  any     `json:"sync_settings,omitempty"`
 }
@@ -66,7 +66,6 @@ type CreateTradeRequest struct {
 	OccurredAt       *string `json:"occurred_at,omitempty"`
 	OccurredDate     *string `json:"occurred_date,omitempty"`
 	OccurredTime     *string `json:"occurred_time,omitempty"`
-	Currency         *string `json:"currency,omitempty"`
 	Note             *string `json:"note,omitempty"`
 }
 
@@ -88,26 +87,46 @@ func NewInvestmentService(accounts AccountService, tx TransactionService, repo d
 }
 
 func (s *investmentService) CreateInvestmentAccount(ctx context.Context, userID string, req CreateInvestmentAccountRequest) (*domain.InvestmentAccount, error) {
-	accountID := strings.TrimSpace(req.AccountID)
-	if accountID == "" {
-		return nil, errors.New("account_id is required")
+	var accountID string
+	if req.AccountID != nil {
+		accountID = strings.TrimSpace(*req.AccountID)
+	}
+	parentAccountID := normalizeOptionalString(req.ParentAccountID)
+	if accountID == "" && parentAccountID == nil {
+		return nil, errors.New("either account_id or parent_account_id is required")
 	}
 
-	acc, err := s.accounts.GetAccount(ctx, userID, accountID)
-	if err != nil {
-		return nil, err
+	var acc *domain.Account
+	if accountID == "" {
+		parent, err := s.accounts.GetAccount(ctx, userID, *parentAccountID)
+		if err != nil {
+			return nil, err
+		}
+		if parent.AccountType != "bank" && parent.AccountType != "wallet" {
+			return nil, errors.New("parent account must be bank or wallet")
+		}
+
+		createdAcc, err := s.accounts.CreateAccount(ctx, userID, CreateAccountRequest{
+			Name:            "Broker",
+			AccountType:     "broker",
+			Currency:        parent.Currency,
+			ParentAccountID: parentAccountID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		accountID = createdAcc.ID
+		acc = createdAcc
+	} else {
+		cur, err := s.accounts.GetAccount(ctx, userID, accountID)
+		if err != nil {
+			return nil, err
+		}
+		acc = cur
 	}
+
 	if acc.AccountType != "broker" {
 		return nil, errors.New("account_id must be an account of type broker")
-	}
-
-	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
-	if len(currency) != 3 {
-		return nil, errors.New("currency must be ISO4217")
-	}
-	// Keep it consistent with underlying account currency.
-	if acc.Currency != "" && currency != acc.Currency {
-		return nil, errors.New("currency must match broker account currency")
 	}
 
 	syncEnabled := false
@@ -122,7 +141,7 @@ func (s *investmentService) CreateInvestmentAccount(ctx context.Context, userID 
 		ID:          id,
 		AccountID:   accountID,
 		BrokerName:  normalizeOptionalString(req.BrokerName),
-		Currency:    currency,
+		Currency:    acc.Currency,
 		SyncEnabled: syncEnabled,
 		SyncSettings: req.SyncSettings,
 		CreatedAt:   now,
@@ -331,7 +350,6 @@ func (s *investmentService) CreateTrade(ctx context.Context, userID string, brok
 				Type:         "expense",
 				OccurredDate: &occurredDate,
 				Amount:       fees,
-				Currency:     &ia.Currency,
 				Description:  &desc,
 				AccountID:    &ia.AccountID,
 				ExternalRef:  externalRef,
@@ -355,7 +373,6 @@ func (s *investmentService) CreateTrade(ctx context.Context, userID string, brok
 				Type:         "expense",
 				OccurredDate: &occurredDate,
 				Amount:       taxes,
-				Currency:     &ia.Currency,
 				Description:  &desc,
 				AccountID:    &ia.AccountID,
 				ExternalRef:  externalRef,

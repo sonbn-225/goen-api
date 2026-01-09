@@ -28,7 +28,7 @@ func (r *RotatingSavingsRepo) CreateGroup(ctx context.Context, userID string, g 
 
 	_, err = pool.Exec(ctx, `
 		INSERT INTO rotating_savings_groups (
-			id, user_id, self_label, account_id, name, currency, member_count,
+			id, user_id, self_label, account_id, name, member_count,
 			contribution_amount, early_payout_fee_rate, cycle_frequency, start_date, status,
 			created_at, updated_at
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
@@ -38,7 +38,6 @@ func (r *RotatingSavingsRepo) CreateGroup(ctx context.Context, userID string, g 
 		g.SelfLabel,
 		g.AccountID,
 		g.Name,
-		g.Currency,
 		g.MemberCount,
 		g.ContributionAmount,
 		g.EarlyPayoutFeeRate,
@@ -62,27 +61,27 @@ func (r *RotatingSavingsRepo) GetGroup(ctx context.Context, userID string, group
 
 	row := pool.QueryRow(ctx, `
 		SELECT
-			id, user_id, self_label, account_id, name, currency, member_count,
-			contribution_amount::text,
-			CASE WHEN early_payout_fee_rate IS NULL THEN NULL ELSE early_payout_fee_rate::text END,
-			cycle_frequency::text,
-			to_char(start_date, 'YYYY-MM-DD'),
-			status::text,
-			created_at, updated_at
-		FROM rotating_savings_groups
-		WHERE id = $1 AND user_id = $2
+			g.id, g.user_id, g.self_label, g.account_id, g.name, a.currency, g.member_count,
+			g.contribution_amount::text,
+			CASE WHEN g.early_payout_fee_rate IS NULL THEN NULL ELSE g.early_payout_fee_rate::text END,
+			g.cycle_frequency::text,
+			to_char(g.start_date, 'YYYY-MM-DD'),
+			g.status::text,
+			g.created_at, g.updated_at
+		FROM rotating_savings_groups g
+		JOIN accounts a ON a.id = g.account_id
+		WHERE g.id = $1 AND g.user_id = $2
 	`, groupID, userID)
 
 	var g domain.RotatingSavingsGroup
 	var selfNull sql.NullString
-	var accountNull sql.NullString
 	var earlyNull sql.NullString
 
 	if err := row.Scan(
 		&g.ID,
 		&g.UserID,
 		&selfNull,
-		&accountNull,
+		&g.AccountID,
 		&g.Name,
 		&g.Currency,
 		&g.MemberCount,
@@ -103,9 +102,6 @@ func (r *RotatingSavingsRepo) GetGroup(ctx context.Context, userID string, group
 	if selfNull.Valid {
 		g.SelfLabel = &selfNull.String
 	}
-	if accountNull.Valid {
-		g.AccountID = &accountNull.String
-	}
 	if earlyNull.Valid {
 		g.EarlyPayoutFeeRate = &earlyNull.String
 	}
@@ -124,16 +120,17 @@ func (r *RotatingSavingsRepo) ListGroups(ctx context.Context, userID string) ([]
 
 	rows, err := pool.Query(ctx, `
 		SELECT
-			id, user_id, self_label, account_id, name, currency, member_count,
-			contribution_amount::text,
-			CASE WHEN early_payout_fee_rate IS NULL THEN NULL ELSE early_payout_fee_rate::text END,
-			cycle_frequency::text,
-			to_char(start_date, 'YYYY-MM-DD'),
-			status::text,
-			created_at, updated_at
-		FROM rotating_savings_groups
-		WHERE user_id = $1
-		ORDER BY start_date DESC, id DESC
+			g.id, g.user_id, g.self_label, g.account_id, g.name, a.currency, g.member_count,
+			g.contribution_amount::text,
+			CASE WHEN g.early_payout_fee_rate IS NULL THEN NULL ELSE g.early_payout_fee_rate::text END,
+			g.cycle_frequency::text,
+			to_char(g.start_date, 'YYYY-MM-DD'),
+			g.status::text,
+			g.created_at, g.updated_at
+		FROM rotating_savings_groups g
+		JOIN accounts a ON a.id = g.account_id
+		WHERE g.user_id = $1
+		ORDER BY g.start_date DESC, g.id DESC
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -144,14 +141,13 @@ func (r *RotatingSavingsRepo) ListGroups(ctx context.Context, userID string) ([]
 	for rows.Next() {
 		var g domain.RotatingSavingsGroup
 		var selfNull sql.NullString
-		var accountNull sql.NullString
 		var earlyNull sql.NullString
 
 		if err := rows.Scan(
 			&g.ID,
 			&g.UserID,
 			&selfNull,
-			&accountNull,
+			&g.AccountID,
 			&g.Name,
 			&g.Currency,
 			&g.MemberCount,
@@ -167,9 +163,6 @@ func (r *RotatingSavingsRepo) ListGroups(ctx context.Context, userID string) ([]
 		}
 		if selfNull.Valid {
 			g.SelfLabel = &selfNull.String
-		}
-		if accountNull.Valid {
-			g.AccountID = &accountNull.String
 		}
 		if earlyNull.Valid {
 			g.EarlyPayoutFeeRate = &earlyNull.String

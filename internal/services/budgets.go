@@ -30,7 +30,6 @@ type CreateBudgetRequest struct {
 	PeriodStart           *string `json:"period_start,omitempty"`
 	PeriodEnd             *string `json:"period_end,omitempty"`
 	Amount                string  `json:"amount"`
-	Currency              *string `json:"currency,omitempty"`
 	AlertThresholdPercent *int    `json:"alert_threshold_percent,omitempty"`
 	RolloverMode          *string `json:"rollover_mode,omitempty"`
 	CategoryID            *string `json:"category_id,omitempty"`
@@ -99,7 +98,6 @@ func (s *budgetService) Create(ctx context.Context, userID string, req CreateBud
 		PeriodStart:          &start,
 		PeriodEnd:            &end,
 		Amount:               amount,
-		Currency:             normalizeOptionalString(req.Currency),
 		AlertThresholdPercent: alert,
 		RolloverMode:         over,
 		CategoryID:           categoryID,

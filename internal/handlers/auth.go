@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/sonbn-225/goen-api/internal/auth"
@@ -104,6 +105,52 @@ func Me(d Deps) http.HandlerFunc {
 		}
 
 		user, err := d.AuthService.GetMe(r.Context(), uid)
+		if err != nil {
+			if errors.Is(err, domain.ErrUserNotFound) {
+				apierror.Write(w, http.StatusUnauthorized, "unauthorized", "user not found", nil)
+				return
+			}
+			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(user)
+	}
+}
+
+// PatchMySettings godoc
+// @Summary Update current user settings
+// @Description Merge-patch current user's settings (JSON object) into stored settings.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body object true "Settings patch (JSON object)"
+// @Success 200 {object} domain.User
+// @Failure 400 {object} apierror.Envelope
+// @Failure 401 {object} apierror.Envelope
+// @Failure 500 {object} apierror.Envelope
+// @Router /auth/me/settings [patch]
+func PatchMySettings(d Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+			return
+		}
+
+		patch := map[string]any{}
+		dec := json.NewDecoder(r.Body)
+		if err := dec.Decode(&patch); err != nil {
+			if errors.Is(err, io.EOF) {
+				patch = map[string]any{}
+			} else {
+				apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+				return
+			}
+		}
+
+		user, err := d.AuthService.UpdateMySettings(r.Context(), uid, patch)
 		if err != nil {
 			if errors.Is(err, domain.ErrUserNotFound) {
 				apierror.Write(w, http.StatusUnauthorized, "unauthorized", "user not found", nil)

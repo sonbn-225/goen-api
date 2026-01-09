@@ -17,11 +17,15 @@ definitions:
     type: object
   domain.Account:
     properties:
+      account_number:
+        type: string
       account_type:
         type: string
       client_id:
         type: string
       closed_at:
+        type: string
+      color:
         type: string
       created_at:
         type: string
@@ -55,6 +59,8 @@ definitions:
     type: object
   domain.AccountPatch:
     properties:
+      color:
+        type: string
       name:
         type: string
       status:
@@ -85,6 +91,8 @@ definitions:
     type: object
   domain.Debt:
     properties:
+      account_id:
+        type: string
       accrued_interest:
         type: string
       client_id:
@@ -440,6 +448,9 @@ definitions:
     type: object
   domain.Transaction:
     properties:
+      account_currency:
+        description: Currencies are derived from linked accounts (not stored on transactions).
+        type: string
       account_id:
         type: string
       amount:
@@ -452,8 +463,6 @@ definitions:
         type: string
       created_by:
         type: string
-      currency:
-        type: string
       deleted_at:
         type: string
       description:
@@ -463,6 +472,11 @@ definitions:
       external_ref:
         type: string
       from_account_id:
+        type: string
+      from_amount:
+        description: For FX transfers, amounts can differ per side.
+        type: string
+      from_currency:
         type: string
       id:
         type: string
@@ -483,6 +497,10 @@ definitions:
           type: string
         type: array
       to_account_id:
+        type: string
+      to_amount:
+        type: string
+      to_currency:
         type: string
       type:
         type: string
@@ -514,6 +532,7 @@ definitions:
         type: string
       phone:
         type: string
+      settings: {}
       status:
         type: string
       updated_at:
@@ -693,8 +712,6 @@ definitions:
         type: string
       created_at:
         type: string
-      currency:
-        type: string
       id:
         type: string
       name:
@@ -720,7 +737,11 @@ definitions:
     type: object
   services.CreateAccountRequest:
     properties:
+      account_number:
+        type: string
       account_type:
+        type: string
+      color:
         type: string
       currency:
         type: string
@@ -736,8 +757,6 @@ definitions:
       amount:
         type: string
       category_id:
-        type: string
-      currency:
         type: string
       name:
         type: string
@@ -787,9 +806,9 @@ definitions:
     type: object
   services.CreateDebtRequest:
     properties:
-      client_id:
+      account_id:
         type: string
-      currency:
+      client_id:
         type: string
       direction:
         type: string
@@ -814,7 +833,7 @@ definitions:
         type: string
       broker_name:
         type: string
-      currency:
+      parent_account_id:
         type: string
       sync_enabled:
         type: boolean
@@ -845,8 +864,6 @@ definitions:
         type: string
       contribution_amount:
         type: string
-      currency:
-        type: string
       cycle_frequency:
         type: string
       early_payout_fee_rate:
@@ -871,6 +888,10 @@ definitions:
       interest_rate:
         type: string
       maturity_date:
+        type: string
+      name:
+        type: string
+      parent_account_id:
         type: string
       principal:
         type: string
@@ -904,8 +925,6 @@ definitions:
   services.CreateTradeRequest:
     properties:
       client_id:
-        type: string
-      currency:
         type: string
       fee_transaction_id:
         type: string
@@ -951,8 +970,6 @@ definitions:
         type: string
       counterparty:
         type: string
-      currency:
-        type: string
       description:
         type: string
       exchange_rate:
@@ -960,6 +977,8 @@ definitions:
       external_ref:
         type: string
       from_account_id:
+        type: string
+      from_amount:
         type: string
       line_items:
         items:
@@ -979,8 +998,29 @@ definitions:
         type: array
       to_account_id:
         type: string
+      to_amount:
+        type: string
       type:
         type: string
+    type: object
+  services.PatchSavingsInstrumentRequest:
+    properties:
+      accrued_interest:
+        type: string
+      auto_renew:
+        type: boolean
+      interest_rate:
+        type: string
+      maturity_date:
+        type: string
+      principal:
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+      term_months:
+        type: integer
     type: object
   services.PatchTransactionRequest:
     properties:
@@ -1242,6 +1282,40 @@ paths:
           schema:
             $ref: '#/definitions/apierror.Envelope'
       summary: Get current user
+      tags:
+      - auth
+  /auth/me/settings:
+    patch:
+      consumes:
+      - application/json
+      description: Merge-patch current user's settings (JSON object) into stored settings.
+      parameters:
+      - description: Settings patch (JSON object)
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Update current user settings
       tags:
       - auth
   /auth/signin:
@@ -2488,6 +2562,38 @@ paths:
       tags:
       - savings
   /savings/instruments/{instrumentId}:
+    delete:
+      description: Delete an existing SavingsInstrument accessible to current user.
+      parameters:
+      - description: Savings instrument ID
+        in: path
+        name: instrumentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Delete savings instrument
+      tags:
+      - savings
     get:
       description: Get a single SavingsInstrument accessible to current user.
       parameters:
@@ -2516,6 +2622,49 @@ paths:
           schema:
             $ref: '#/definitions/apierror.Envelope'
       summary: Get savings instrument
+      tags:
+      - savings
+    patch:
+      consumes:
+      - application/json
+      description: Patch fields of an existing SavingsInstrument accessible to current
+        user.
+      parameters:
+      - description: Savings instrument ID
+        in: path
+        name: instrumentId
+        required: true
+        type: string
+      - description: Patch savings instrument request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.PatchSavingsInstrumentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.SavingsInstrument'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierror.Envelope'
+      summary: Patch savings instrument
       tags:
       - savings
   /securities:

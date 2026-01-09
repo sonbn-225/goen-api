@@ -343,6 +343,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/me/settings": {
+            "patch": {
+                "description": "Merge-patch current user's settings (JSON object) into stored settings.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Update current user settings",
+                "parameters": [
+                    {
+                        "description": "Settings patch (JSON object)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/domain.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/signin": {
             "post": {
                 "description": "Sign in with email/phone and password.",
@@ -2259,6 +2311,117 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "delete": {
+                "description": "Delete an existing SavingsInstrument accessible to current user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "savings"
+                ],
+                "summary": "Delete savings instrument",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Savings instrument ID",
+                        "name": "instrumentId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "description": "Patch fields of an existing SavingsInstrument accessible to current user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "savings"
+                ],
+                "summary": "Patch savings instrument",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Savings instrument ID",
+                        "name": "instrumentId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Patch savings instrument request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.PatchSavingsInstrumentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/domain.SavingsInstrument"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apierror.Envelope"
+                        }
+                    }
+                }
             }
         },
         "/securities": {
@@ -3218,6 +3381,9 @@ const docTemplate = `{
         "domain.Account": {
             "type": "object",
             "properties": {
+                "account_number": {
+                    "type": "string"
+                },
                 "account_type": {
                     "type": "string"
                 },
@@ -3225,6 +3391,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "closed_at": {
+                    "type": "string"
+                },
+                "color": {
                     "type": "string"
                 },
                 "created_at": {
@@ -3276,6 +3445,9 @@ const docTemplate = `{
         "domain.AccountPatch": {
             "type": "object",
             "properties": {
+                "color": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -3322,6 +3494,9 @@ const docTemplate = `{
         "domain.Debt": {
             "type": "object",
             "properties": {
+                "account_id": {
+                    "type": "string"
+                },
                 "accrued_interest": {
                     "type": "string"
                 },
@@ -3861,6 +4036,10 @@ const docTemplate = `{
         "domain.Transaction": {
             "type": "object",
             "properties": {
+                "account_currency": {
+                    "description": "Currencies are derived from linked accounts (not stored on transactions).",
+                    "type": "string"
+                },
                 "account_id": {
                     "type": "string"
                 },
@@ -3879,9 +4058,6 @@ const docTemplate = `{
                 "created_by": {
                     "type": "string"
                 },
-                "currency": {
-                    "type": "string"
-                },
                 "deleted_at": {
                     "type": "string"
                 },
@@ -3895,6 +4071,13 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "from_account_id": {
+                    "type": "string"
+                },
+                "from_amount": {
+                    "description": "For FX transfers, amounts can differ per side.",
+                    "type": "string"
+                },
+                "from_currency": {
                     "type": "string"
                 },
                 "id": {
@@ -3925,6 +4108,12 @@ const docTemplate = `{
                     }
                 },
                 "to_account_id": {
+                    "type": "string"
+                },
+                "to_amount": {
+                    "type": "string"
+                },
+                "to_currency": {
                     "type": "string"
                 },
                 "type": {
@@ -3973,6 +4162,7 @@ const docTemplate = `{
                 "phone": {
                     "type": "string"
                 },
+                "settings": {},
                 "status": {
                     "type": "string"
                 },
@@ -4249,9 +4439,6 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
-                "currency": {
-                    "type": "string"
-                },
                 "id": {
                     "type": "string"
                 },
@@ -4290,7 +4477,13 @@ const docTemplate = `{
         "services.CreateAccountRequest": {
             "type": "object",
             "properties": {
+                "account_number": {
+                    "type": "string"
+                },
                 "account_type": {
+                    "type": "string"
+                },
+                "color": {
                     "type": "string"
                 },
                 "currency": {
@@ -4314,9 +4507,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "category_id": {
-                    "type": "string"
-                },
-                "currency": {
                     "type": "string"
                 },
                 "name": {
@@ -4393,10 +4583,10 @@ const docTemplate = `{
         "services.CreateDebtRequest": {
             "type": "object",
             "properties": {
-                "client_id": {
+                "account_id": {
                     "type": "string"
                 },
-                "currency": {
+                "client_id": {
                     "type": "string"
                 },
                 "direction": {
@@ -4434,7 +4624,7 @@ const docTemplate = `{
                 "broker_name": {
                     "type": "string"
                 },
-                "currency": {
+                "parent_account_id": {
                     "type": "string"
                 },
                 "sync_enabled": {
@@ -4481,9 +4671,6 @@ const docTemplate = `{
                 "contribution_amount": {
                     "type": "string"
                 },
-                "currency": {
-                    "type": "string"
-                },
                 "cycle_frequency": {
                     "type": "string"
                 },
@@ -4520,6 +4707,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "maturity_date": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_account_id": {
                     "type": "string"
                 },
                 "principal": {
@@ -4571,9 +4764,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "client_id": {
-                    "type": "string"
-                },
-                "currency": {
                     "type": "string"
                 },
                 "fee_transaction_id": {
@@ -4643,9 +4833,6 @@ const docTemplate = `{
                 "counterparty": {
                     "type": "string"
                 },
-                "currency": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string"
                 },
@@ -4656,6 +4843,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "from_account_id": {
+                    "type": "string"
+                },
+                "from_amount": {
                     "type": "string"
                 },
                 "line_items": {
@@ -4685,8 +4875,40 @@ const docTemplate = `{
                 "to_account_id": {
                     "type": "string"
                 },
+                "to_amount": {
+                    "type": "string"
+                },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "services.PatchSavingsInstrumentRequest": {
+            "type": "object",
+            "properties": {
+                "accrued_interest": {
+                    "type": "string"
+                },
+                "auto_renew": {
+                    "type": "boolean"
+                },
+                "interest_rate": {
+                    "type": "string"
+                },
+                "maturity_date": {
+                    "type": "string"
+                },
+                "principal": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "term_months": {
+                    "type": "integer"
                 }
             }
         },

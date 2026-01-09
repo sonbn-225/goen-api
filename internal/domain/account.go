@@ -16,6 +16,8 @@ type Account struct {
 	ID              string     `json:"id"`
 	ClientID        *string    `json:"client_id,omitempty"`
 	Name            string     `json:"name"`
+	AccountNumber   *string    `json:"account_number,omitempty"`
+	Color           *string    `json:"color,omitempty"`
 	AccountType     string     `json:"account_type"`
 	Currency        string     `json:"currency"`
 	ParentAccountID *string    `json:"parent_account_id,omitempty"`
@@ -30,6 +32,7 @@ type Account struct {
 
 type AccountPatch struct {
 	Name   *string `json:"name,omitempty"`
+	Color  *string `json:"color,omitempty"`
 	Status *string `json:"status,omitempty"`
 }
 

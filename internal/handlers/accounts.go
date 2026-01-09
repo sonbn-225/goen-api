@@ -75,6 +75,8 @@ func CreateAccount(d Deps) http.HandlerFunc {
 			switch {
 			case msg == "name is required":
 				details["field"] = "name"
+			case msg == "color is invalid":
+				details["field"] = "color"
 			case msg == "account_type is invalid":
 				details["field"] = "account_type"
 			case msg == "currency must be ISO4217":

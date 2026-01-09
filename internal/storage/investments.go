@@ -32,9 +32,9 @@ func (r *InvestmentRepo) CreateInvestmentAccount(ctx context.Context, userID str
 	// Require write permission (owner/editor) because this is a write action.
 	cmd, err := pool.Exec(ctx, `
 		INSERT INTO investment_accounts (
-			id, account_id, broker_name, currency, sync_enabled, sync_settings, created_at, updated_at
+			id, account_id, broker_name, sync_enabled, sync_settings, created_at, updated_at
 		)
-		SELECT $1,$2,$3,$4,$5,$6,$7,$8
+		SELECT $1,$2,$3,$4,$5,$6,$7
 		WHERE EXISTS (
 			SELECT 1
 			FROM accounts a
@@ -46,7 +46,7 @@ func (r *InvestmentRepo) CreateInvestmentAccount(ctx context.Context, userID str
 			  AND ua.status = 'active'
 			  AND ua.permission IN ('owner','editor')
 		)
-	`, ia.ID, ia.AccountID, ia.BrokerName, ia.Currency, ia.SyncEnabled, ia.SyncSettings, ia.CreatedAt, ia.UpdatedAt, userID)
+	`, ia.ID, ia.AccountID, ia.BrokerName, ia.SyncEnabled, ia.SyncSettings, ia.CreatedAt, ia.UpdatedAt, userID)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func (r *InvestmentRepo) GetInvestmentAccount(ctx context.Context, userID string
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT ia.id, ia.account_id, ia.broker_name, ia.currency, ia.sync_enabled, ia.sync_settings, ia.created_at, ia.updated_at
+		SELECT ia.id, ia.account_id, ia.broker_name, a.currency, ia.sync_enabled, ia.sync_settings, ia.created_at, ia.updated_at
 		FROM investment_accounts ia
 		JOIN accounts a ON a.id = ia.account_id
 		JOIN user_accounts ua ON ua.account_id = a.id
@@ -97,7 +97,7 @@ func (r *InvestmentRepo) ListInvestmentAccounts(ctx context.Context, userID stri
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT ia.id, ia.account_id, ia.broker_name, ia.currency, ia.sync_enabled, ia.sync_settings, ia.created_at, ia.updated_at
+		SELECT ia.id, ia.account_id, ia.broker_name, a.currency, ia.sync_enabled, ia.sync_settings, ia.created_at, ia.updated_at
 		FROM investment_accounts ia
 		JOIN accounts a ON a.id = ia.account_id
 		JOIN user_accounts ua ON ua.account_id = a.id

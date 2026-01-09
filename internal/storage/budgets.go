@@ -37,9 +37,9 @@ func (r *BudgetRepo) CreateBudget(ctx context.Context, userID string, b domain.B
 
 	_, err = pool.Exec(ctx, `
 		INSERT INTO budgets (
-			id, user_id, name, period, period_start, period_end, amount, currency,
+			id, user_id, name, period, period_start, period_end, amount,
 			alert_threshold_percent, rollover_mode, category_id, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 	`,
 		b.ID,
 		b.UserID,
@@ -48,7 +48,6 @@ func (r *BudgetRepo) CreateBudget(ctx context.Context, userID string, b domain.B
 		b.PeriodStart,
 		b.PeriodEnd,
 		b.Amount,
-		b.Currency,
 		b.AlertThresholdPercent,
 		b.RolloverMode,
 		b.CategoryID,
@@ -76,7 +75,6 @@ func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID stri
 			CASE WHEN period_start IS NULL THEN NULL ELSE to_char(period_start, 'YYYY-MM-DD') END,
 			CASE WHEN period_end IS NULL THEN NULL ELSE to_char(period_end, 'YYYY-MM-DD') END,
 			amount::text,
-			currency,
 			alert_threshold_percent,
 			CASE WHEN rollover_mode IS NULL THEN NULL ELSE rollover_mode::text END,
 			category_id,
@@ -90,7 +88,6 @@ func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID stri
 	var nameNull sql.NullString
 	var startNull sql.NullString
 	var endNull sql.NullString
-	var currencyNull sql.NullString
 	var alertNull sql.NullInt32
 	var rolloverNull sql.NullString
 	var categoryNull sql.NullString
@@ -103,7 +100,6 @@ func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID stri
 		&startNull,
 		&endNull,
 		&b.Amount,
-		&currencyNull,
 		&alertNull,
 		&rolloverNull,
 		&categoryNull,
@@ -124,9 +120,6 @@ func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID stri
 	}
 	if endNull.Valid {
 		b.PeriodEnd = &endNull.String
-	}
-	if currencyNull.Valid {
-		b.Currency = &currencyNull.String
 	}
 	if alertNull.Valid {
 		v := int(alertNull.Int32)
@@ -160,7 +153,6 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID string) ([]domain.B
 			CASE WHEN period_start IS NULL THEN NULL ELSE to_char(period_start, 'YYYY-MM-DD') END,
 			CASE WHEN period_end IS NULL THEN NULL ELSE to_char(period_end, 'YYYY-MM-DD') END,
 			amount::text,
-			currency,
 			alert_threshold_percent,
 			CASE WHEN rollover_mode IS NULL THEN NULL ELSE rollover_mode::text END,
 			category_id,
@@ -181,7 +173,6 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID string) ([]domain.B
 		var nameNull sql.NullString
 		var startNull sql.NullString
 		var endNull sql.NullString
-		var currencyNull sql.NullString
 		var alertNull sql.NullInt32
 		var rolloverNull sql.NullString
 		var categoryNull sql.NullString
@@ -194,7 +185,6 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID string) ([]domain.B
 			&startNull,
 			&endNull,
 			&b.Amount,
-			&currencyNull,
 			&alertNull,
 			&rolloverNull,
 			&categoryNull,
@@ -212,9 +202,6 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID string) ([]domain.B
 		}
 		if endNull.Valid {
 			b.PeriodEnd = &endNull.String
-		}
-		if currencyNull.Valid {
-			b.Currency = &currencyNull.String
 		}
 		if alertNull.Valid {
 			v := int(alertNull.Int32)

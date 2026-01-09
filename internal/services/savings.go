@@ -14,10 +14,14 @@ type SavingsService interface {
 	CreateInstrument(ctx context.Context, userID string, req CreateSavingsInstrumentRequest) (*domain.SavingsInstrument, error)
 	GetInstrument(ctx context.Context, userID string, savingsInstrumentID string) (*domain.SavingsInstrument, error)
 	ListInstruments(ctx context.Context, userID string) ([]domain.SavingsInstrument, error)
+	PatchInstrument(ctx context.Context, userID string, savingsInstrumentID string, req PatchSavingsInstrumentRequest) (*domain.SavingsInstrument, error)
+	DeleteInstrument(ctx context.Context, userID string, savingsInstrumentID string) error
 }
 
 type CreateSavingsInstrumentRequest struct {
-	SavingsAccountID string  `json:"savings_account_id"`
+	Name            *string `json:"name,omitempty"`
+	SavingsAccountID  *string `json:"savings_account_id,omitempty"`
+	ParentAccountID   *string `json:"parent_account_id,omitempty"`
 	Principal        string  `json:"principal"`
 	InterestRate     *string `json:"interest_rate,omitempty"`
 	TermMonths       *int    `json:"term_months,omitempty"`
@@ -28,19 +32,35 @@ type CreateSavingsInstrumentRequest struct {
 	Status           *string `json:"status,omitempty"`
 }
 
+type PatchSavingsInstrumentRequest struct {
+	Principal       *string `json:"principal,omitempty"`
+	InterestRate    *string `json:"interest_rate,omitempty"`
+	TermMonths      *int    `json:"term_months,omitempty"`
+	StartDate       *string `json:"start_date,omitempty"`
+	MaturityDate    *string `json:"maturity_date,omitempty"`
+	AutoRenew       *bool   `json:"auto_renew,omitempty"`
+	AccruedInterest *string `json:"accrued_interest,omitempty"`
+	Status          *string `json:"status,omitempty"`
+}
+
 type savingsService struct {
-	accounts domain.AccountRepository
+	accounts AccountService
 	repo     domain.SavingsRepository
 }
 
-func NewSavingsService(accounts domain.AccountRepository, repo domain.SavingsRepository) SavingsService {
+func NewSavingsService(accounts AccountService, repo domain.SavingsRepository) SavingsService {
 	return &savingsService{accounts: accounts, repo: repo}
 }
 
 func (s *savingsService) CreateInstrument(ctx context.Context, userID string, req CreateSavingsInstrumentRequest) (*domain.SavingsInstrument, error) {
-	savingsAccountID := strings.TrimSpace(req.SavingsAccountID)
-	if savingsAccountID == "" {
-		return nil, errors.New("savings_account_id is required")
+	var savingsAccountID string
+	parentAccountID := normalizeOptionalString(req.ParentAccountID)
+	name := normalizeOptionalString(req.Name)
+	if req.SavingsAccountID != nil {
+		savingsAccountID = strings.TrimSpace(*req.SavingsAccountID)
+	}
+	if savingsAccountID == "" && parentAccountID == nil {
+		return nil, errors.New("either savings_account_id or parent_account_id is required")
 	}
 
 	principal := strings.TrimSpace(req.Principal)
@@ -89,10 +109,40 @@ func (s *savingsService) CreateInstrument(ctx context.Context, userID string, re
 		}
 	}
 
-	acc, err := s.accounts.GetAccountForUser(ctx, userID, savingsAccountID)
-	if err != nil {
-		return nil, err
+	var acc *domain.Account
+	if savingsAccountID == "" {
+		parent, err := s.accounts.GetAccount(ctx, userID, *parentAccountID)
+		if err != nil {
+			return nil, err
+		}
+		if parent.AccountType != "bank" && parent.AccountType != "wallet" {
+			return nil, errors.New("parent account must be bank or wallet")
+		}
+
+		accName := "Savings"
+		if name != nil {
+			accName = *name
+		}
+
+		createdAcc, err := s.accounts.CreateAccount(ctx, userID, CreateAccountRequest{
+			Name:            accName,
+			AccountType:     "savings",
+			Currency:        parent.Currency,
+			ParentAccountID: parentAccountID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		savingsAccountID = createdAcc.ID
+		acc = createdAcc
+	} else {
+		cur, err := s.accounts.GetAccount(ctx, userID, savingsAccountID)
+		if err != nil {
+			return nil, err
+		}
+		acc = cur
 	}
+
 	if acc.AccountType != "savings" {
 		return nil, errors.New("savings_account_id must be an account of type savings")
 	}
@@ -152,4 +202,112 @@ func (s *savingsService) GetInstrument(ctx context.Context, userID string, savin
 
 func (s *savingsService) ListInstruments(ctx context.Context, userID string) ([]domain.SavingsInstrument, error) {
 	return s.repo.ListSavingsInstruments(ctx, userID)
+}
+
+func (s *savingsService) PatchInstrument(ctx context.Context, userID string, savingsInstrumentID string, req PatchSavingsInstrumentRequest) (*domain.SavingsInstrument, error) {
+	cur, err := s.repo.GetSavingsInstrument(ctx, userID, savingsInstrumentID)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Principal != nil {
+		principal := strings.TrimSpace(*req.Principal)
+		if principal == "" {
+			return nil, errors.New("principal is required")
+		}
+		if !isValidDecimal(principal) {
+			return nil, errors.New("principal must be a decimal string")
+		}
+		cur.Principal = principal
+	}
+
+	if req.InterestRate != nil {
+		v := strings.TrimSpace(*req.InterestRate)
+		if v == "" {
+			cur.InterestRate = nil
+		} else {
+			if !isValidDecimal(v) {
+				return nil, errors.New("interest_rate must be a decimal string")
+			}
+			cur.InterestRate = &v
+		}
+	}
+
+	if req.AccruedInterest != nil {
+		v := strings.TrimSpace(*req.AccruedInterest)
+		if v == "" {
+			cur.AccruedInterest = "0"
+		} else {
+			if !isValidDecimal(v) {
+				return nil, errors.New("accrued_interest must be a decimal string")
+			}
+			cur.AccruedInterest = v
+		}
+	}
+
+	if req.TermMonths != nil {
+		if *req.TermMonths < 0 {
+			return nil, errors.New("term_months must be >= 0")
+		}
+		if *req.TermMonths == 0 {
+			cur.TermMonths = nil
+		} else {
+			v := *req.TermMonths
+			cur.TermMonths = &v
+		}
+	}
+
+	if req.StartDate != nil {
+		v := strings.TrimSpace(*req.StartDate)
+		if v == "" {
+			cur.StartDate = nil
+		} else {
+			if _, err := time.Parse("2006-01-02", v); err != nil {
+				return nil, errors.New("date must be YYYY-MM-DD")
+			}
+			cur.StartDate = &v
+		}
+	}
+
+	if req.MaturityDate != nil {
+		v := strings.TrimSpace(*req.MaturityDate)
+		if v == "" {
+			cur.MaturityDate = nil
+		} else {
+			if _, err := time.Parse("2006-01-02", v); err != nil {
+				return nil, errors.New("date must be YYYY-MM-DD")
+			}
+			cur.MaturityDate = &v
+		}
+	}
+
+	if req.AutoRenew != nil {
+		cur.AutoRenew = *req.AutoRenew
+	}
+
+	if req.Status != nil {
+		v := strings.TrimSpace(*req.Status)
+		if v != "" {
+			if v != "active" && v != "matured" && v != "closed" {
+				return nil, errors.New("status is invalid")
+			}
+			cur.Status = v
+			if v == "closed" {
+				now := time.Now().UTC()
+				cur.ClosedAt = &now
+			} else {
+				cur.ClosedAt = nil
+			}
+		}
+	}
+
+	cur.UpdatedAt = time.Now().UTC()
+	if err := s.repo.UpdateSavingsInstrument(ctx, userID, *cur); err != nil {
+		return nil, err
+	}
+	return s.repo.GetSavingsInstrument(ctx, userID, savingsInstrumentID)
+}
+
+func (s *savingsService) DeleteInstrument(ctx context.Context, userID string, savingsInstrumentID string) error {
+	return s.repo.DeleteSavingsInstrument(ctx, userID, savingsInstrumentID)
 }

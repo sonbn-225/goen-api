@@ -21,31 +21,39 @@ func (r *DebtRepo) CreateDebt(ctx context.Context, debt domain.Debt) error {
 	if r.db == nil {
 		return errors.New("database not ready")
 	}
+	if debt.AccountID == nil || *debt.AccountID == "" {
+		return domain.ErrAccountInvalidInput
+	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
 	}
 
-	_, err = pool.Exec(ctx, `
+	tag, err := pool.Exec(ctx, `
 		INSERT INTO debts (
-			id, client_id, user_id, direction, name, principal, currency,
+			id, client_id, user_id, account_id, direction, name, principal,
 			start_date, due_date, interest_rate, interest_rule,
 			outstanding_principal, accrued_interest, status, closed_at,
 			created_at, updated_at
-		) VALUES (
-			$1,$2,$3,$4,$5,$6::numeric,$7,
+		)
+		SELECT
+			$1,$2,$3,$4,$5,$6,$7::numeric,
 			$8::date,$9::date,$10::numeric,$11,
 			$12::numeric,$13::numeric,$14,$15,
 			$16,$17
+		WHERE EXISTS (
+			SELECT 1
+			FROM user_accounts ua
+			WHERE ua.user_id = $3 AND ua.account_id = $4 AND ua.status = 'active'
 		)
 	`,
 		debt.ID,
 		debt.ClientID,
 		debt.UserID,
+		debt.AccountID,
 		debt.Direction,
 		debt.Name,
 		debt.Principal,
-		debt.Currency,
 		debt.StartDate,
 		debt.DueDate,
 		debt.InterestRate,
@@ -57,7 +65,21 @@ func (r *DebtRepo) CreateDebt(ctx context.Context, debt domain.Debt) error {
 		debt.CreatedAt,
 		debt.UpdatedAt,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		// Either account doesn't exist, or user can't access it.
+		var exists bool
+		if err := pool.QueryRow(ctx, `SELECT TRUE FROM accounts WHERE id = $1`, *debt.AccountID).Scan(&exists); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return domain.ErrAccountNotFound
+			}
+			return err
+		}
+		return domain.ErrAccountForbidden
+	}
+	return nil
 }
 
 func (r *DebtRepo) GetDebt(ctx context.Context, userID string, debtID string) (*domain.Debt, error) {
@@ -71,25 +93,27 @@ func (r *DebtRepo) GetDebt(ctx context.Context, userID string, debtID string) (*
 
 	row := pool.QueryRow(ctx, `
 		SELECT
-			id,
-			client_id,
-			user_id,
-			direction,
-			name,
-			principal::text,
-			currency,
-			to_char(start_date, 'YYYY-MM-DD'),
-			to_char(due_date, 'YYYY-MM-DD'),
-			CASE WHEN interest_rate IS NULL THEN NULL ELSE interest_rate::text END,
-			interest_rule,
-			outstanding_principal::text,
-			accrued_interest::text,
-			status,
-			closed_at,
-			created_at,
-			updated_at
-		FROM debts
-		WHERE id = $1 AND user_id = $2
+			d.id,
+			d.client_id,
+			d.user_id,
+			d.account_id,
+			d.direction,
+			d.name,
+			d.principal::text,
+			a.currency,
+			to_char(d.start_date, 'YYYY-MM-DD'),
+			to_char(d.due_date, 'YYYY-MM-DD'),
+			CASE WHEN d.interest_rate IS NULL THEN NULL ELSE d.interest_rate::text END,
+			d.interest_rule,
+			d.outstanding_principal::text,
+			d.accrued_interest::text,
+			d.status,
+			d.closed_at,
+			d.created_at,
+			d.updated_at
+		FROM debts d
+		LEFT JOIN accounts a ON a.id = d.account_id
+		WHERE d.id = $1 AND d.user_id = $2
 	`, debtID, userID)
 
 	var d domain.Debt
@@ -97,6 +121,7 @@ func (r *DebtRepo) GetDebt(ctx context.Context, userID string, debtID string) (*
 		&d.ID,
 		&d.ClientID,
 		&d.UserID,
+		&d.AccountID,
 		&d.Direction,
 		&d.Name,
 		&d.Principal,
@@ -131,26 +156,28 @@ func (r *DebtRepo) ListDebts(ctx context.Context, userID string) ([]domain.Debt,
 
 	rows, err := pool.Query(ctx, `
 		SELECT
-			id,
-			client_id,
-			user_id,
-			direction,
-			name,
-			principal::text,
-			currency,
-			to_char(start_date, 'YYYY-MM-DD'),
-			to_char(due_date, 'YYYY-MM-DD'),
-			CASE WHEN interest_rate IS NULL THEN NULL ELSE interest_rate::text END,
-			interest_rule,
-			outstanding_principal::text,
-			accrued_interest::text,
-			status,
-			closed_at,
-			created_at,
-			updated_at
-		FROM debts
-		WHERE user_id = $1
-		ORDER BY due_date ASC, id ASC
+			d.id,
+			d.client_id,
+			d.user_id,
+			d.account_id,
+			d.direction,
+			d.name,
+			d.principal::text,
+			a.currency,
+			to_char(d.start_date, 'YYYY-MM-DD'),
+			to_char(d.due_date, 'YYYY-MM-DD'),
+			CASE WHEN d.interest_rate IS NULL THEN NULL ELSE d.interest_rate::text END,
+			d.interest_rule,
+			d.outstanding_principal::text,
+			d.accrued_interest::text,
+			d.status,
+			d.closed_at,
+			d.created_at,
+			d.updated_at
+		FROM debts d
+		LEFT JOIN accounts a ON a.id = d.account_id
+		WHERE d.user_id = $1
+		ORDER BY d.due_date ASC, d.id ASC
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -164,6 +191,7 @@ func (r *DebtRepo) ListDebts(ctx context.Context, userID string) ([]domain.Debt,
 			&d.ID,
 			&d.ClientID,
 			&d.UserID,
+			&d.AccountID,
 			&d.Direction,
 			&d.Name,
 			&d.Principal,

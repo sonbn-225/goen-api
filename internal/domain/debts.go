@@ -12,10 +12,11 @@ type Debt struct {
 	ID                 string     `json:"id"`
 	ClientID           *string    `json:"client_id,omitempty"`
 	UserID             string     `json:"user_id"`
+	AccountID          *string    `json:"account_id,omitempty"`
 	Direction          string     `json:"direction"`
 	Name               *string    `json:"name,omitempty"`
 	Principal          string     `json:"principal"`
-	Currency           string     `json:"currency"`
+	Currency           *string    `json:"currency,omitempty"`
 	StartDate          string     `json:"start_date"`
 	DueDate            string     `json:"due_date"`
 	InterestRate       *string    `json:"interest_rate,omitempty"`

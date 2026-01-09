@@ -32,13 +32,15 @@ func (r *AccountRepo) CreateAccountWithOwner(ctx context.Context, account domain
 	return withTx(ctx, pool, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
 			INSERT INTO accounts (
-				id, client_id, name, account_type, currency, parent_account_id, status, closed_at,
+				id, client_id, name, account_number, color, account_type, currency, parent_account_id, status, closed_at,
 				created_at, updated_at, created_by, updated_by, deleted_at
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
 		`,
 			account.ID,
 			account.ClientID,
 			account.Name,
+			account.AccountNumber,
+			account.Color,
 			account.AccountType,
 			account.Currency,
 			account.ParentAccountID,
@@ -85,7 +87,7 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID string) ([
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT a.id, a.client_id, a.name, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
+		SELECT a.id, a.client_id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
 		       a.created_at, a.updated_at, a.created_by, a.updated_by, a.deleted_at
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
@@ -104,6 +106,8 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID string) ([
 			&a.ID,
 			&a.ClientID,
 			&a.Name,
+			&a.AccountNumber,
+			&a.Color,
 			&a.AccountType,
 			&a.Currency,
 			&a.ParentAccountID,
@@ -133,7 +137,7 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID string, acco
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT a.id, a.client_id, a.name, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
+		SELECT a.id, a.client_id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
 		       a.created_at, a.updated_at, a.created_by, a.updated_by, a.deleted_at
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
@@ -145,6 +149,8 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID string, acco
 		&a.ID,
 		&a.ClientID,
 		&a.Name,
+		&a.AccountNumber,
+		&a.Color,
 		&a.AccountType,
 		&a.Currency,
 		&a.ParentAccountID,
@@ -201,6 +207,7 @@ func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID string, acco
 
 		status := cur.Status
 		closedAt := cur.ClosedAt
+		color := cur.Color
 		if patch.Status != nil {
 			s := strings.TrimSpace(*patch.Status)
 			if s != "active" && s != "closed" {
@@ -215,16 +222,26 @@ func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID string, acco
 				closedAt = nil
 			}
 		}
+		if patch.Color != nil {
+			c := strings.TrimSpace(*patch.Color)
+			if c == "" {
+				color = nil
+			} else {
+				lc := strings.ToLower(c)
+				color = &lc
+			}
+		}
 
 		ct, err := tx.Exec(ctx, `
 			UPDATE accounts
 			SET name = $1,
-			    status = $2,
-			    closed_at = $3,
-			    updated_at = $4,
-			    updated_by = $5
-			WHERE id = $6 AND deleted_at IS NULL
-		`, name, status, closedAt, now, actorUserID, accountID)
+			    color = $2,
+			    status = $3,
+			    closed_at = $4,
+			    updated_at = $5,
+			    updated_by = $6
+			WHERE id = $7 AND deleted_at IS NULL
+		`, name, color, status, closedAt, now, actorUserID, accountID)
 		if err != nil {
 			return err
 		}
@@ -298,8 +315,8 @@ func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID str
 		         CASE
 		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
 		           WHEN t.type = 'expense' AND t.account_id = a.id THEN -t.amount
-		           WHEN t.type = 'transfer' AND t.to_account_id = a.id THEN t.amount
-		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -t.amount
+		           WHEN t.type = 'transfer' AND t.to_account_id = a.id THEN COALESCE(t.to_amount, t.amount)
+		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -COALESCE(t.from_amount, t.amount)
 		           ELSE 0
 		         END
 		       ), 0)::text AS balance

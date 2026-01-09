@@ -112,3 +112,88 @@ func GetSavingsInstrument(d Deps) http.HandlerFunc {
 		writeJSON(w, http.StatusOK, item)
 	}
 }
+
+// PatchSavingsInstrument godoc
+// @Summary Patch savings instrument
+// @Description Patch fields of an existing SavingsInstrument accessible to current user.
+// @Tags savings
+// @Accept json
+// @Produce json
+// @Param instrumentId path string true "Savings instrument ID"
+// @Param body body services.PatchSavingsInstrumentRequest true "Patch savings instrument request"
+// @Success 200 {object} domain.SavingsInstrument
+// @Failure 400 {object} apierror.Envelope
+// @Failure 401 {object} apierror.Envelope
+// @Failure 404 {object} apierror.Envelope
+// @Failure 500 {object} apierror.Envelope
+// @Router /savings/instruments/{instrumentId} [patch]
+func PatchSavingsInstrument(d Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+			return
+		}
+
+		id := chi.URLParam(r, "instrumentId")
+		if id == "" {
+			apierror.Write(w, http.StatusBadRequest, "validation_error", "instrumentId is required", map[string]any{"field": "instrumentId"})
+			return
+		}
+
+		var req services.PatchSavingsInstrumentRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+			return
+		}
+
+		item, err := d.SavingsService.PatchInstrument(r.Context(), uid, id, req)
+		if err != nil {
+			if errors.Is(err, domain.ErrSavingsInstrumentNotFound) {
+				apierror.Write(w, http.StatusNotFound, "not_found", "savings instrument not found", nil)
+				return
+			}
+			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			return
+		}
+		writeJSON(w, http.StatusOK, item)
+	}
+}
+
+// DeleteSavingsInstrument godoc
+// @Summary Delete savings instrument
+// @Description Delete an existing SavingsInstrument accessible to current user.
+// @Tags savings
+// @Produce json
+// @Param instrumentId path string true "Savings instrument ID"
+// @Success 200 {object} map[string]string
+// @Failure 401 {object} apierror.Envelope
+// @Failure 404 {object} apierror.Envelope
+// @Failure 500 {object} apierror.Envelope
+// @Router /savings/instruments/{instrumentId} [delete]
+func DeleteSavingsInstrument(d Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := auth.UserIDFromContext(r.Context())
+		if !ok {
+			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+			return
+		}
+
+		id := chi.URLParam(r, "instrumentId")
+		if id == "" {
+			apierror.Write(w, http.StatusBadRequest, "validation_error", "instrumentId is required", map[string]any{"field": "instrumentId"})
+			return
+		}
+
+		if err := d.SavingsService.DeleteInstrument(r.Context(), uid, id); err != nil {
+			if errors.Is(err, domain.ErrSavingsInstrumentNotFound) {
+				apierror.Write(w, http.StatusNotFound, "not_found", "savings instrument not found", nil)
+				return
+			}
+			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]string{"deleted": id})
+	}
+}

@@ -31,4 +31,6 @@ type SavingsRepository interface {
 	CreateSavingsInstrument(ctx context.Context, userID string, s SavingsInstrument) error
 	GetSavingsInstrument(ctx context.Context, userID string, savingsInstrumentID string) (*SavingsInstrument, error)
 	ListSavingsInstruments(ctx context.Context, userID string) ([]SavingsInstrument, error)
+	UpdateSavingsInstrument(ctx context.Context, userID string, s SavingsInstrument) error
+	DeleteSavingsInstrument(ctx context.Context, userID string, savingsInstrumentID string) error
 }

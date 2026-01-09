@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -31,10 +32,15 @@ func (r *UserRepo) CreateUser(ctx context.Context, u domain.UserWithPassword) er
 		return err
 	}
 
+	settingsJSON, err := json.Marshal(u.Settings)
+	if err != nil {
+		return err
+	}
+
 	_, err = pool.Exec(ctx, `
-		INSERT INTO users (id, email, phone, display_name, status, password_hash, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, u.ID, u.Email, u.Phone, u.DisplayName, u.Status, u.PasswordHash, u.CreatedAt, u.UpdatedAt)
+		INSERT INTO users (id, email, phone, display_name, settings, status, password_hash, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9)
+	`, u.ID, u.Email, u.Phone, u.DisplayName, settingsJSON, u.Status, u.PasswordHash, u.CreatedAt, u.UpdatedAt)
 
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -64,16 +70,18 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*domain.User, e
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, email, phone, display_name, status, created_at, updated_at
+		SELECT id, email, phone, display_name, settings, status, created_at, updated_at
 		FROM users
 		WHERE id = $1`, id)
 
 	var u domain.User
+	var settingsJSON []byte
 	err = row.Scan(
 		&u.ID,
 		&u.Email,
 		&u.Phone,
 		&u.DisplayName,
+		&settingsJSON,
 		&u.Status,
 		&u.CreatedAt,
 		&u.UpdatedAt,
@@ -83,6 +91,12 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*domain.User, e
 			return nil, domain.ErrUserNotFound
 		}
 		return nil, err
+	}
+	if len(settingsJSON) > 0 {
+		var v any
+		if err := json.Unmarshal(settingsJSON, &v); err == nil {
+			u.Settings = v
+		}
 	}
 	return &u, nil
 }
@@ -97,16 +111,18 @@ func (r *UserRepo) findOneUser(ctx context.Context, whereClause string, args ...
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, email, phone, display_name, status, password_hash, created_at, updated_at
+		SELECT id, email, phone, display_name, settings, status, password_hash, created_at, updated_at
 		FROM users
 		WHERE `+whereClause, args...)
 
 	var u domain.UserWithPassword
+	var settingsJSON []byte
 	err = row.Scan(
 		&u.ID,
 		&u.Email,
 		&u.Phone,
 		&u.DisplayName,
+		&settingsJSON,
 		&u.Status,
 		&u.PasswordHash,
 		&u.CreatedAt,
@@ -117,6 +133,51 @@ func (r *UserRepo) findOneUser(ctx context.Context, whereClause string, args ...
 			return nil, domain.ErrUserNotFound
 		}
 		return nil, err
+	}
+	if len(settingsJSON) > 0 {
+		var v any
+		if err := json.Unmarshal(settingsJSON, &v); err == nil {
+			u.Settings = v
+		}
+	}
+	return &u, nil
+}
+
+func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID string, patch map[string]any) (*domain.User, error) {
+	if r.db == nil {
+		return nil, errors.New("database not ready")
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	patchJSON, err := json.Marshal(patch)
+	if err != nil {
+		return nil, err
+	}
+
+	row := pool.QueryRow(ctx, `
+		UPDATE users
+		SET settings = COALESCE(settings, '{}'::jsonb) || $1::jsonb,
+		    updated_at = NOW()
+		WHERE id = $2
+		RETURNING id, email, phone, display_name, settings, status, created_at, updated_at
+	`, patchJSON, userID)
+
+	var u domain.User
+	var settingsJSON []byte
+	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrUserNotFound
+		}
+		return nil, err
+	}
+	if len(settingsJSON) > 0 {
+		var v any
+		if err := json.Unmarshal(settingsJSON, &v); err == nil {
+			u.Settings = v
+		}
 	}
 	return &u, nil
 }

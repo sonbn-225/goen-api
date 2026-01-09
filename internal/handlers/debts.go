@@ -67,6 +67,14 @@ func CreateDebt(d Deps) http.HandlerFunc {
 
 		item, err := d.DebtService.Create(r.Context(), uid, req)
 		if err != nil {
+			if errors.Is(err, domain.ErrAccountNotFound) {
+				apierror.Write(w, http.StatusNotFound, "not_found", "account not found", map[string]any{"field": "account_id"})
+				return
+			}
+			if errors.Is(err, domain.ErrAccountForbidden) {
+				apierror.Write(w, http.StatusForbidden, "forbidden", "account forbidden", map[string]any{"field": "account_id"})
+				return
+			}
 			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
 			return
 		}

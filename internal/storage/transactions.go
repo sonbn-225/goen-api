@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -35,7 +36,8 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 		auditDiff := map[string]any{
 			"type":        tx.Type,
 			"amount":      tx.Amount,
-			"currency":    tx.Currency,
+			"from_amount": tx.FromAmount,
+			"to_amount":   tx.ToAmount,
 			"occurred_at": tx.OccurredAt.UTC().Format(time.RFC3339Nano),
 		}
 		// Permission checks
@@ -69,16 +71,54 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 			if err := requireAccountActive(ctx, dbtx, *tx.ToAccountID); err != nil {
 				return err
 			}
+
+			fromCur, err := getAccountCurrency(ctx, dbtx, *tx.FromAccountID)
+			if err != nil {
+				return err
+			}
+			toCur, err := getAccountCurrency(ctx, dbtx, *tx.ToAccountID)
+			if err != nil {
+				return err
+			}
+			fx := strings.ToUpper(strings.TrimSpace(fromCur)) != strings.ToUpper(strings.TrimSpace(toCur))
+
+			// Default amounts for same-currency transfers.
+			if tx.FromAmount == nil {
+				tx.FromAmount = &tx.Amount
+			}
+			if tx.ToAmount == nil {
+				if fx {
+					return errors.New("to_amount is required for FX transfer")
+				}
+				tx.ToAmount = &tx.Amount
+			}
+			if fx {
+				if tx.FromAmount == nil || tx.ToAmount == nil {
+					return errors.New("from_amount and to_amount are required for FX transfer")
+				}
+			}
+
+			// Auto-compute exchange_rate if omitted and amounts are provided.
+			if tx.ExchangeRate == nil && tx.FromAmount != nil && tx.ToAmount != nil {
+				rate, err := computeExchangeRate(*tx.FromAmount, *tx.ToAmount)
+				if err != nil {
+					return err
+				}
+				if rate != nil {
+					tx.ExchangeRate = rate
+				}
+			}
 		default:
 			return errors.New("type is invalid")
 		}
 
 		_, err := dbtx.Exec(ctx, `
 			INSERT INTO transactions (
-				id, client_id, external_ref, type, occurred_at, amount, currency, description,
+				id, client_id, external_ref, type, occurred_at, amount, description,
+				from_amount, to_amount,
 				account_id, from_account_id, to_account_id, exchange_rate,
 				counterparty, notes, status, created_at, updated_at, created_by, updated_by, deleted_at
-			) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7,$8,$9,$10,$11,$12::numeric,$13,$14,$15,$16,$17,$18,$19,$20)
+			) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7,$8::numeric,$9::numeric,$10,$11,$12,$13::numeric,$14,$15,$16,$17,$18,$19,$20,$21,$22)
 		`,
 			tx.ID,
 			tx.ClientID,
@@ -86,8 +126,9 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 			tx.Type,
 			tx.OccurredAt,
 			tx.Amount,
-			tx.Currency,
 			tx.Description,
+			tx.FromAmount,
+			tx.ToAmount,
 			tx.AccountID,
 			tx.FromAccountID,
 			tx.ToAccountID,
@@ -174,6 +215,41 @@ func requireAccountActive(ctx context.Context, dbtx pgx.Tx, accountID string) er
 	return nil
 }
 
+func getAccountCurrency(ctx context.Context, dbtx pgx.Tx, accountID string) (string, error) {
+	var currency string
+	err := dbtx.QueryRow(ctx, `
+		SELECT currency
+		FROM accounts
+		WHERE id = $1 AND deleted_at IS NULL
+	`, accountID).Scan(&currency)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", errors.New("account not found")
+		}
+		return "", err
+	}
+	return currency, nil
+}
+
+// computeExchangeRate returns to_amount / from_amount rounded to 8 decimals.
+// Returns nil when from_amount is zero (cannot compute).
+func computeExchangeRate(fromAmount string, toAmount string) (*string, error) {
+	fromRat, ok := new(big.Rat).SetString(strings.TrimSpace(fromAmount))
+	if !ok {
+		return nil, errors.New("from_amount must be a decimal string")
+	}
+	toRat, ok := new(big.Rat).SetString(strings.TrimSpace(toAmount))
+	if !ok {
+		return nil, errors.New("to_amount must be a decimal string")
+	}
+	if fromRat.Cmp(new(big.Rat)) == 0 {
+		return nil, nil
+	}
+	rate := new(big.Rat).Quo(toRat, fromRat)
+	v := rate.FloatString(8)
+	return &v, nil
+}
+
 func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, transactionID string) (*domain.Transaction, error) {
 	if r.db == nil {
 		return nil, errors.New("database not ready")
@@ -192,12 +268,16 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 			t.occurred_at,
 			to_char(t.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS occurred_date,
 			t.amount::text,
-			t.currency,
+			CASE WHEN t.from_amount IS NULL THEN NULL ELSE t.from_amount::text END,
+			CASE WHEN t.to_amount IS NULL THEN NULL ELSE t.to_amount::text END,
 			t.description,
 			t.account_id,
 			t.from_account_id,
 			t.to_account_id,
 			CASE WHEN t.exchange_rate IS NULL THEN NULL ELSE t.exchange_rate::text END,
+			a.currency AS account_currency,
+			fa.currency AS from_currency,
+			ta.currency AS to_currency,
 			t.counterparty,
 			t.notes,
 			t.status,
@@ -208,6 +288,9 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 			t.deleted_at,
 			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::text[]) AS tag_ids
 		FROM transactions t
+		LEFT JOIN accounts a ON a.id = t.account_id
+		LEFT JOIN accounts fa ON fa.id = t.from_account_id
+		LEFT JOIN accounts ta ON ta.id = t.to_account_id
 		WHERE t.id = $1 AND t.deleted_at IS NULL
 		  AND (
 			(t.type IN ('expense','income') AND EXISTS (
@@ -234,12 +317,16 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 		&t.OccurredAt,
 		&t.OccurredDate,
 		&t.Amount,
-		&t.Currency,
+		&t.FromAmount,
+		&t.ToAmount,
 		&t.Description,
 		&t.AccountID,
 		&t.FromAccountID,
 		&t.ToAccountID,
 		&t.ExchangeRate,
+		&t.AccountCurrency,
+		&t.FromCurrency,
+		&t.ToCurrency,
 		&t.Counterparty,
 		&t.Notes,
 		&t.Status,
@@ -338,12 +425,16 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 			t.occurred_at,
 			to_char(t.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS occurred_date,
 			t.amount::text,
-			t.currency,
+			CASE WHEN t.from_amount IS NULL THEN NULL ELSE t.from_amount::text END,
+			CASE WHEN t.to_amount IS NULL THEN NULL ELSE t.to_amount::text END,
 			t.description,
 			t.account_id,
 			t.from_account_id,
 			t.to_account_id,
 			CASE WHEN t.exchange_rate IS NULL THEN NULL ELSE t.exchange_rate::text END,
+			a.currency AS account_currency,
+			fa.currency AS from_currency,
+			ta.currency AS to_currency,
 			t.counterparty,
 			t.notes,
 			t.status,
@@ -354,6 +445,9 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 			t.deleted_at,
 			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::text[]) AS tag_ids
 		FROM transactions t
+		LEFT JOIN accounts a ON a.id = t.account_id
+		LEFT JOIN accounts fa ON fa.id = t.from_account_id
+		LEFT JOIN accounts ta ON ta.id = t.to_account_id
 		WHERE t.deleted_at IS NULL
 		  AND (
 			(t.type IN ('expense','income') AND EXISTS (
@@ -389,12 +483,16 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 			&t.OccurredAt,
 			&t.OccurredDate,
 			&t.Amount,
-			&t.Currency,
+			&t.FromAmount,
+			&t.ToAmount,
 			&t.Description,
 			&t.AccountID,
 			&t.FromAccountID,
 			&t.ToAccountID,
 			&t.ExchangeRate,
+			&t.AccountCurrency,
+			&t.FromCurrency,
+			&t.ToCurrency,
 			&t.Counterparty,
 			&t.Notes,
 			&t.Status,

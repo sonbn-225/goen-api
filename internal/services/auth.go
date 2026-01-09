@@ -17,6 +17,18 @@ type AuthService interface {
 	Signup(ctx context.Context, req SignupRequest) (*AuthResponse, error)
 	Signin(ctx context.Context, req SigninRequest) (*AuthResponse, error)
 	GetMe(ctx context.Context, userID string) (*domain.User, error)
+	UpdateMySettings(ctx context.Context, userID string, patch map[string]any) (*domain.User, error)
+}
+
+func defaultUserSettings() map[string]any {
+	return map[string]any{
+		"locale":           "vi-VN",
+		"default_currency": "VND",
+		"number_format":    "vi-VN",
+		"month_start_day":  1,
+		"week_start_day":   1,
+		"timezone":         "Asia/Ho_Chi_Minh",
+	}
 }
 
 type SignupRequest struct {
@@ -90,6 +102,7 @@ func (s *authService) Signup(ctx context.Context, req SignupRequest) (*AuthRespo
 			Email:       emailPtr,
 			Phone:       phonePtr,
 			DisplayName: displayNamePtr,
+			Settings:    defaultUserSettings(),
 			Status:      "active",
 			CreatedAt:   now,
 			UpdatedAt:   now,
@@ -166,6 +179,79 @@ func (s *authService) GetMe(ctx context.Context, userID string) (*domain.User, e
 		return nil, err
 	}
 	return user, nil
+}
+
+func (s *authService) UpdateMySettings(ctx context.Context, userID string, patch map[string]any) (*domain.User, error) {
+	if patch == nil {
+		patch = map[string]any{}
+	}
+
+	// Minimal validation/sanitization for common keys.
+	if v, ok := patch["default_currency"]; ok {
+		if s, ok := v.(string); ok {
+			patch["default_currency"] = strings.ToUpper(strings.TrimSpace(s))
+		} else {
+			delete(patch, "default_currency")
+		}
+	}
+	if v, ok := patch["locale"]; ok {
+		if s, ok := v.(string); ok {
+			patch["locale"] = strings.TrimSpace(s)
+		} else {
+			delete(patch, "locale")
+		}
+	}
+	if v, ok := patch["number_format"]; ok {
+		if s, ok := v.(string); ok {
+			patch["number_format"] = strings.TrimSpace(s)
+		} else {
+			delete(patch, "number_format")
+		}
+	}
+	if v, ok := patch["timezone"]; ok {
+		if s, ok := v.(string); ok {
+			patch["timezone"] = strings.TrimSpace(s)
+		} else {
+			delete(patch, "timezone")
+		}
+	}
+	if v, ok := patch["month_start_day"]; ok {
+		n, ok := v.(float64) // JSON numbers decode as float64
+		if !ok {
+			delete(patch, "month_start_day")
+		} else {
+			day := int(n)
+			if day < 1 || day > 28 {
+				delete(patch, "month_start_day")
+			} else {
+				patch["month_start_day"] = day
+			}
+		}
+	}
+	if v, ok := patch["week_start_day"]; ok {
+		n, ok := v.(float64)
+		if !ok {
+			delete(patch, "week_start_day")
+		} else {
+			day := int(n)
+			if day < 1 || day > 7 {
+				delete(patch, "week_start_day")
+			} else {
+				patch["week_start_day"] = day
+			}
+		}
+	}
+
+	updated, err := s.userRepo.UpdateUserSettings(ctx, userID, patch)
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure defaults exist for older users.
+	if updated.Settings == nil {
+		updated.Settings = defaultUserSettings()
+	}
+	return updated, nil
 }
 
 func (s *authService) generateToken(user domain.User) (string, int, error) {
