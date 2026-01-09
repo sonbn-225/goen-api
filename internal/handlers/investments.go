@@ -151,42 +151,6 @@ func ListSecurities(d Deps) http.HandlerFunc {
 	}
 }
 
-// CreateSecurity godoc
-// @Summary Create security
-// @Description Create a security in global catalog (MVP).
-// @Tags investments
-// @Accept json
-// @Produce json
-// @Param body body services.CreateSecurityRequest true "Create security request"
-// @Success 200 {object} domain.Security
-// @Failure 400 {object} apierror.Envelope
-// @Failure 401 {object} apierror.Envelope
-// @Failure 500 {object} apierror.Envelope
-// @Router /securities [post]
-func CreateSecurity(d Deps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
-		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
-			return
-		}
-
-		var req services.CreateSecurityRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
-			return
-		}
-
-		item, err := d.InvestmentService.CreateSecurity(r.Context(), uid, req)
-		if err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
-			return
-		}
-
-		writeJSON(w, http.StatusOK, item)
-	}
-}
-
 // GetSecurity godoc
 // @Summary Get security
 // @Description Get a single security.

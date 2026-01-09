@@ -2401,56 +2401,6 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "post": {
-                "description": "Create a security in global catalog (MVP).",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "Create security",
-                "parameters": [
-                    {
-                        "description": "Create security request",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.CreateSecurityRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/domain.Security"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
             }
         },
         "/securities/{securityId}": {
@@ -4665,23 +4615,6 @@ const docTemplate = `{
                 },
                 "term_months": {
                     "type": "integer"
-                }
-            }
-        },
-        "services.CreateSecurityRequest": {
-            "type": "object",
-            "properties": {
-                "asset_class": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "symbol": {
-                    "type": "string"
                 }
             }
         },

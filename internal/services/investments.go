@@ -3,11 +3,13 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
@@ -18,7 +20,6 @@ type InvestmentService interface {
 	ListInvestmentAccounts(ctx context.Context, userID string) ([]domain.InvestmentAccount, error)
 
 	// Securities
-	CreateSecurity(ctx context.Context, userID string, req CreateSecurityRequest) (*domain.Security, error)
 	GetSecurity(ctx context.Context, userID string, securityID string) (*domain.Security, error)
 	ListSecurities(ctx context.Context, userID string) ([]domain.Security, error)
 
@@ -39,18 +40,11 @@ type InvestmentService interface {
 }
 
 type CreateInvestmentAccountRequest struct {
-	AccountID      *string `json:"account_id,omitempty"`
+	AccountID       *string `json:"account_id,omitempty"`
 	ParentAccountID *string `json:"parent_account_id,omitempty"`
-	BrokerName    *string `json:"broker_name,omitempty"`
-	SyncEnabled   *bool   `json:"sync_enabled,omitempty"`
-	SyncSettings  any     `json:"sync_settings,omitempty"`
-}
-
-type CreateSecurityRequest struct {
-	Symbol     string  `json:"symbol"`
-	Name       *string `json:"name,omitempty"`
-	AssetClass *string `json:"asset_class,omitempty"`
-	Currency   *string `json:"currency,omitempty"`
+	BrokerName      *string `json:"broker_name,omitempty"`
+	SyncEnabled     *bool   `json:"sync_enabled,omitempty"`
+	SyncSettings    any     `json:"sync_settings,omitempty"`
 }
 
 type CreateTradeRequest struct {
@@ -138,14 +132,14 @@ func (s *investmentService) CreateInvestmentAccount(ctx context.Context, userID 
 	id := uuid.NewString()
 
 	item := domain.InvestmentAccount{
-		ID:          id,
-		AccountID:   accountID,
-		BrokerName:  normalizeOptionalString(req.BrokerName),
-		Currency:    acc.Currency,
-		SyncEnabled: syncEnabled,
+		ID:           id,
+		AccountID:    accountID,
+		BrokerName:   normalizeOptionalString(req.BrokerName),
+		Currency:     acc.Currency,
+		SyncEnabled:  syncEnabled,
 		SyncSettings: req.SyncSettings,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
 
 	if err := s.repo.CreateInvestmentAccount(ctx, userID, item); err != nil {
@@ -167,53 +161,61 @@ func (s *investmentService) GetInvestmentAccount(ctx context.Context, userID str
 }
 
 func (s *investmentService) ListInvestmentAccounts(ctx context.Context, userID string) ([]domain.InvestmentAccount, error) {
-	return s.repo.ListInvestmentAccounts(ctx, userID)
-}
-
-func (s *investmentService) CreateSecurity(ctx context.Context, _ string, req CreateSecurityRequest) (*domain.Security, error) {
-	symbol := strings.TrimSpace(req.Symbol)
-	if symbol == "" {
-		return nil, errors.New("symbol is required")
-	}
-	currency := normalizeOptionalString(req.Currency)
-	if currency != nil {
-		v := strings.ToUpper(strings.TrimSpace(*currency))
-		if len(v) != 3 {
-			return nil, errors.New("currency must be ISO4217")
-		}
-		currency = &v
-	}
-
-	assetClass := normalizeOptionalString(req.AssetClass)
-	if assetClass != nil {
-		switch *assetClass {
-		case "stock", "fund", "crypto", "bond", "other":
-			// ok
-		default:
-			return nil, errors.New("asset_class is invalid")
-		}
-	}
-
-	now := time.Now().UTC()
-	id := uuid.NewString()
-	item := domain.Security{
-		ID:         id,
-		Symbol:     symbol,
-		Name:       normalizeOptionalString(req.Name),
-		AssetClass: assetClass,
-		Currency:   currency,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	}
-
-	if err := s.repo.CreateSecurity(ctx, item); err != nil {
-		return nil, err
-	}
-	created, err := s.repo.GetSecurity(ctx, id)
+	// Backfill: accounts of type `broker` created via Accounts UI should appear here.
+	// Investment accounts are a 1-1 extension table, so ensure the extension exists.
+	accounts, err := s.accounts.ListAccounts(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return created, nil
+
+	existing, err := s.repo.ListInvestmentAccounts(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	existingByAccountID := make(map[string]struct{}, len(existing))
+	for _, ia := range existing {
+		existingByAccountID[ia.AccountID] = struct{}{}
+	}
+
+	createdAny := false
+	for _, acc := range accounts {
+		if acc.AccountType != "broker" || acc.Status != "active" {
+			continue
+		}
+		if _, ok := existingByAccountID[acc.ID]; ok {
+			continue
+		}
+
+		now := time.Now().UTC()
+		brokerName := strings.TrimSpace(acc.Name)
+		var brokerNamePtr *string
+		if brokerName != "" {
+			brokerNamePtr = &brokerName
+		}
+
+		item := domain.InvestmentAccount{
+			ID:          uuid.NewString(),
+			AccountID:   acc.ID,
+			BrokerName:  brokerNamePtr,
+			Currency:    acc.Currency,
+			SyncEnabled: false,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+
+		if err := s.repo.CreateInvestmentAccount(ctx, userID, item); err != nil {
+			if isUniqueViolation(err) {
+				continue
+			}
+			return nil, fmt.Errorf("backfill investment account for broker account %s: %w", acc.ID, err)
+		}
+		createdAny = true
+	}
+
+	if createdAny {
+		return s.repo.ListInvestmentAccounts(ctx, userID)
+	}
+	return existing, nil
 }
 
 func (s *investmentService) GetSecurity(ctx context.Context, _ string, securityID string) (*domain.Security, error) {
@@ -385,28 +387,28 @@ func (s *investmentService) CreateTrade(ctx context.Context, userID string, brok
 	}
 
 	item := domain.Trade{
-		ID:              id,
-		ClientID:        normalizeOptionalString(req.ClientID),
-		BrokerAccountID: bid,
-		SecurityID:      securityID,
+		ID:               id,
+		ClientID:         normalizeOptionalString(req.ClientID),
+		BrokerAccountID:  bid,
+		SecurityID:       securityID,
 		FeeTransactionID: feeTxID,
 		TaxTransactionID: taxTxID,
-		Side:            side,
-		Quantity:        quantity,
-		Price:           price,
-		Fees:            fees,
-		Taxes:           taxes,
-		OccurredAt:      occurredAt,
-		Note:            normalizeOptionalString(req.Note),
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		Side:             side,
+		Quantity:         quantity,
+		Price:            price,
+		Fees:             fees,
+		Taxes:            taxes,
+		OccurredAt:       occurredAt,
+		Note:             normalizeOptionalString(req.Note),
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 
 	if err := s.repo.CreateTrade(ctx, userID, item); err != nil {
 		return nil, err
 	}
 
-	// Return it by scanning list (MVP style). 
+	// Return it by scanning list (MVP style).
 	items, err := s.repo.ListTrades(ctx, userID, bid)
 	if err != nil {
 		return &item, nil
@@ -546,7 +548,6 @@ func deriveTradeExternalRef(clientID *string, tradeID string, kind string) *stri
 	return &out
 }
 
-
 func firstNonNilString(a, b, c *string) string {
 	if a != nil {
 		v := strings.TrimSpace(*a)
@@ -604,4 +605,12 @@ func cmpDecimalStrings(a, b string) int {
 		return 0
 	}
 	return ra.Cmp(rb)
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return false
 }

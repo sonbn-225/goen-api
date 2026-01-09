@@ -42,7 +42,7 @@ func (r *InvestmentRepo) CreateInvestmentAccount(ctx context.Context, userID str
 			WHERE a.id = $2
 			  AND a.account_type = 'broker'
 			  AND a.deleted_at IS NULL
-			  AND ua.user_id = $9
+			  AND ua.user_id = $8
 			  AND ua.status = 'active'
 			  AND ua.permission IN ('owner','editor')
 		)
@@ -122,21 +122,6 @@ func (r *InvestmentRepo) ListInvestmentAccounts(ctx context.Context, userID stri
 		out = append(out, ia)
 	}
 	return out, rows.Err()
-}
-
-func (r *InvestmentRepo) CreateSecurity(ctx context.Context, s domain.Security) error {
-	if r.db == nil {
-		return errors.New("database not ready")
-	}
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = pool.Exec(ctx, `
-		INSERT INTO securities (id, symbol, name, asset_class, currency, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)
-	`, s.ID, s.Symbol, s.Name, s.AssetClass, s.Currency, s.CreatedAt, s.UpdatedAt)
-	return err
 }
 
 func (r *InvestmentRepo) GetSecurity(ctx context.Context, securityID string) (*domain.Security, error) {

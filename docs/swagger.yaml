@@ -899,17 +899,6 @@ definitions:
       term_months:
         type: integer
     type: object
-  services.CreateSecurityRequest:
-    properties:
-      asset_class:
-        type: string
-      currency:
-        type: string
-      name:
-        type: string
-      symbol:
-        type: string
-    type: object
   services.CreateTagRequest:
     properties:
       color:
@@ -2646,39 +2635,6 @@ paths:
           schema:
             $ref: '#/definitions/apierror.Envelope'
       summary: List securities
-      tags:
-      - investments
-    post:
-      consumes:
-      - application/json
-      description: Create a security in global catalog (MVP).
-      parameters:
-      - description: Create security request
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/services.CreateSecurityRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.Security'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: Create security
       tags:
       - investments
   /securities/{securityId}:
