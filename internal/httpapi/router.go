@@ -167,8 +167,6 @@ func NewRouter(cfg *config.Config) http.Handler {
 
 		r.With(invAuth).Get("/securities", handlers.ListSecurities(deps))
 		r.With(invAuth).Get("/securities/", handlers.ListSecurities(deps))
-		r.With(invAuth).Post("/securities", handlers.CreateSecurity(deps))
-		r.With(invAuth).Post("/securities/", handlers.CreateSecurity(deps))
 		r.With(invAuth).Get("/securities/{securityId}", handlers.GetSecurity(deps))
 		r.With(invAuth).Get("/securities/{securityId}/prices-daily", handlers.ListSecurityPricesDaily(deps))
 		r.With(invAuth).Post("/securities/{securityId}/prices-daily/refresh", handlers.RefreshSecurityPricesDaily(deps))

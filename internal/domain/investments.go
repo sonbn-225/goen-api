@@ -127,7 +127,6 @@ type InvestmentRepository interface {
 	ListInvestmentAccounts(ctx context.Context, userID string) ([]InvestmentAccount, error)
 
 	// Securities
-	CreateSecurity(ctx context.Context, s Security) error
 	GetSecurity(ctx context.Context, securityID string) (*Security, error)
 	ListSecurities(ctx context.Context) ([]Security, error)
 
