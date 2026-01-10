@@ -30,22 +30,10 @@ func Connectivity(d Deps) http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()
 
-		resp := ConnectivityResponse{}
-
-		if d.DB == nil {
-			resp.Postgres = ConnectivityItem{OK: false, Error: "DATABASE_URL not set"}
-		} else if details, err := d.DB.Probe(ctx); err != nil {
-			resp.Postgres = ConnectivityItem{OK: false, Error: err.Error()}
-		} else {
-			resp.Postgres = ConnectivityItem{OK: true, Details: details}
-		}
-
-		if d.Redis == nil {
-			resp.Redis = ConnectivityItem{OK: false, Error: "REDIS_URL not set or invalid"}
-		} else if details, err := d.Redis.Probe(ctx); err != nil {
-			resp.Redis = ConnectivityItem{OK: false, Error: err.Error()}
-		} else {
-			resp.Redis = ConnectivityItem{OK: true, Details: details}
+		svcResp := d.DiagnosticsService.Connectivity(ctx)
+		resp := ConnectivityResponse{
+			Postgres: ConnectivityItem{OK: svcResp.Postgres.OK, Details: svcResp.Postgres.Details, Error: svcResp.Postgres.Error},
+			Redis:    ConnectivityItem{OK: svcResp.Redis.OK, Details: svcResp.Redis.Details, Error: svcResp.Redis.Error},
 		}
 
 		status := http.StatusOK

@@ -20,9 +20,9 @@ type SavingsService interface {
 }
 
 type CreateSavingsInstrumentRequest struct {
-	Name            *string `json:"name,omitempty"`
-	SavingsAccountID  *string `json:"savings_account_id,omitempty"`
-	ParentAccountID   *string `json:"parent_account_id,omitempty"`
+	Name             *string `json:"name,omitempty"`
+	SavingsAccountID *string `json:"savings_account_id,omitempty"`
+	ParentAccountID  *string `json:"parent_account_id,omitempty"`
 	Principal        string  `json:"principal"`
 	InterestRate     *string `json:"interest_rate,omitempty"`
 	TermMonths       *int    `json:"term_months,omitempty"`
@@ -62,33 +62,33 @@ func (s *savingsService) CreateInstrument(ctx context.Context, userID string, re
 		savingsAccountID = strings.TrimSpace(*req.SavingsAccountID)
 	}
 	if savingsAccountID == "" && parentAccountID == nil {
-		return nil, errors.New("either savings_account_id or parent_account_id is required")
+		return nil, ValidationError("either savings_account_id or parent_account_id is required", nil)
 	}
 
 	principal := strings.TrimSpace(req.Principal)
 	if principal == "" {
-		return nil, errors.New("principal is required")
+		return nil, ValidationError("principal is required", map[string]any{"field": "principal"})
 	}
 	if !isValidDecimal(principal) {
-		return nil, errors.New("principal must be a decimal string")
+		return nil, ValidationError("principal must be a decimal string", map[string]any{"field": "principal"})
 	}
 
 	interestRate := normalizeOptionalString(req.InterestRate)
 	if interestRate != nil && !isValidDecimal(*interestRate) {
-		return nil, errors.New("interest_rate must be a decimal string")
+		return nil, ValidationError("interest_rate must be a decimal string", map[string]any{"field": "interest_rate"})
 	}
 
 	accruedInterest := normalizeOptionalString(req.AccruedInterest)
 	accrued := "0"
 	if accruedInterest != nil {
 		if !isValidDecimal(*accruedInterest) {
-			return nil, errors.New("accrued_interest must be a decimal string")
+			return nil, ValidationError("accrued_interest must be a decimal string", map[string]any{"field": "accrued_interest"})
 		}
 		accrued = *accruedInterest
 	}
 
 	if req.TermMonths != nil && *req.TermMonths < 0 {
-		return nil, errors.New("term_months must be >= 0")
+		return nil, ValidationError("term_months must be >= 0", map[string]any{"field": "term_months"})
 	}
 
 	startDate, err := normalizeOptionalDate(req.StartDate)
@@ -105,7 +105,7 @@ func (s *savingsService) CreateInstrument(ctx context.Context, userID string, re
 		v := strings.TrimSpace(*req.Status)
 		if v != "" {
 			if v != "active" && v != "matured" && v != "closed" {
-				return nil, errors.New("status is invalid")
+				return nil, ValidationError("status is invalid", map[string]any{"field": "status"})
 			}
 			status = v
 		}
@@ -119,7 +119,7 @@ func (s *savingsService) CreateInstrument(ctx context.Context, userID string, re
 			return nil, err
 		}
 		if parent.AccountType != "bank" && parent.AccountType != "wallet" {
-			return nil, errors.New("parent account must be bank or wallet")
+			return nil, ValidationError("parent account must be bank or wallet", map[string]any{"field": "parent_account_id"})
 		}
 
 		accName := "Savings"
@@ -148,10 +148,10 @@ func (s *savingsService) CreateInstrument(ctx context.Context, userID string, re
 	}
 
 	if acc.AccountType != "savings" {
-		return nil, errors.New("savings_account_id must be an account of type savings")
+		return nil, ValidationError("savings_account_id must be an account of type savings", map[string]any{"field": "savings_account_id"})
 	}
 	if acc.ParentAccountID == nil {
-		return nil, errors.New("savings account must have parent_account_id")
+		return nil, ValidationError("savings account must have parent_account_id", map[string]any{"field": "savings_account_id"})
 	}
 
 	autoRenew := false
@@ -230,13 +230,26 @@ func normalizeOptionalDate(s *string) (*string, error) {
 		return nil, nil
 	}
 	if _, err := time.Parse("2006-01-02", *v); err != nil {
-		return nil, errors.New("date must be YYYY-MM-DD")
+		return nil, ValidationError("date must be YYYY-MM-DD", nil)
 	}
 	return v, nil
 }
 
 func (s *savingsService) GetInstrument(ctx context.Context, userID string, savingsInstrumentID string) (*domain.SavingsInstrument, error) {
-	return s.repo.GetSavingsInstrument(ctx, userID, savingsInstrumentID)
+	item, err := s.repo.GetSavingsInstrument(ctx, userID, savingsInstrumentID)
+	if err != nil {
+		if strings.TrimSpace(savingsInstrumentID) == "" {
+			return nil, ValidationError("instrumentId is required", map[string]any{"field": "instrumentId"})
+		}
+		if strings.TrimSpace(userID) == "" {
+			return nil, UnauthorizedError("unauthorized")
+		}
+		if errors.Is(err, domain.ErrSavingsInstrumentNotFound) {
+			return nil, NotFoundErrorWithCause("savings instrument not found", nil, err)
+		}
+		return nil, err
+	}
+	return item, nil
 }
 
 func (s *savingsService) ListInstruments(ctx context.Context, userID string) ([]domain.SavingsInstrument, error) {
@@ -246,16 +259,19 @@ func (s *savingsService) ListInstruments(ctx context.Context, userID string) ([]
 func (s *savingsService) PatchInstrument(ctx context.Context, userID string, savingsInstrumentID string, req PatchSavingsInstrumentRequest) (*domain.SavingsInstrument, error) {
 	cur, err := s.repo.GetSavingsInstrument(ctx, userID, savingsInstrumentID)
 	if err != nil {
+		if errors.Is(err, domain.ErrSavingsInstrumentNotFound) {
+			return nil, NotFoundErrorWithCause("savings instrument not found", nil, err)
+		}
 		return nil, err
 	}
 
 	if req.Principal != nil {
 		principal := strings.TrimSpace(*req.Principal)
 		if principal == "" {
-			return nil, errors.New("principal is required")
+			return nil, ValidationError("principal is required", map[string]any{"field": "principal"})
 		}
 		if !isValidDecimal(principal) {
-			return nil, errors.New("principal must be a decimal string")
+			return nil, ValidationError("principal must be a decimal string", map[string]any{"field": "principal"})
 		}
 		cur.Principal = principal
 	}
@@ -266,7 +282,7 @@ func (s *savingsService) PatchInstrument(ctx context.Context, userID string, sav
 			cur.InterestRate = nil
 		} else {
 			if !isValidDecimal(v) {
-				return nil, errors.New("interest_rate must be a decimal string")
+				return nil, ValidationError("interest_rate must be a decimal string", map[string]any{"field": "interest_rate"})
 			}
 			cur.InterestRate = &v
 		}
@@ -278,7 +294,7 @@ func (s *savingsService) PatchInstrument(ctx context.Context, userID string, sav
 			cur.AccruedInterest = "0"
 		} else {
 			if !isValidDecimal(v) {
-				return nil, errors.New("accrued_interest must be a decimal string")
+				return nil, ValidationError("accrued_interest must be a decimal string", map[string]any{"field": "accrued_interest"})
 			}
 			cur.AccruedInterest = v
 		}
@@ -286,7 +302,7 @@ func (s *savingsService) PatchInstrument(ctx context.Context, userID string, sav
 
 	if req.TermMonths != nil {
 		if *req.TermMonths < 0 {
-			return nil, errors.New("term_months must be >= 0")
+			return nil, ValidationError("term_months must be >= 0", map[string]any{"field": "term_months"})
 		}
 		if *req.TermMonths == 0 {
 			cur.TermMonths = nil
@@ -302,7 +318,7 @@ func (s *savingsService) PatchInstrument(ctx context.Context, userID string, sav
 			cur.StartDate = nil
 		} else {
 			if _, err := time.Parse("2006-01-02", v); err != nil {
-				return nil, errors.New("date must be YYYY-MM-DD")
+				return nil, ValidationError("date must be YYYY-MM-DD", map[string]any{"field": "start_date"})
 			}
 			cur.StartDate = &v
 		}
@@ -314,7 +330,7 @@ func (s *savingsService) PatchInstrument(ctx context.Context, userID string, sav
 			cur.MaturityDate = nil
 		} else {
 			if _, err := time.Parse("2006-01-02", v); err != nil {
-				return nil, errors.New("date must be YYYY-MM-DD")
+				return nil, ValidationError("date must be YYYY-MM-DD", map[string]any{"field": "maturity_date"})
 			}
 			cur.MaturityDate = &v
 		}
@@ -328,7 +344,7 @@ func (s *savingsService) PatchInstrument(ctx context.Context, userID string, sav
 		v := strings.TrimSpace(*req.Status)
 		if v != "" {
 			if v != "active" && v != "matured" && v != "closed" {
-				return nil, errors.New("status is invalid")
+				return nil, ValidationError("status is invalid", map[string]any{"field": "status"})
 			}
 			cur.Status = v
 			if v == "closed" {
@@ -342,11 +358,28 @@ func (s *savingsService) PatchInstrument(ctx context.Context, userID string, sav
 
 	cur.UpdatedAt = time.Now().UTC()
 	if err := s.repo.UpdateSavingsInstrument(ctx, userID, *cur); err != nil {
+		if errors.Is(err, domain.ErrSavingsInstrumentNotFound) {
+			return nil, NotFoundErrorWithCause("savings instrument not found", nil, err)
+		}
 		return nil, err
 	}
-	return s.repo.GetSavingsInstrument(ctx, userID, savingsInstrumentID)
+	item, err := s.repo.GetSavingsInstrument(ctx, userID, savingsInstrumentID)
+	if err != nil {
+		if errors.Is(err, domain.ErrSavingsInstrumentNotFound) {
+			return nil, NotFoundErrorWithCause("savings instrument not found", nil, err)
+		}
+		return nil, err
+	}
+	return item, nil
 }
 
 func (s *savingsService) DeleteInstrument(ctx context.Context, userID string, savingsInstrumentID string) error {
-	return s.repo.DeleteSavingsInstrument(ctx, userID, savingsInstrumentID)
+	err := s.repo.DeleteSavingsInstrument(ctx, userID, savingsInstrumentID)
+	if err != nil {
+		if errors.Is(err, domain.ErrSavingsInstrumentNotFound) {
+			return NotFoundErrorWithCause("savings instrument not found", nil, err)
+		}
+		return err
+	}
+	return nil
 }

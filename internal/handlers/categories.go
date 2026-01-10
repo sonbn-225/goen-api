@@ -1,13 +1,10 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/auth"
-	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
 // ListCategories godoc
@@ -21,15 +18,17 @@ import (
 // @Router /categories [get]
 func ListCategories(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		items, err := d.CategoryService.List(r.Context(), uid)
 		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			if writeServiceError(w, err) {
+				return
+			}
+			writeInternalError(w, err)
 			return
 		}
 
@@ -50,9 +49,8 @@ func ListCategories(d Deps) http.HandlerFunc {
 // @Router /categories/{categoryId} [get]
 func GetCategory(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -64,11 +62,10 @@ func GetCategory(d Deps) http.HandlerFunc {
 
 		c, err := d.CategoryService.Get(r.Context(), uid, id)
 		if err != nil {
-			if errors.Is(err, domain.ErrCategoryNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "category not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 

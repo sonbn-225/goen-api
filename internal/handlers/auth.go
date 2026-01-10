@@ -6,9 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/sonbn-225/goen-api/internal/auth"
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/services"
 )
 
@@ -28,23 +26,20 @@ import (
 func Signup(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req services.SignupRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		resp, err := d.AuthService.Signup(r.Context(), req)
 		if err != nil {
-			if errors.Is(err, domain.ErrUserAlreadyExists) {
-				apierror.Write(w, http.StatusConflict, "conflict", "user already exists", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		writeJSON(w, http.StatusOK, resp)
 	}
 }
 
@@ -64,25 +59,20 @@ func Signup(d Deps) http.HandlerFunc {
 func Signin(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req services.SigninRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		resp, err := d.AuthService.Signin(r.Context(), req)
 		if err != nil {
-			// In a real app we might verify if it's "invalid credentials" or internal error
-			// The service returns "invalid credentials" for not found or bad password.
-			if err.Error() == "invalid credentials" {
-				apierror.Write(w, http.StatusUnauthorized, "unauthorized", "invalid credentials", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		writeJSON(w, http.StatusOK, resp)
 	}
 }
 
@@ -98,24 +88,21 @@ func Signin(d Deps) http.HandlerFunc {
 // @Router /auth/me [get]
 func Me(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		user, err := d.AuthService.GetMe(r.Context(), uid)
 		if err != nil {
-			if errors.Is(err, domain.ErrUserNotFound) {
-				apierror.Write(w, http.StatusUnauthorized, "unauthorized", "user not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(user)
+		writeJSON(w, http.StatusOK, user)
 	}
 }
 
@@ -133,9 +120,8 @@ func Me(d Deps) http.HandlerFunc {
 // @Router /auth/me/settings [patch]
 func PatchMySettings(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -152,15 +138,13 @@ func PatchMySettings(d Deps) http.HandlerFunc {
 
 		user, err := d.AuthService.UpdateMySettings(r.Context(), uid, patch)
 		if err != nil {
-			if errors.Is(err, domain.ErrUserNotFound) {
-				apierror.Write(w, http.StatusUnauthorized, "unauthorized", "user not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(user)
+		writeJSON(w, http.StatusOK, user)
 	}
 }

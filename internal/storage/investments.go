@@ -32,9 +32,9 @@ func (r *InvestmentRepo) CreateInvestmentAccount(ctx context.Context, userID str
 	// Require write permission (owner/editor) because this is a write action.
 	cmd, err := pool.Exec(ctx, `
 		INSERT INTO investment_accounts (
-			id, account_id, broker_name, sync_enabled, sync_settings, created_at, updated_at
+			id, account_id, fee_settings, tax_settings, created_at, updated_at
 		)
-		SELECT $1,$2,$3,$4,$5,$6,$7
+		SELECT $1,$2,$3,$4,$5,$6
 		WHERE EXISTS (
 			SELECT 1
 			FROM accounts a
@@ -42,11 +42,11 @@ func (r *InvestmentRepo) CreateInvestmentAccount(ctx context.Context, userID str
 			WHERE a.id = $2
 			  AND a.account_type = 'broker'
 			  AND a.deleted_at IS NULL
-			  AND ua.user_id = $8
+			  AND ua.user_id = $7
 			  AND ua.status = 'active'
 			  AND ua.permission IN ('owner','editor')
 		)
-	`, ia.ID, ia.AccountID, ia.BrokerName, ia.SyncEnabled, ia.SyncSettings, ia.CreatedAt, ia.UpdatedAt, userID)
+	`, ia.ID, ia.AccountID, ia.FeeSettings, ia.TaxSettings, ia.CreatedAt, ia.UpdatedAt, userID)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func (r *InvestmentRepo) GetInvestmentAccount(ctx context.Context, userID string
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT ia.id, ia.account_id, ia.broker_name, a.currency, ia.sync_enabled, ia.sync_settings, ia.created_at, ia.updated_at
+		SELECT ia.id, ia.account_id, a.currency, ia.fee_settings, ia.tax_settings, ia.created_at, ia.updated_at
 		FROM investment_accounts ia
 		JOIN accounts a ON a.id = ia.account_id
 		JOIN user_accounts ua ON ua.account_id = a.id
@@ -74,15 +74,19 @@ func (r *InvestmentRepo) GetInvestmentAccount(ctx context.Context, userID string
 	`, investmentAccountID, userID)
 
 	var out domain.InvestmentAccount
-	var syncSettings any
-	if err := row.Scan(&out.ID, &out.AccountID, &out.BrokerName, &out.Currency, &out.SyncEnabled, &syncSettings, &out.CreatedAt, &out.UpdatedAt); err != nil {
+	var feeSettings any
+	var taxSettings any
+	if err := row.Scan(&out.ID, &out.AccountID, &out.Currency, &feeSettings, &taxSettings, &out.CreatedAt, &out.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrInvestmentAccountNotFound
 		}
 		return nil, err
 	}
-	if syncSettings != nil {
-		out.SyncSettings = syncSettings
+	if feeSettings != nil {
+		out.FeeSettings = feeSettings
+	}
+	if taxSettings != nil {
+		out.TaxSettings = taxSettings
 	}
 	return &out, nil
 }
@@ -97,7 +101,7 @@ func (r *InvestmentRepo) ListInvestmentAccounts(ctx context.Context, userID stri
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT ia.id, ia.account_id, ia.broker_name, a.currency, ia.sync_enabled, ia.sync_settings, ia.created_at, ia.updated_at
+		SELECT ia.id, ia.account_id, a.currency, ia.fee_settings, ia.tax_settings, ia.created_at, ia.updated_at
 		FROM investment_accounts ia
 		JOIN accounts a ON a.id = ia.account_id
 		JOIN user_accounts ua ON ua.account_id = a.id
@@ -112,12 +116,16 @@ func (r *InvestmentRepo) ListInvestmentAccounts(ctx context.Context, userID stri
 	out := []domain.InvestmentAccount{}
 	for rows.Next() {
 		var ia domain.InvestmentAccount
-		var syncSettings any
-		if err := rows.Scan(&ia.ID, &ia.AccountID, &ia.BrokerName, &ia.Currency, &ia.SyncEnabled, &syncSettings, &ia.CreatedAt, &ia.UpdatedAt); err != nil {
+		var feeSettings any
+		var taxSettings any
+		if err := rows.Scan(&ia.ID, &ia.AccountID, &ia.Currency, &feeSettings, &taxSettings, &ia.CreatedAt, &ia.UpdatedAt); err != nil {
 			return nil, err
 		}
-		if syncSettings != nil {
-			ia.SyncSettings = syncSettings
+		if feeSettings != nil {
+			ia.FeeSettings = feeSettings
+		}
+		if taxSettings != nil {
+			ia.TaxSettings = taxSettings
 		}
 		out = append(out, ia)
 	}

@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/auth"
 )
 
 func boolTo01(v bool) string {
@@ -35,13 +34,8 @@ type RefreshMarketDataResponse struct {
 // @Router /market-data/vnstock/sync-all [post]
 func RefreshMarketDataAll(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
-			return
-		}
-		if d.Redis == nil {
-			apierror.Write(w, http.StatusServiceUnavailable, "dependency_unavailable", "redis is not configured", nil)
 			return
 		}
 
@@ -54,26 +48,15 @@ func RefreshMarketDataAll(d Deps) http.HandlerFunc {
 			return
 		}
 
-		stream := "goen:market_data:jobs"
-		values := map[string]any{
-			"job_type":             "vnstock.market_sync",
-			"include_prices":       boolTo01(includePrices),
-			"include_events":       boolTo01(includeEvents),
-			"requested_by_user_id": uid,
-		}
-		if force != "" {
-			values["force"] = force
-		}
-		if full && includePrices {
-			values["full"] = "1"
-		}
-
-		id, err := d.Redis.XAdd(r.Context(), stream, values)
+		resp, err := d.MarketDataService.EnqueueMarketSync(r.Context(), uid, includePrices, includeEvents, force, full)
 		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			if writeServiceError(w, err) {
+				return
+			}
+			writeInternalError(w, err)
 			return
 		}
 
-		writeJSON(w, http.StatusAccepted, RefreshMarketDataResponse{Stream: stream, MessageID: id})
+		writeJSON(w, http.StatusAccepted, RefreshMarketDataResponse{Stream: resp.Stream, MessageID: resp.MessageID})
 	}
 }

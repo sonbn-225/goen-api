@@ -40,11 +40,14 @@ type InvestmentService interface {
 }
 
 type CreateInvestmentAccountRequest struct {
-	AccountID       *string `json:"account_id,omitempty"`
-	ParentAccountID *string `json:"parent_account_id,omitempty"`
-	BrokerName      *string `json:"broker_name,omitempty"`
-	SyncEnabled     *bool   `json:"sync_enabled,omitempty"`
-	SyncSettings    any     `json:"sync_settings,omitempty"`
+	AccountID             *string `json:"account_id,omitempty"`
+	ParentAccountID       *string `json:"parent_account_id,omitempty"`
+	BrokerAccountName     *string `json:"broker_account_name,omitempty"`
+	BrokerAccountNumber   *string `json:"broker_account_number,omitempty"`
+	BrokerAccountColor    *string `json:"broker_account_color,omitempty"`
+	BrokerAccountCurrency *string `json:"broker_account_currency,omitempty"`
+	FeeSettings           any     `json:"fee_settings,omitempty"`
+	TaxSettings           any     `json:"tax_settings,omitempty"`
 }
 
 type CreateTradeRequest struct {
@@ -86,25 +89,37 @@ func (s *investmentService) CreateInvestmentAccount(ctx context.Context, userID 
 		accountID = strings.TrimSpace(*req.AccountID)
 	}
 	parentAccountID := normalizeOptionalString(req.ParentAccountID)
-	if accountID == "" && parentAccountID == nil {
-		return nil, errors.New("either account_id or parent_account_id is required")
-	}
 
 	var acc *domain.Account
 	if accountID == "" {
-		parent, err := s.accounts.GetAccount(ctx, userID, *parentAccountID)
-		if err != nil {
-			return nil, err
+		var inferredCurrency string
+		if parentAccountID != nil {
+			parent, err := s.accounts.GetAccount(ctx, userID, *parentAccountID)
+			if err != nil {
+				return nil, err
+			}
+			if parent.AccountType != "bank" && parent.AccountType != "wallet" {
+				return nil, ValidationError("parent account must be bank or wallet", map[string]any{"field": "parent_account_id"})
+			}
+			inferredCurrency = parent.Currency
 		}
-		if parent.AccountType != "bank" && parent.AccountType != "wallet" {
-			return nil, errors.New("parent account must be bank or wallet")
+
+		brokerCurrency := strings.ToUpper(strings.TrimSpace(toString(req.BrokerAccountCurrency)))
+		if brokerCurrency == "" {
+			brokerCurrency = inferredCurrency
+		}
+
+		brokerName := strings.TrimSpace(toString(req.BrokerAccountName))
+		if brokerName == "" {
+			brokerName = "Broker"
 		}
 
 		createdAcc, err := s.accounts.CreateAccount(ctx, userID, CreateAccountRequest{
-			Name:            "Broker",
-			AccountType:     "broker",
-			Currency:        parent.Currency,
-			ParentAccountID: parentAccountID,
+			Name:          brokerName,
+			AccountType:   "broker",
+			Currency:      brokerCurrency,
+			AccountNumber: normalizeOptionalString(req.BrokerAccountNumber),
+			Color:         normalizeOptionalString(req.BrokerAccountColor),
 		})
 		if err != nil {
 			return nil, err
@@ -120,29 +135,38 @@ func (s *investmentService) CreateInvestmentAccount(ctx context.Context, userID 
 	}
 
 	if acc.AccountType != "broker" {
-		return nil, errors.New("account_id must be an account of type broker")
-	}
-
-	syncEnabled := false
-	if req.SyncEnabled != nil {
-		syncEnabled = *req.SyncEnabled
+		return nil, ValidationError("account_id must be an account of type broker", map[string]any{"field": "account_id"})
 	}
 
 	now := time.Now().UTC()
 	id := uuid.NewString()
 
 	item := domain.InvestmentAccount{
-		ID:           id,
-		AccountID:    accountID,
-		BrokerName:   normalizeOptionalString(req.BrokerName),
-		Currency:     acc.Currency,
-		SyncEnabled:  syncEnabled,
-		SyncSettings: req.SyncSettings,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:          id,
+		AccountID:   accountID,
+		FeeSettings: req.FeeSettings,
+		TaxSettings: req.TaxSettings,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
 	if err := s.repo.CreateInvestmentAccount(ctx, userID, item); err != nil {
+		if errors.Is(err, domain.ErrInvestmentForbidden) {
+			return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		if isUniqueViolation(err) {
+			// Make this endpoint effectively idempotent for a broker account.
+			items, listErr := s.repo.ListInvestmentAccounts(ctx, userID)
+			if listErr != nil {
+				return nil, err
+			}
+			for _, existing := range items {
+				if existing.AccountID == accountID {
+					out := existing
+					return &out, nil
+				}
+			}
+		}
 		return nil, err
 	}
 	created, err := s.repo.GetInvestmentAccount(ctx, userID, id)
@@ -155,9 +179,16 @@ func (s *investmentService) CreateInvestmentAccount(ctx context.Context, userID 
 func (s *investmentService) GetInvestmentAccount(ctx context.Context, userID string, investmentAccountID string) (*domain.InvestmentAccount, error) {
 	id := strings.TrimSpace(investmentAccountID)
 	if id == "" {
-		return nil, errors.New("investmentAccountId is required")
+		return nil, ValidationError("investmentAccountId is required", map[string]any{"field": "investmentAccountId"})
 	}
-	return s.repo.GetInvestmentAccount(ctx, userID, id)
+	item, err := s.repo.GetInvestmentAccount(ctx, userID, id)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvestmentAccountNotFound) {
+			return nil, NotFoundErrorWithCause("investment account not found", nil, err)
+		}
+		return nil, err
+	}
+	return item, nil
 }
 
 func (s *investmentService) ListInvestmentAccounts(ctx context.Context, userID string) ([]domain.InvestmentAccount, error) {
@@ -187,20 +218,11 @@ func (s *investmentService) ListInvestmentAccounts(ctx context.Context, userID s
 		}
 
 		now := time.Now().UTC()
-		brokerName := strings.TrimSpace(acc.Name)
-		var brokerNamePtr *string
-		if brokerName != "" {
-			brokerNamePtr = &brokerName
-		}
-
 		item := domain.InvestmentAccount{
-			ID:          uuid.NewString(),
-			AccountID:   acc.ID,
-			BrokerName:  brokerNamePtr,
-			Currency:    acc.Currency,
-			SyncEnabled: false,
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			ID:        uuid.NewString(),
+			AccountID: acc.ID,
+			CreatedAt: now,
+			UpdatedAt: now,
 		}
 
 		if err := s.repo.CreateInvestmentAccount(ctx, userID, item); err != nil {
@@ -221,9 +243,16 @@ func (s *investmentService) ListInvestmentAccounts(ctx context.Context, userID s
 func (s *investmentService) GetSecurity(ctx context.Context, _ string, securityID string) (*domain.Security, error) {
 	id := strings.TrimSpace(securityID)
 	if id == "" {
-		return nil, errors.New("securityId is required")
+		return nil, ValidationError("securityId is required", map[string]any{"field": "securityId"})
 	}
-	return s.repo.GetSecurity(ctx, id)
+	item, err := s.repo.GetSecurity(ctx, id)
+	if err != nil {
+		if errors.Is(err, domain.ErrSecurityNotFound) {
+			return nil, NotFoundErrorWithCause("security not found", nil, err)
+		}
+		return nil, err
+	}
+	return item, nil
 }
 
 func (s *investmentService) ListSecurities(ctx context.Context, _ string) ([]domain.Security, error) {
@@ -233,16 +262,16 @@ func (s *investmentService) ListSecurities(ctx context.Context, _ string) ([]dom
 func (s *investmentService) ListSecurityPrices(ctx context.Context, _ string, securityID string, from *string, to *string) ([]domain.SecurityPriceDaily, error) {
 	id := strings.TrimSpace(securityID)
 	if id == "" {
-		return nil, errors.New("securityId is required")
+		return nil, ValidationError("securityId is required", map[string]any{"field": "securityId"})
 	}
 	if from != nil && strings.TrimSpace(*from) != "" {
 		if _, err := time.Parse("2006-01-02", strings.TrimSpace(*from)); err != nil {
-			return nil, errors.New("from is invalid")
+			return nil, ValidationError("from is invalid", map[string]any{"field": "from"})
 		}
 	}
 	if to != nil && strings.TrimSpace(*to) != "" {
 		if _, err := time.Parse("2006-01-02", strings.TrimSpace(*to)); err != nil {
-			return nil, errors.New("to is invalid")
+			return nil, ValidationError("to is invalid", map[string]any{"field": "to"})
 		}
 	}
 	return s.repo.ListSecurityPrices(ctx, id, normalizeOptionalString(from), normalizeOptionalString(to))
@@ -251,16 +280,16 @@ func (s *investmentService) ListSecurityPrices(ctx context.Context, _ string, se
 func (s *investmentService) ListSecurityEvents(ctx context.Context, _ string, securityID string, from *string, to *string) ([]domain.SecurityEvent, error) {
 	id := strings.TrimSpace(securityID)
 	if id == "" {
-		return nil, errors.New("securityId is required")
+		return nil, ValidationError("securityId is required", map[string]any{"field": "securityId"})
 	}
 	if from != nil && strings.TrimSpace(*from) != "" {
 		if _, err := time.Parse("2006-01-02", strings.TrimSpace(*from)); err != nil {
-			return nil, errors.New("from is invalid")
+			return nil, ValidationError("from is invalid", map[string]any{"field": "from"})
 		}
 	}
 	if to != nil && strings.TrimSpace(*to) != "" {
 		if _, err := time.Parse("2006-01-02", strings.TrimSpace(*to)); err != nil {
-			return nil, errors.New("to is invalid")
+			return nil, ValidationError("to is invalid", map[string]any{"field": "to"})
 		}
 	}
 	return s.repo.ListSecurityEvents(ctx, id, normalizeOptionalString(from), normalizeOptionalString(to))
@@ -269,41 +298,47 @@ func (s *investmentService) ListSecurityEvents(ctx context.Context, _ string, se
 func (s *investmentService) CreateTrade(ctx context.Context, userID string, brokerAccountID string, req CreateTradeRequest) (*domain.Trade, error) {
 	bid := strings.TrimSpace(brokerAccountID)
 	if bid == "" {
-		return nil, errors.New("investmentAccountId is required")
+		return nil, ValidationError("investmentAccountId is required", map[string]any{"field": "investmentAccountId"})
 	}
 
 	ia, err := s.repo.GetInvestmentAccount(ctx, userID, bid)
 	if err != nil {
+		if errors.Is(err, domain.ErrInvestmentAccountNotFound) {
+			return nil, NotFoundErrorWithCause("investment account not found", nil, err)
+		}
 		return nil, err
 	}
 
 	securityID := strings.TrimSpace(req.SecurityID)
 	if securityID == "" {
-		return nil, errors.New("security_id is required")
+		return nil, ValidationError("security_id is required", map[string]any{"field": "security_id"})
 	}
 	if _, err := s.repo.GetSecurity(ctx, securityID); err != nil {
+		if errors.Is(err, domain.ErrSecurityNotFound) {
+			return nil, NotFoundErrorWithCause("security not found", nil, err)
+		}
 		return nil, err
 	}
 
 	side := strings.TrimSpace(req.Side)
 	if side != "buy" && side != "sell" {
-		return nil, errors.New("side is invalid")
+		return nil, ValidationError("side is invalid", map[string]any{"field": "side"})
 	}
 
 	quantity := strings.TrimSpace(req.Quantity)
 	if quantity == "" {
-		return nil, errors.New("quantity is required")
+		return nil, ValidationError("quantity is required", map[string]any{"field": "quantity"})
 	}
 	if !isValidDecimal(quantity) {
-		return nil, errors.New("quantity must be a decimal string")
+		return nil, ValidationError("quantity must be a decimal string", map[string]any{"field": "quantity"})
 	}
 
 	price := strings.TrimSpace(req.Price)
 	if price == "" {
-		return nil, errors.New("price is required")
+		return nil, ValidationError("price is required", map[string]any{"field": "price"})
 	}
 	if !isValidDecimal(price) {
-		return nil, errors.New("price must be a decimal string")
+		return nil, ValidationError("price must be a decimal string", map[string]any{"field": "price"})
 	}
 
 	fees := "0"
@@ -314,7 +349,7 @@ func (s *investmentService) CreateTrade(ctx context.Context, userID string, brok
 		}
 	}
 	if !isValidDecimal(fees) {
-		return nil, errors.New("fees must be a decimal string")
+		return nil, ValidationError("fees must be a decimal string", map[string]any{"field": "fees"})
 	}
 
 	taxes := "0"
@@ -325,7 +360,7 @@ func (s *investmentService) CreateTrade(ctx context.Context, userID string, brok
 		}
 	}
 	if !isValidDecimal(taxes) {
-		return nil, errors.New("taxes must be a decimal string")
+		return nil, ValidationError("taxes must be a decimal string", map[string]any{"field": "taxes"})
 	}
 
 	occurredAt, _, err := normalizeOccurredAt(req.OccurredAt, req.OccurredDate, req.OccurredTime)
@@ -405,6 +440,9 @@ func (s *investmentService) CreateTrade(ctx context.Context, userID string, brok
 	}
 
 	if err := s.repo.CreateTrade(ctx, userID, item); err != nil {
+		if errors.Is(err, domain.ErrInvestmentForbidden) {
+			return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+		}
 		return nil, err
 	}
 
@@ -424,7 +462,7 @@ func (s *investmentService) CreateTrade(ctx context.Context, userID string, brok
 func (s *investmentService) ListTrades(ctx context.Context, userID string, brokerAccountID string) ([]domain.Trade, error) {
 	bid := strings.TrimSpace(brokerAccountID)
 	if bid == "" {
-		return nil, errors.New("investmentAccountId is required")
+		return nil, ValidationError("investmentAccountId is required", map[string]any{"field": "investmentAccountId"})
 	}
 	return s.repo.ListTrades(ctx, userID, bid)
 }
@@ -432,7 +470,7 @@ func (s *investmentService) ListTrades(ctx context.Context, userID string, broke
 func (s *investmentService) ListHoldings(ctx context.Context, userID string, brokerAccountID string) ([]domain.Holding, error) {
 	bid := strings.TrimSpace(brokerAccountID)
 	if bid == "" {
-		return nil, errors.New("investmentAccountId is required")
+		return nil, ValidationError("investmentAccountId is required", map[string]any{"field": "investmentAccountId"})
 	}
 	return s.repo.ListHoldings(ctx, userID, bid)
 }
@@ -440,29 +478,35 @@ func (s *investmentService) ListHoldings(ctx context.Context, userID string, bro
 func (s *investmentService) UpsertSecurityEventElection(ctx context.Context, userID string, brokerAccountID string, req UpsertSecurityEventElectionRequest) (*domain.SecurityEventElection, error) {
 	bid := strings.TrimSpace(brokerAccountID)
 	if bid == "" {
-		return nil, errors.New("investmentAccountId is required")
+		return nil, ValidationError("investmentAccountId is required", map[string]any{"field": "investmentAccountId"})
 	}
 	// Ensure access.
 	_, err := s.repo.GetInvestmentAccount(ctx, userID, bid)
 	if err != nil {
+		if errors.Is(err, domain.ErrInvestmentAccountNotFound) {
+			return nil, NotFoundErrorWithCause("investment account not found", nil, err)
+		}
 		return nil, err
 	}
 
 	eventID := strings.TrimSpace(req.SecurityEventID)
 	if eventID == "" {
-		return nil, errors.New("security_event_id is required")
+		return nil, ValidationError("security_event_id is required", map[string]any{"field": "security_event_id"})
 	}
 	event, err := s.repo.GetSecurityEvent(ctx, eventID)
 	if err != nil {
+		if errors.Is(err, domain.ErrSecurityEventNotFound) {
+			return nil, NotFoundErrorWithCause("security event not found", nil, err)
+		}
 		return nil, err
 	}
 
 	elected := strings.TrimSpace(req.ElectedQuantity)
 	if elected == "" {
-		return nil, errors.New("elected_quantity is required")
+		return nil, ValidationError("elected_quantity is required", map[string]any{"field": "elected_quantity"})
 	}
 	if !isValidDecimal(elected) {
-		return nil, errors.New("elected_quantity must be a decimal string")
+		return nil, ValidationError("elected_quantity must be a decimal string", map[string]any{"field": "elected_quantity"})
 	}
 
 	status := "draft"
@@ -470,13 +514,13 @@ func (s *investmentService) UpsertSecurityEventElection(ctx context.Context, use
 		status = strings.TrimSpace(*req.Status)
 	}
 	if status != "draft" && status != "confirmed" && status != "cancelled" {
-		return nil, errors.New("status is invalid")
+		return nil, ValidationError("status is invalid", map[string]any{"field": "status"})
 	}
 
 	// Entitlement date precedence: ex_date -> record_date -> effective_date.
 	entitlementDate := firstNonNilString(event.ExDate, event.RecordDate, event.EffectiveDate)
 	if entitlementDate == "" {
-		return nil, errors.New("security event has no entitlement date")
+		return nil, ValidationError("security event has no entitlement date", nil)
 	}
 
 	// Snapshot holding quantity using current holding row (MVP approximation).
@@ -489,7 +533,7 @@ func (s *investmentService) UpsertSecurityEventElection(ctx context.Context, use
 
 	// Clamp/validate: elected <= entitled.
 	if cmpDecimalStrings(elected, entitled) > 0 {
-		return nil, errors.New("elected_quantity must be <= entitled_quantity")
+		return nil, ValidationError("elected_quantity must be <= entitled_quantity", map[string]any{"field": "elected_quantity"})
 	}
 
 	now := time.Now().UTC()
@@ -516,18 +560,25 @@ func (s *investmentService) UpsertSecurityEventElection(ctx context.Context, use
 		UpdatedAt:                    now,
 	}
 
-	return s.repo.UpsertSecurityEventElection(ctx, userID, item)
+	out, err := s.repo.UpsertSecurityEventElection(ctx, userID, item)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvestmentForbidden) {
+			return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		return nil, err
+	}
+	return out, nil
 }
 
 func (s *investmentService) ListSecurityEventElections(ctx context.Context, userID string, brokerAccountID string, status *string) ([]domain.SecurityEventElection, error) {
 	bid := strings.TrimSpace(brokerAccountID)
 	if bid == "" {
-		return nil, errors.New("investmentAccountId is required")
+		return nil, ValidationError("investmentAccountId is required", map[string]any{"field": "investmentAccountId"})
 	}
 	if status != nil {
 		v := strings.TrimSpace(*status)
 		if v != "" && v != "draft" && v != "confirmed" && v != "cancelled" {
-			return nil, errors.New("status is invalid")
+			return nil, ValidationError("status is invalid", map[string]any{"field": "status"})
 		}
 	}
 	return s.repo.ListSecurityEventElections(ctx, userID, bid, normalizeOptionalString(status))

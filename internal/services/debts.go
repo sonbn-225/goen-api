@@ -25,16 +25,16 @@ type DebtService interface {
 }
 
 type CreateDebtRequest struct {
-	ClientID      *string `json:"client_id,omitempty"`
-	AccountID     string  `json:"account_id"`
-	Direction     string  `json:"direction"`
-	Name          *string `json:"name,omitempty"`
-	Principal     string  `json:"principal"`
-	StartDate     string  `json:"start_date"`
-	DueDate       string  `json:"due_date"`
-	InterestRate  *string `json:"interest_rate,omitempty"`
-	InterestRule  *string `json:"interest_rule,omitempty"`
-	Status        *string `json:"status,omitempty"`
+	ClientID     *string `json:"client_id,omitempty"`
+	AccountID    string  `json:"account_id"`
+	Direction    string  `json:"direction"`
+	Name         *string `json:"name,omitempty"`
+	Principal    string  `json:"principal"`
+	StartDate    string  `json:"start_date"`
+	DueDate      string  `json:"due_date"`
+	InterestRate *string `json:"interest_rate,omitempty"`
+	InterestRule *string `json:"interest_rule,omitempty"`
+	Status       *string `json:"status,omitempty"`
 }
 
 type CreateDebtPaymentRequest struct {
@@ -63,41 +63,41 @@ func NewDebtService(txService TransactionService, repo domain.DebtRepository) De
 func (s *debtService) Create(ctx context.Context, userID string, req CreateDebtRequest) (*domain.Debt, error) {
 	direction := strings.TrimSpace(req.Direction)
 	if direction != "borrowed" && direction != "lent" {
-		return nil, errors.New("direction is invalid")
+		return nil, ValidationError("direction is invalid", nil)
 	}
 
 	principal := strings.TrimSpace(req.Principal)
 	if principal == "" {
-		return nil, errors.New("principal is required")
+		return nil, ValidationError("principal is required", nil)
 	}
 	if !isValidDecimal(principal) {
-		return nil, errors.New("principal must be a decimal string")
+		return nil, ValidationError("principal must be a decimal string", nil)
 	}
 
 	accountID := strings.TrimSpace(req.AccountID)
 	if accountID == "" {
-		return nil, errors.New("account_id is required")
+		return nil, ValidationError("account_id is required", map[string]any{"field": "account_id"})
 	}
 
 	startDate := strings.TrimSpace(req.StartDate)
 	if startDate == "" {
-		return nil, errors.New("start_date is required")
+		return nil, ValidationError("start_date is required", nil)
 	}
 	if _, err := time.Parse("2006-01-02", startDate); err != nil {
-		return nil, errors.New("start_date must be YYYY-MM-DD")
+		return nil, ValidationError("start_date must be YYYY-MM-DD", nil)
 	}
 
 	dueDate := strings.TrimSpace(req.DueDate)
 	if dueDate == "" {
-		return nil, errors.New("due_date is required")
+		return nil, ValidationError("due_date is required", nil)
 	}
 	dueT, err := time.Parse("2006-01-02", dueDate)
 	if err != nil {
-		return nil, errors.New("due_date must be YYYY-MM-DD")
+		return nil, ValidationError("due_date must be YYYY-MM-DD", nil)
 	}
 	startT, _ := time.Parse("2006-01-02", startDate)
 	if dueT.Before(startT) {
-		return nil, errors.New("due_date must be >= start_date")
+		return nil, ValidationError("due_date must be >= start_date", nil)
 	}
 
 	var interestRate *string
@@ -105,7 +105,7 @@ func (s *debtService) Create(ctx context.Context, userID string, req CreateDebtR
 		v := strings.TrimSpace(*req.InterestRate)
 		if v != "" {
 			if !isValidDecimal(v) {
-				return nil, errors.New("interest_rate must be a decimal string")
+				return nil, ValidationError("interest_rate must be a decimal string", nil)
 			}
 			interestRate = &v
 		}
@@ -116,7 +116,7 @@ func (s *debtService) Create(ctx context.Context, userID string, req CreateDebtR
 		v := strings.TrimSpace(*req.InterestRule)
 		if v != "" {
 			if v != "interest_first" && v != "principal_first" {
-				return nil, errors.New("interest_rule is invalid")
+				return nil, ValidationError("interest_rule is invalid", nil)
 			}
 			interestRule = &v
 		}
@@ -127,7 +127,7 @@ func (s *debtService) Create(ctx context.Context, userID string, req CreateDebtR
 		v := strings.TrimSpace(*req.Status)
 		if v != "" {
 			if v != "active" && v != "overdue" && v != "closed" {
-				return nil, errors.New("status is invalid")
+				return nil, ValidationError("status is invalid", nil)
 			}
 			status = v
 		}
@@ -138,32 +138,45 @@ func (s *debtService) Create(ctx context.Context, userID string, req CreateDebtR
 	clientID := normalizeOptionalString(req.ClientID)
 
 	debt := domain.Debt{
-		ID:                  uuid.NewString(),
-		ClientID:            clientID,
-		UserID:              userID,
-		AccountID:           &accountID,
-		Direction:           direction,
-		Name:                name,
-		Principal:           principal,
-		StartDate:           startDate,
-		DueDate:             dueDate,
-		InterestRate:        interestRate,
-		InterestRule:        interestRule,
+		ID:                   uuid.NewString(),
+		ClientID:             clientID,
+		UserID:               userID,
+		AccountID:            &accountID,
+		Direction:            direction,
+		Name:                 name,
+		Principal:            principal,
+		StartDate:            startDate,
+		DueDate:              dueDate,
+		InterestRate:         interestRate,
+		InterestRule:         interestRule,
 		OutstandingPrincipal: principal,
-		AccruedInterest:     "0",
-		Status:              status,
-		CreatedAt:           now,
-		UpdatedAt:           now,
+		AccruedInterest:      "0",
+		Status:               status,
+		CreatedAt:            now,
+		UpdatedAt:            now,
 	}
 
 	if err := s.repo.CreateDebt(ctx, debt); err != nil {
+		if errors.Is(err, domain.ErrAccountNotFound) {
+			return nil, NotFoundErrorWithCause("account not found", map[string]any{"field": "account_id"}, err)
+		}
+		if errors.Is(err, domain.ErrAccountForbidden) {
+			return nil, ForbiddenErrorWithCause("account forbidden", map[string]any{"field": "account_id"}, err)
+		}
 		return nil, err
 	}
 	return s.repo.GetDebt(ctx, userID, debt.ID)
 }
 
 func (s *debtService) Get(ctx context.Context, userID string, debtID string) (*domain.Debt, error) {
-	return s.repo.GetDebt(ctx, userID, debtID)
+	item, err := s.repo.GetDebt(ctx, userID, debtID)
+	if err != nil {
+		if errors.Is(err, domain.ErrDebtNotFound) {
+			return nil, NotFoundErrorWithCause("debt not found", nil, err)
+		}
+		return nil, err
+	}
+	return item, nil
 }
 
 func (s *debtService) List(ctx context.Context, userID string) ([]domain.Debt, error) {
@@ -173,11 +186,14 @@ func (s *debtService) List(ctx context.Context, userID string) ([]domain.Debt, e
 func (s *debtService) CreatePayment(ctx context.Context, userID string, debtID string, req CreateDebtPaymentRequest) (*domain.DebtPaymentLink, error) {
 	transactionID := strings.TrimSpace(req.TransactionID)
 	if transactionID == "" {
-		return nil, errors.New("transaction_id is required")
+		return nil, ValidationError("transaction_id is required", nil)
 	}
 
 	debt, err := s.repo.GetDebt(ctx, userID, debtID)
 	if err != nil {
+		if errors.Is(err, domain.ErrDebtNotFound) {
+			return nil, NotFoundErrorWithCause("debt not found", nil, err)
+		}
 		return nil, err
 	}
 
@@ -190,25 +206,25 @@ func (s *debtService) CreatePayment(ctx context.Context, userID string, debtID s
 	// - borrowed: repayment is expense
 	// - lent: collection is income
 	if debt.Direction == "borrowed" && tx.Type != "expense" {
-		return nil, errors.New("transaction.type must be expense for borrowed debt payment")
+		return nil, ValidationError("transaction.type must be expense for borrowed debt payment", nil)
 	}
 	if debt.Direction == "lent" && tx.Type != "income" {
-		return nil, errors.New("transaction.type must be income for lent debt collection")
+		return nil, ValidationError("transaction.type must be income for lent debt collection", nil)
 	}
 
 	amountRat, ok := new(big.Rat).SetString(tx.Amount)
 	if !ok {
-		return nil, errors.New("transaction amount is invalid")
+		return nil, ValidationError("transaction amount is invalid", nil)
 	}
 
 	outstandingRat, ok := new(big.Rat).SetString(debt.OutstandingPrincipal)
 	if !ok {
-		return nil, errors.New("outstanding_principal is invalid")
+		return nil, ValidationError("outstanding_principal is invalid", nil)
 	}
 
 	accruedRat, ok := new(big.Rat).SetString(debt.AccruedInterest)
 	if !ok {
-		return nil, errors.New("accrued_interest is invalid")
+		return nil, ValidationError("accrued_interest is invalid", nil)
 	}
 
 	var principalPaidRat *big.Rat
@@ -219,11 +235,11 @@ func (s *debtService) CreatePayment(ctx context.Context, userID string, debtID s
 			v := strings.TrimSpace(*req.PrincipalPaid)
 			if v != "" {
 				if !isValidDecimal(v) {
-					return nil, errors.New("principal_paid must be a decimal string")
+					return nil, ValidationError("principal_paid must be a decimal string", nil)
 				}
 				p, ok := new(big.Rat).SetString(v)
 				if !ok {
-					return nil, errors.New("principal_paid must be a decimal string")
+					return nil, ValidationError("principal_paid must be a decimal string", nil)
 				}
 				principalPaidRat = p
 			}
@@ -232,11 +248,11 @@ func (s *debtService) CreatePayment(ctx context.Context, userID string, debtID s
 			v := strings.TrimSpace(*req.InterestPaid)
 			if v != "" {
 				if !isValidDecimal(v) {
-					return nil, errors.New("interest_paid must be a decimal string")
+					return nil, ValidationError("interest_paid must be a decimal string", nil)
 				}
 				i, ok := new(big.Rat).SetString(v)
 				if !ok {
-					return nil, errors.New("interest_paid must be a decimal string")
+					return nil, ValidationError("interest_paid must be a decimal string", nil)
 				}
 				interestPaidRat = i
 			}
@@ -251,7 +267,7 @@ func (s *debtService) CreatePayment(ctx context.Context, userID string, debtID s
 
 		sum := new(big.Rat).Add(principalPaidRat, interestPaidRat)
 		if sum.Cmp(amountRat) != 0 {
-			return nil, errors.New("principal_paid + interest_paid must equal transaction.amount")
+			return nil, ValidationError("principal_paid + interest_paid must equal transaction.amount", nil)
 		}
 	} else {
 		// Auto allocate based on interest_rule
@@ -277,14 +293,14 @@ func (s *debtService) CreatePayment(ctx context.Context, userID string, debtID s
 		// If payment exceeds total due, reject
 		totalDue := new(big.Rat).Add(outstandingRat, accruedRat)
 		if amountRat.Cmp(totalDue) > 0 {
-			return nil, errors.New("payment exceeds total due")
+			return nil, ValidationError("payment exceeds total due", nil)
 		}
 	}
 
 	newOutstanding := new(big.Rat).Sub(outstandingRat, principalPaidRat)
 	newAccrued := new(big.Rat).Sub(accruedRat, interestPaidRat)
 	if newOutstanding.Sign() < 0 || newAccrued.Sign() < 0 {
-		return nil, errors.New("outstanding cannot become negative")
+		return nil, ValidationError("outstanding cannot become negative", nil)
 	}
 
 	status := debt.Status
@@ -308,19 +324,29 @@ func (s *debtService) CreatePayment(ctx context.Context, userID string, debtID s
 	}
 
 	if err := s.repo.CreatePaymentLink(ctx, userID, link, ratToDecimalString(newOutstanding), ratToDecimalString(newAccrued), status, closedAt); err != nil {
+		if errors.Is(err, domain.ErrDebtNotFound) {
+			return nil, NotFoundErrorWithCause("debt not found", nil, err)
+		}
 		return nil, err
 	}
 	return &link, nil
 }
 
 func (s *debtService) ListPayments(ctx context.Context, userID string, debtID string) ([]domain.DebtPaymentLink, error) {
-	return s.repo.ListPaymentLinks(ctx, userID, debtID)
+	items, err := s.repo.ListPaymentLinks(ctx, userID, debtID)
+	if err != nil {
+		if errors.Is(err, domain.ErrDebtNotFound) {
+			return nil, NotFoundErrorWithCause("debt not found", nil, err)
+		}
+		return nil, err
+	}
+	return items, nil
 }
 
 func (s *debtService) ListPaymentsByTransaction(ctx context.Context, userID string, transactionID string) ([]domain.DebtPaymentLink, error) {
 	transactionID = strings.TrimSpace(transactionID)
 	if transactionID == "" {
-		return nil, errors.New("transaction_id is required")
+		return nil, ValidationError("transaction_id is required", nil)
 	}
 
 	// Ensure the user has access to this transaction.
@@ -333,22 +359,22 @@ func (s *debtService) ListPaymentsByTransaction(ctx context.Context, userID stri
 
 func (s *debtService) CreateInstallment(ctx context.Context, userID string, debtID string, req CreateDebtInstallmentRequest) (*domain.DebtInstallment, error) {
 	if req.InstallmentNo <= 0 {
-		return nil, errors.New("installment_no must be > 0")
+		return nil, ValidationError("installment_no must be > 0", nil)
 	}
 	dueDate := strings.TrimSpace(req.DueDate)
 	if dueDate == "" {
-		return nil, errors.New("due_date is required")
+		return nil, ValidationError("due_date is required", nil)
 	}
 	if _, err := time.Parse("2006-01-02", dueDate); err != nil {
-		return nil, errors.New("due_date must be YYYY-MM-DD")
+		return nil, ValidationError("due_date must be YYYY-MM-DD", nil)
 	}
 
 	amountDue := strings.TrimSpace(req.AmountDue)
 	if amountDue == "" {
-		return nil, errors.New("amount_due is required")
+		return nil, ValidationError("amount_due is required", nil)
 	}
 	if !isValidDecimal(amountDue) {
-		return nil, errors.New("amount_due must be a decimal string")
+		return nil, ValidationError("amount_due must be a decimal string", nil)
 	}
 
 	amountPaid := "0"
@@ -356,7 +382,7 @@ func (s *debtService) CreateInstallment(ctx context.Context, userID string, debt
 		v := strings.TrimSpace(*req.AmountPaid)
 		if v != "" {
 			if !isValidDecimal(v) {
-				return nil, errors.New("amount_paid must be a decimal string")
+				return nil, ValidationError("amount_paid must be a decimal string", nil)
 			}
 			amountPaid = v
 		}
@@ -367,7 +393,7 @@ func (s *debtService) CreateInstallment(ctx context.Context, userID string, debt
 		v := strings.TrimSpace(*req.Status)
 		if v != "" {
 			if v != "pending" && v != "paid" && v != "overdue" {
-				return nil, errors.New("status is invalid")
+				return nil, ValidationError("status is invalid", nil)
 			}
 			status = v
 		}
@@ -384,13 +410,23 @@ func (s *debtService) CreateInstallment(ctx context.Context, userID string, debt
 	}
 
 	if err := s.repo.CreateInstallment(ctx, userID, inst); err != nil {
+		if errors.Is(err, domain.ErrDebtNotFound) {
+			return nil, NotFoundErrorWithCause("debt not found", nil, err)
+		}
 		return nil, err
 	}
 	return &inst, nil
 }
 
 func (s *debtService) ListInstallments(ctx context.Context, userID string, debtID string) ([]domain.DebtInstallment, error) {
-	return s.repo.ListInstallments(ctx, userID, debtID)
+	items, err := s.repo.ListInstallments(ctx, userID, debtID)
+	if err != nil {
+		if errors.Is(err, domain.ErrDebtNotFound) {
+			return nil, NotFoundErrorWithCause("debt not found", nil, err)
+		}
+		return nil, err
+	}
+	return items, nil
 }
 
 func minRat(a *big.Rat, b *big.Rat) *big.Rat {

@@ -2989,7 +2989,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.CreateTransactionRequest"
+                            "$ref": "#/definitions/handlers.CreateTransactionBody"
                         }
                     }
                 ],
@@ -3549,22 +3549,17 @@ const docTemplate = `{
                 "account_id": {
                     "type": "string"
                 },
-                "broker_name": {
-                    "type": "string"
-                },
                 "created_at": {
                     "type": "string"
                 },
                 "currency": {
                     "type": "string"
                 },
+                "fee_settings": {},
                 "id": {
                     "type": "string"
                 },
-                "sync_enabled": {
-                    "type": "boolean"
-                },
-                "sync_settings": {},
+                "tax_settings": {},
                 "updated_at": {
                     "type": "string"
                 }
@@ -4103,14 +4098,82 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.CreateTransactionBody": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "amount": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "counterparty": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "exchange_rate": {
+                    "type": "string"
+                },
+                "external_ref": {
+                    "type": "string"
+                },
+                "from_account_id": {
+                    "type": "string"
+                },
+                "from_amount": {
+                    "type": "string"
+                },
+                "line_items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.CreateTransactionLineItemRequest"
+                    }
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "occurred_date": {
+                    "type": "string"
+                },
+                "occurred_time": {
+                    "type": "string"
+                },
+                "tag_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "to_account_id": {
+                    "type": "string"
+                },
+                "to_amount": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.GlobalMarketDataStatusResponse": {
             "type": "object",
             "properties": {
                 "market_sync": {
-                    "$ref": "#/definitions/handlers.MarketDataSyncState"
+                    "$ref": "#/definitions/services.MarketDataSyncState"
                 },
                 "rate_limit": {
-                    "$ref": "#/definitions/handlers.MarketDataRateLimit"
+                    "$ref": "#/definitions/services.MarketDataRateLimit"
                 }
             }
         },
@@ -4124,67 +4187,6 @@ const docTemplate = `{
                     }
                 },
                 "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.MarketDataRateLimit": {
-            "type": "object",
-            "properties": {
-                "hour_reset_in_seconds": {
-                    "type": "number"
-                },
-                "minute_reset_in_seconds": {
-                    "type": "number"
-                },
-                "per_hour": {
-                    "type": "integer"
-                },
-                "per_minute": {
-                    "type": "integer"
-                },
-                "remaining_hour": {
-                    "type": "integer"
-                },
-                "remaining_minute": {
-                    "type": "integer"
-                },
-                "used_hour": {
-                    "type": "integer"
-                },
-                "used_minute": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.MarketDataSyncState": {
-            "type": "object",
-            "properties": {
-                "cooldown_seconds": {
-                    "type": "integer"
-                },
-                "last_error": {
-                    "type": "string"
-                },
-                "last_failure_at": {
-                    "type": "string"
-                },
-                "last_started_at": {
-                    "type": "string"
-                },
-                "last_status": {
-                    "type": "string"
-                },
-                "last_success_at": {
-                    "type": "string"
-                },
-                "min_interval_seconds": {
-                    "type": "integer"
-                },
-                "next_due_at": {
-                    "type": "string"
-                },
-                "sync_key": {
                     "type": "string"
                 }
             }
@@ -4266,13 +4268,13 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "prices_daily": {
-                    "$ref": "#/definitions/handlers.MarketDataSyncState"
+                    "$ref": "#/definitions/services.MarketDataSyncState"
                 },
                 "rate_limit": {
-                    "$ref": "#/definitions/handlers.MarketDataRateLimit"
+                    "$ref": "#/definitions/services.MarketDataRateLimit"
                 },
                 "security_events": {
-                    "$ref": "#/definitions/handlers.MarketDataSyncState"
+                    "$ref": "#/definitions/services.MarketDataSyncState"
                 },
                 "security_id": {
                     "type": "string"
@@ -4507,16 +4509,23 @@ const docTemplate = `{
                 "account_id": {
                     "type": "string"
                 },
-                "broker_name": {
+                "broker_account_color": {
                     "type": "string"
                 },
+                "broker_account_currency": {
+                    "type": "string"
+                },
+                "broker_account_name": {
+                    "type": "string"
+                },
+                "broker_account_number": {
+                    "type": "string"
+                },
+                "fee_settings": {},
                 "parent_account_id": {
                     "type": "string"
                 },
-                "sync_enabled": {
-                    "type": "boolean"
-                },
-                "sync_settings": {}
+                "tax_settings": {}
             }
         },
         "services.CreateRotatingSavingsContributionRequest": {
@@ -4687,67 +4696,63 @@ const docTemplate = `{
                 }
             }
         },
-        "services.CreateTransactionRequest": {
+        "services.MarketDataRateLimit": {
             "type": "object",
             "properties": {
-                "account_id": {
+                "hour_reset_in_seconds": {
+                    "type": "number"
+                },
+                "minute_reset_in_seconds": {
+                    "type": "number"
+                },
+                "per_hour": {
+                    "type": "integer"
+                },
+                "per_minute": {
+                    "type": "integer"
+                },
+                "remaining_hour": {
+                    "type": "integer"
+                },
+                "remaining_minute": {
+                    "type": "integer"
+                },
+                "used_hour": {
+                    "type": "integer"
+                },
+                "used_minute": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.MarketDataSyncState": {
+            "type": "object",
+            "properties": {
+                "cooldown_seconds": {
+                    "type": "integer"
+                },
+                "last_error": {
                     "type": "string"
                 },
-                "amount": {
+                "last_failure_at": {
                     "type": "string"
                 },
-                "client_id": {
+                "last_started_at": {
                     "type": "string"
                 },
-                "counterparty": {
+                "last_status": {
                     "type": "string"
                 },
-                "description": {
+                "last_success_at": {
                     "type": "string"
                 },
-                "exchange_rate": {
+                "min_interval_seconds": {
+                    "type": "integer"
+                },
+                "next_due_at": {
                     "type": "string"
                 },
-                "external_ref": {
-                    "type": "string"
-                },
-                "from_account_id": {
-                    "type": "string"
-                },
-                "from_amount": {
-                    "type": "string"
-                },
-                "line_items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/services.CreateTransactionLineItemRequest"
-                    }
-                },
-                "notes": {
-                    "type": "string"
-                },
-                "occurred_at": {
-                    "type": "string"
-                },
-                "occurred_date": {
-                    "type": "string"
-                },
-                "occurred_time": {
-                    "type": "string"
-                },
-                "tag_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "to_account_id": {
-                    "type": "string"
-                },
-                "to_amount": {
-                    "type": "string"
-                },
-                "type": {
+                "sync_key": {
                     "type": "string"
                 }
             }

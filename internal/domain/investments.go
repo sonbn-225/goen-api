@@ -17,14 +17,13 @@ var (
 )
 
 type InvestmentAccount struct {
-	ID           string    `json:"id"`
-	AccountID    string    `json:"account_id"`
-	BrokerName   *string   `json:"broker_name,omitempty"`
-	Currency     string    `json:"currency"`
-	SyncEnabled  bool      `json:"sync_enabled"`
-	SyncSettings any       `json:"sync_settings,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID          string    `json:"id"`
+	AccountID   string    `json:"account_id"`
+	Currency    string    `json:"currency"`
+	FeeSettings any       `json:"fee_settings,omitempty"`
+	TaxSettings any       `json:"tax_settings,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type Security struct {

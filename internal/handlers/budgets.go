@@ -1,14 +1,10 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/auth"
-	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/services"
 )
 
@@ -23,15 +19,14 @@ import (
 // @Router /budgets [get]
 func ListBudgets(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		items, err := d.BudgetService.List(r.Context(), uid)
 		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -54,25 +49,22 @@ func ListBudgets(d Deps) http.HandlerFunc {
 // @Router /budgets [post]
 func CreateBudget(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		var req services.CreateBudgetRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		b, err := d.BudgetService.Create(r.Context(), uid, req)
 		if err != nil {
-			if errors.Is(err, domain.ErrCategoryNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "category not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -93,9 +85,8 @@ func CreateBudget(d Deps) http.HandlerFunc {
 // @Router /budgets/{budgetId} [get]
 func GetBudget(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -107,11 +98,10 @@ func GetBudget(d Deps) http.HandlerFunc {
 
 		b, err := d.BudgetService.Get(r.Context(), uid, id)
 		if err != nil {
-			if errors.Is(err, domain.ErrBudgetNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "budget not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 

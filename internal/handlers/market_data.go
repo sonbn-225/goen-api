@@ -6,8 +6,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/auth"
-	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
 type RefreshPricesDailyResponse struct {
@@ -33,29 +31,14 @@ type RefreshPricesDailyResponse struct {
 // @Router /securities/{securityId}/prices-daily/refresh [post]
 func RefreshSecurityPricesDaily(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
-			return
-		}
-		if d.Redis == nil {
-			apierror.Write(w, http.StatusServiceUnavailable, "dependency_unavailable", "redis is not configured", nil)
 			return
 		}
 
 		securityID := chi.URLParam(r, "securityId")
 		if securityID == "" {
 			apierror.Write(w, http.StatusBadRequest, "validation_error", "securityId is required", map[string]any{"field": "securityId"})
-			return
-		}
-
-		// Validate security exists (also normalizes errors)
-		if _, err := d.InvestmentService.GetSecurity(r.Context(), uid, securityID); err != nil {
-			if err == domain.ErrSecurityNotFound {
-				apierror.Write(w, http.StatusNotFound, "not_found", "security not found", nil)
-				return
-			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
 			return
 		}
 
@@ -77,31 +60,15 @@ func RefreshSecurityPricesDaily(d Deps) http.HandlerFunc {
 			}
 		}
 
-		stream := "goen:market_data:jobs"
-		values := map[string]any{
-			"job_type":             "vnstock.prices_daily",
-			"security_id":          securityID,
-			"requested_by_user_id": uid,
-		}
-		if force != "" {
-			values["force"] = force
-		}
-		if full != "" {
-			values["full"] = full
-		}
-		if from != "" {
-			values["from"] = from
-		}
-		if to != "" {
-			values["to"] = to
-		}
-
-		id, err := d.Redis.XAdd(r.Context(), stream, values)
+		resp, err := d.MarketDataService.EnqueueSecurityPricesDaily(r.Context(), uid, securityID, force, full, from, to)
 		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			if writeServiceError(w, err) {
+				return
+			}
+			writeInternalError(w, err)
 			return
 		}
 
-		writeJSON(w, http.StatusAccepted, RefreshPricesDailyResponse{Stream: stream, MessageID: id})
+		writeJSON(w, http.StatusAccepted, RefreshPricesDailyResponse{Stream: resp.Stream, MessageID: resp.MessageID})
 	}
 }

@@ -1,14 +1,10 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/auth"
-	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/services"
 )
 
@@ -23,15 +19,14 @@ import (
 // @Router /debts [get]
 func ListDebts(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		items, err := d.DebtService.List(r.Context(), uid)
 		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -53,29 +48,22 @@ func ListDebts(d Deps) http.HandlerFunc {
 // @Router /debts [post]
 func CreateDebt(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		var req services.CreateDebtRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		item, err := d.DebtService.Create(r.Context(), uid, req)
 		if err != nil {
-			if errors.Is(err, domain.ErrAccountNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "account not found", map[string]any{"field": "account_id"})
+			if writeServiceError(w, err) {
 				return
 			}
-			if errors.Is(err, domain.ErrAccountForbidden) {
-				apierror.Write(w, http.StatusForbidden, "forbidden", "account forbidden", map[string]any{"field": "account_id"})
-				return
-			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -96,9 +84,8 @@ func CreateDebt(d Deps) http.HandlerFunc {
 // @Router /debts/{debtId} [get]
 func GetDebt(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -110,11 +97,10 @@ func GetDebt(d Deps) http.HandlerFunc {
 
 		item, err := d.DebtService.Get(r.Context(), uid, id)
 		if err != nil {
-			if errors.Is(err, domain.ErrDebtNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "debt not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -135,9 +121,8 @@ func GetDebt(d Deps) http.HandlerFunc {
 // @Router /debts/{debtId}/payments [get]
 func ListDebtPayments(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -149,11 +134,10 @@ func ListDebtPayments(d Deps) http.HandlerFunc {
 
 		items, err := d.DebtService.ListPayments(r.Context(), uid, debtID)
 		if err != nil {
-			if errors.Is(err, domain.ErrDebtNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "debt not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -177,9 +161,8 @@ func ListDebtPayments(d Deps) http.HandlerFunc {
 // @Router /debts/{debtId}/payments [post]
 func CreateDebtPayment(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -190,22 +173,16 @@ func CreateDebtPayment(d Deps) http.HandlerFunc {
 		}
 
 		var req services.CreateDebtPaymentRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		item, err := d.DebtService.CreatePayment(r.Context(), uid, debtID, req)
 		if err != nil {
-			if errors.Is(err, domain.ErrDebtNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "debt not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			if errors.Is(err, domain.ErrTransactionNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "transaction not found", nil)
-				return
-			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -226,9 +203,8 @@ func CreateDebtPayment(d Deps) http.HandlerFunc {
 // @Router /debts/{debtId}/installments [get]
 func ListDebtInstallments(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -240,11 +216,10 @@ func ListDebtInstallments(d Deps) http.HandlerFunc {
 
 		items, err := d.DebtService.ListInstallments(r.Context(), uid, debtID)
 		if err != nil {
-			if errors.Is(err, domain.ErrDebtNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "debt not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -268,9 +243,8 @@ func ListDebtInstallments(d Deps) http.HandlerFunc {
 // @Router /debts/{debtId}/installments [post]
 func CreateDebtInstallment(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -281,18 +255,16 @@ func CreateDebtInstallment(d Deps) http.HandlerFunc {
 		}
 
 		var req services.CreateDebtInstallmentRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		item, err := d.DebtService.CreateInstallment(r.Context(), uid, debtID, req)
 		if err != nil {
-			if errors.Is(err, domain.ErrDebtNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "debt not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -314,9 +286,8 @@ func CreateDebtInstallment(d Deps) http.HandlerFunc {
 // @Router /transactions/{transactionId}/debt-links [get]
 func ListDebtLinksForTransaction(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -328,11 +299,10 @@ func ListDebtLinksForTransaction(d Deps) http.HandlerFunc {
 
 		items, err := d.DebtService.ListPaymentsByTransaction(r.Context(), uid, txID)
 		if err != nil {
-			if errors.Is(err, domain.ErrTransactionNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "transaction not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 

@@ -1,17 +1,37 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/auth"
 	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/services"
 )
+
+type CreateTransactionBody struct {
+	ClientID      *string                                     `json:"client_id,omitempty"`
+	ExternalRef   *string                                     `json:"external_ref,omitempty"`
+	Type          string                                      `json:"type"`
+	OccurredAt    *string                                     `json:"occurred_at,omitempty"`
+	OccurredDate  *string                                     `json:"occurred_date,omitempty"`
+	OccurredTime  *string                                     `json:"occurred_time,omitempty"`
+	Amount        string                                      `json:"amount"`
+	Currency      *string                                     `json:"currency,omitempty"`
+	FromAmount    *string                                     `json:"from_amount,omitempty"`
+	ToAmount      *string                                     `json:"to_amount,omitempty"`
+	Description   *string                                     `json:"description,omitempty"`
+	AccountID     *string                                     `json:"account_id,omitempty"`
+	FromAccountID *string                                     `json:"from_account_id,omitempty"`
+	ToAccountID   *string                                     `json:"to_account_id,omitempty"`
+	ExchangeRate  *string                                     `json:"exchange_rate,omitempty"`
+	Counterparty  *string                                     `json:"counterparty,omitempty"`
+	Notes         *string                                     `json:"notes,omitempty"`
+	TagIDs        []string                                    `json:"tag_ids,omitempty"`
+	LineItems     []services.CreateTransactionLineItemRequest `json:"line_items,omitempty"`
+}
 
 type TransactionListResponse struct {
 	Data       []domain.Transaction `json:"data"`
@@ -35,9 +55,8 @@ type TransactionListResponse struct {
 // @Router /transactions [get]
 func ListTransactions(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -79,7 +98,10 @@ func ListTransactions(d Deps) http.HandlerFunc {
 			Limit:     limit,
 		})
 		if err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			if writeServiceError(w, err) {
+				return
+			}
+			writeInternalError(w, err)
 			return
 		}
 
@@ -100,9 +122,8 @@ func ListTransactions(d Deps) http.HandlerFunc {
 // @Router /transactions/{transactionId} [get]
 func GetTransaction(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -114,11 +135,10 @@ func GetTransaction(d Deps) http.HandlerFunc {
 
 		tx, err := d.TransactionService.Get(r.Context(), uid, id)
 		if err != nil {
-			if errors.Is(err, domain.ErrTransactionNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "transaction not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -133,7 +153,7 @@ func GetTransaction(d Deps) http.HandlerFunc {
 // @Accept json
 // @Produce json
 // @Param X-Client-Id header string false "Client instance ID (recommended)"
-// @Param body body services.CreateTransactionRequest true "Create transaction request"
+// @Param body body handlers.CreateTransactionBody true "Create transaction request"
 // @Success 200 {object} domain.Transaction
 // @Failure 400 {object} apierror.Envelope
 // @Failure 401 {object} apierror.Envelope
@@ -142,25 +162,47 @@ func GetTransaction(d Deps) http.HandlerFunc {
 // @Router /transactions [post]
 func CreateTransaction(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
-		var req services.CreateTransactionRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		var body CreateTransactionBody
+		if ok := decodeJSON(w, r, &body); !ok {
 			return
+		}
+		if body.Currency != nil && strings.TrimSpace(*body.Currency) != "" {
+			apierror.Write(w, http.StatusBadRequest, "validation_error", "currency is not supported for transactions (omit currency)", map[string]any{"field": "currency"})
+			return
+		}
+
+		req := services.CreateTransactionRequest{
+			ClientID:      body.ClientID,
+			ExternalRef:   body.ExternalRef,
+			Type:          body.Type,
+			OccurredAt:    body.OccurredAt,
+			OccurredDate:  body.OccurredDate,
+			OccurredTime:  body.OccurredTime,
+			Amount:        body.Amount,
+			FromAmount:    body.FromAmount,
+			ToAmount:      body.ToAmount,
+			Description:   body.Description,
+			AccountID:     body.AccountID,
+			FromAccountID: body.FromAccountID,
+			ToAccountID:   body.ToAccountID,
+			ExchangeRate:  body.ExchangeRate,
+			Counterparty:  body.Counterparty,
+			Notes:         body.Notes,
+			TagIDs:        body.TagIDs,
+			LineItems:     body.LineItems,
 		}
 
 		tx, err := d.TransactionService.Create(r.Context(), uid, req)
 		if err != nil {
-			if errors.Is(err, domain.ErrTransactionForbidden) {
-				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -185,9 +227,8 @@ func CreateTransaction(d Deps) http.HandlerFunc {
 // @Router /transactions/{transactionId} [patch]
 func PatchTransaction(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -198,22 +239,16 @@ func PatchTransaction(d Deps) http.HandlerFunc {
 		}
 
 		var req services.PatchTransactionRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		tx, err := d.TransactionService.Patch(r.Context(), uid, id, req)
 		if err != nil {
-			if errors.Is(err, domain.ErrTransactionNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "transaction not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			if errors.Is(err, domain.ErrTransactionForbidden) {
-				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
-				return
-			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -235,9 +270,8 @@ func PatchTransaction(d Deps) http.HandlerFunc {
 // @Router /transactions/{transactionId} [delete]
 func DeleteTransaction(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -249,15 +283,10 @@ func DeleteTransaction(d Deps) http.HandlerFunc {
 
 		err := d.TransactionService.Delete(r.Context(), uid, id)
 		if err != nil {
-			if errors.Is(err, domain.ErrTransactionNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "transaction not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			if errors.Is(err, domain.ErrTransactionForbidden) {
-				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
-				return
-			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
