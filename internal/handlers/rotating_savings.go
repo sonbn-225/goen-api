@@ -1,14 +1,10 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/auth"
-	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/services"
 )
 
@@ -23,15 +19,14 @@ import (
 // @Router /rotating-savings/groups [get]
 func ListRotatingSavingsGroups(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		items, err := d.RotatingSavingsService.ListGroups(r.Context(), uid)
 		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -53,21 +48,22 @@ func ListRotatingSavingsGroups(d Deps) http.HandlerFunc {
 // @Router /rotating-savings/groups [post]
 func CreateRotatingSavingsGroup(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		var req services.CreateRotatingSavingsGroupRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		item, err := d.RotatingSavingsService.CreateGroup(r.Context(), uid, req)
 		if err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			if writeServiceError(w, err) {
+				return
+			}
+			writeInternalError(w, err)
 			return
 		}
 
@@ -88,9 +84,8 @@ func CreateRotatingSavingsGroup(d Deps) http.HandlerFunc {
 // @Router /rotating-savings/groups/{groupId} [get]
 func GetRotatingSavingsGroup(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -102,11 +97,10 @@ func GetRotatingSavingsGroup(d Deps) http.HandlerFunc {
 
 		item, err := d.RotatingSavingsService.GetGroup(r.Context(), uid, id)
 		if err != nil {
-			if errors.Is(err, domain.ErrRotatingSavingsGroupNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "group not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -127,9 +121,8 @@ func GetRotatingSavingsGroup(d Deps) http.HandlerFunc {
 // @Router /rotating-savings/groups/{groupId}/contributions [get]
 func ListRotatingSavingsContributions(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -141,11 +134,10 @@ func ListRotatingSavingsContributions(d Deps) http.HandlerFunc {
 
 		items, err := d.RotatingSavingsService.ListContributions(r.Context(), uid, groupID)
 		if err != nil {
-			if errors.Is(err, domain.ErrRotatingSavingsGroupNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "group not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -169,9 +161,8 @@ func ListRotatingSavingsContributions(d Deps) http.HandlerFunc {
 // @Router /rotating-savings/groups/{groupId}/contributions [post]
 func CreateRotatingSavingsContribution(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -182,18 +173,16 @@ func CreateRotatingSavingsContribution(d Deps) http.HandlerFunc {
 		}
 
 		var req services.CreateRotatingSavingsContributionRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		item, err := d.RotatingSavingsService.CreateContribution(r.Context(), uid, groupID, req)
 		if err != nil {
-			if errors.Is(err, domain.ErrRotatingSavingsGroupNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "group not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 

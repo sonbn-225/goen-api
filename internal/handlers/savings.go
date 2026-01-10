@@ -1,14 +1,10 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/auth"
-	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/services"
 )
 
@@ -23,15 +19,14 @@ import (
 // @Router /savings/instruments [get]
 func ListSavingsInstruments(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		items, err := d.SavingsService.ListInstruments(r.Context(), uid)
 		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -53,21 +48,22 @@ func ListSavingsInstruments(d Deps) http.HandlerFunc {
 // @Router /savings/instruments [post]
 func CreateSavingsInstrument(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		var req services.CreateSavingsInstrumentRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		item, err := d.SavingsService.CreateInstrument(r.Context(), uid, req)
 		if err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			if writeServiceError(w, err) {
+				return
+			}
+			writeInternalError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, item)
@@ -87,9 +83,8 @@ func CreateSavingsInstrument(d Deps) http.HandlerFunc {
 // @Router /savings/instruments/{instrumentId} [get]
 func GetSavingsInstrument(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -101,11 +96,10 @@ func GetSavingsInstrument(d Deps) http.HandlerFunc {
 
 		item, err := d.SavingsService.GetInstrument(r.Context(), uid, id)
 		if err != nil {
-			if errors.Is(err, domain.ErrSavingsInstrumentNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "savings instrument not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -129,9 +123,8 @@ func GetSavingsInstrument(d Deps) http.HandlerFunc {
 // @Router /savings/instruments/{instrumentId} [patch]
 func PatchSavingsInstrument(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -142,18 +135,16 @@ func PatchSavingsInstrument(d Deps) http.HandlerFunc {
 		}
 
 		var req services.PatchSavingsInstrumentRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		item, err := d.SavingsService.PatchInstrument(r.Context(), uid, id, req)
 		if err != nil {
-			if errors.Is(err, domain.ErrSavingsInstrumentNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "savings instrument not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, item)
@@ -173,9 +164,8 @@ func PatchSavingsInstrument(d Deps) http.HandlerFunc {
 // @Router /savings/instruments/{instrumentId} [delete]
 func DeleteSavingsInstrument(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -186,11 +176,10 @@ func DeleteSavingsInstrument(d Deps) http.HandlerFunc {
 		}
 
 		if err := d.SavingsService.DeleteInstrument(r.Context(), uid, id); err != nil {
-			if errors.Is(err, domain.ErrSavingsInstrumentNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "savings instrument not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 

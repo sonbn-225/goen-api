@@ -76,3 +76,13 @@ func (p *Postgres) Pool(ctx context.Context) (*pgxpool.Pool, error) {
 	}
 	return p.ensurePool(ctx)
 }
+
+func (p *Postgres) Close() {
+	if p == nil {
+		return
+	}
+	if p.pool != nil {
+		p.pool.Close()
+		p.pool = nil
+	}
+}

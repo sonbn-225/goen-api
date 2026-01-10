@@ -33,20 +33,20 @@ type CreateRotatingSavingsGroupRequest struct {
 }
 
 type CreateRotatingSavingsContributionRequest struct {
-	Kind        string  `json:"kind"`
-	AccountID   *string `json:"account_id,omitempty"`
-	OccurredDate string `json:"occurred_date"`
+	Kind         string  `json:"kind"`
+	AccountID    *string `json:"account_id,omitempty"`
+	OccurredDate string  `json:"occurred_date"`
 	OccurredTime *string `json:"occurred_time,omitempty"`
-	Amount      string  `json:"amount"`
-	CycleNo     *int    `json:"cycle_no,omitempty"`
-	DueDate     *string `json:"due_date,omitempty"`
-	Note        *string `json:"note,omitempty"`
+	Amount       string  `json:"amount"`
+	CycleNo      *int    `json:"cycle_no,omitempty"`
+	DueDate      *string `json:"due_date,omitempty"`
+	Note         *string `json:"note,omitempty"`
 }
 
 type rotatingSavingsService struct {
-	accounts     domain.AccountRepository
-	tx           TransactionService
-	repo         domain.RotatingSavingsRepository
+	accounts domain.AccountRepository
+	tx       TransactionService
+	repo     domain.RotatingSavingsRepository
 }
 
 func NewRotatingSavingsService(accounts domain.AccountRepository, tx TransactionService, repo domain.RotatingSavingsRepository) RotatingSavingsService {
@@ -56,43 +56,43 @@ func NewRotatingSavingsService(accounts domain.AccountRepository, tx Transaction
 func (s *rotatingSavingsService) CreateGroup(ctx context.Context, userID string, req CreateRotatingSavingsGroupRequest) (*domain.RotatingSavingsGroup, error) {
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		return nil, errors.New("name is required")
+		return nil, ValidationError("name is required", map[string]any{"field": "name"})
 	}
 
 	accountIDRaw := strings.TrimSpace(req.AccountID)
 	if accountIDRaw == "" {
-		return nil, errors.New("account_id is required")
+		return nil, ValidationError("account_id is required", map[string]any{"field": "account_id"})
 	}
 	accountID := accountIDRaw
 
 	if req.MemberCount <= 0 {
-		return nil, errors.New("member_count must be > 0")
+		return nil, ValidationError("member_count must be > 0", map[string]any{"field": "member_count"})
 	}
 
 	contributionAmount := strings.TrimSpace(req.ContributionAmount)
 	if contributionAmount == "" {
-		return nil, errors.New("contribution_amount is required")
+		return nil, ValidationError("contribution_amount is required", map[string]any{"field": "contribution_amount"})
 	}
 	if !isValidDecimal(contributionAmount) {
-		return nil, errors.New("contribution_amount must be a decimal string")
+		return nil, ValidationError("contribution_amount must be a decimal string", map[string]any{"field": "contribution_amount"})
 	}
 
 	earlyFee := normalizeOptionalString(req.EarlyPayoutFeeRate)
 	if earlyFee != nil && !isValidDecimal(*earlyFee) {
-		return nil, errors.New("early_payout_fee_rate must be a decimal string")
+		return nil, ValidationError("early_payout_fee_rate must be a decimal string", map[string]any{"field": "early_payout_fee_rate"})
 	}
 
 	cycleFrequency := strings.TrimSpace(req.CycleFrequency)
 	if cycleFrequency != "weekly" && cycleFrequency != "monthly" && cycleFrequency != "custom" {
-		return nil, errors.New("cycle_frequency is invalid")
+		return nil, ValidationError("cycle_frequency is invalid", map[string]any{"field": "cycle_frequency"})
 	}
 
 	startDate := strings.TrimSpace(req.StartDate)
 	if startDate == "" {
-		return nil, errors.New("start_date is required")
+		return nil, ValidationError("start_date is required", map[string]any{"field": "start_date"})
 	}
 	if _, err := time.Parse("2006-01-02", startDate); err != nil {
-		return nil, errors.New("start_date is invalid")
+		return nil, ValidationError("start_date is invalid", map[string]any{"field": "start_date"})
 	}
 
 	status := "active"
@@ -100,7 +100,7 @@ func (s *rotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 		v := strings.TrimSpace(*req.Status)
 		if v != "" {
 			if v != "active" && v != "completed" && v != "closed" {
-				return nil, errors.New("status is invalid")
+				return nil, ValidationError("status is invalid", map[string]any{"field": "status"})
 			}
 			status = v
 		}
@@ -108,6 +108,12 @@ func (s *rotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 
 	// Validate user has access.
 	if _, err := s.accounts.GetAccountForUser(ctx, userID, accountID); err != nil {
+		if errors.Is(err, domain.ErrAccountNotFound) {
+			return nil, NotFoundErrorWithCause("account not found", map[string]any{"field": "account_id"}, err)
+		}
+		if errors.Is(err, domain.ErrAccountForbidden) {
+			return nil, ForbiddenErrorWithCause("account forbidden", map[string]any{"field": "account_id"}, err)
+		}
 		return nil, err
 	}
 
@@ -142,7 +148,14 @@ func (s *rotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 }
 
 func (s *rotatingSavingsService) GetGroup(ctx context.Context, userID string, groupID string) (*domain.RotatingSavingsGroup, error) {
-	return s.repo.GetGroup(ctx, userID, groupID)
+	g, err := s.repo.GetGroup(ctx, userID, groupID)
+	if err != nil {
+		if errors.Is(err, domain.ErrRotatingSavingsGroupNotFound) {
+			return nil, NotFoundErrorWithCause("group not found", nil, err)
+		}
+		return nil, err
+	}
+	return g, nil
 }
 
 func (s *rotatingSavingsService) ListGroups(ctx context.Context, userID string) ([]domain.RotatingSavingsGroup, error) {
@@ -152,34 +165,37 @@ func (s *rotatingSavingsService) ListGroups(ctx context.Context, userID string) 
 func (s *rotatingSavingsService) CreateContribution(ctx context.Context, userID string, groupID string, req CreateRotatingSavingsContributionRequest) (*domain.RotatingSavingsContribution, error) {
 	kind := strings.TrimSpace(req.Kind)
 	if kind != "contribution" && kind != "payout" {
-		return nil, errors.New("kind is invalid")
+		return nil, ValidationError("kind is invalid", map[string]any{"field": "kind"})
 	}
 
 	amount := strings.TrimSpace(req.Amount)
 	if amount == "" {
-		return nil, errors.New("amount is required")
+		return nil, ValidationError("amount is required", map[string]any{"field": "amount"})
 	}
 	if !isValidDecimal(amount) {
-		return nil, errors.New("amount must be a decimal string")
+		return nil, ValidationError("amount must be a decimal string", map[string]any{"field": "amount"})
 	}
 
 	occurredDate := strings.TrimSpace(req.OccurredDate)
 	if occurredDate == "" {
-		return nil, errors.New("occurred_date is required")
+		return nil, ValidationError("occurred_date is required", map[string]any{"field": "occurred_date"})
 	}
 	if _, err := time.Parse("2006-01-02", occurredDate); err != nil {
-		return nil, errors.New("occurred_date is invalid")
+		return nil, ValidationError("occurred_date is invalid", map[string]any{"field": "occurred_date"})
 	}
 
 	dueDate := normalizeOptionalString(req.DueDate)
 	if dueDate != nil {
 		if _, err := time.Parse("2006-01-02", *dueDate); err != nil {
-			return nil, errors.New("due_date is invalid")
+			return nil, ValidationError("due_date is invalid", map[string]any{"field": "due_date"})
 		}
 	}
 
 	group, err := s.repo.GetGroup(ctx, userID, groupID)
 	if err != nil {
+		if errors.Is(err, domain.ErrRotatingSavingsGroupNotFound) {
+			return nil, NotFoundErrorWithCause("group not found", nil, err)
+		}
 		return nil, err
 	}
 
@@ -190,6 +206,12 @@ func (s *rotatingSavingsService) CreateContribution(ctx context.Context, userID 
 
 	// Validate account access.
 	if _, err := s.accounts.GetAccountForUser(ctx, userID, *accountID); err != nil {
+		if errors.Is(err, domain.ErrAccountNotFound) {
+			return nil, NotFoundErrorWithCause("account not found", map[string]any{"field": "account_id"}, err)
+		}
+		if errors.Is(err, domain.ErrAccountForbidden) {
+			return nil, ForbiddenErrorWithCause("account forbidden", map[string]any{"field": "account_id"}, err)
+		}
 		return nil, err
 	}
 
@@ -198,7 +220,7 @@ func (s *rotatingSavingsService) CreateContribution(ctx context.Context, userID 
 		txType = "income"
 	}
 
-desc := fmt.Sprintf("RotatingSavings: %s", group.Name)
+	desc := fmt.Sprintf("RotatingSavings: %s", group.Name)
 	txReq := CreateTransactionRequest{
 		Type:         txType,
 		OccurredDate: &occurredDate,
@@ -249,6 +271,9 @@ desc := fmt.Sprintf("RotatingSavings: %s", group.Name)
 func (s *rotatingSavingsService) ListContributions(ctx context.Context, userID string, groupID string) ([]domain.RotatingSavingsContribution, error) {
 	// Ensure group belongs to user.
 	if _, err := s.repo.GetGroup(ctx, userID, groupID); err != nil {
+		if errors.Is(err, domain.ErrRotatingSavingsGroupNotFound) {
+			return nil, NotFoundErrorWithCause("group not found", nil, err)
+		}
 		return nil, err
 	}
 	return s.repo.ListContributions(ctx, userID, groupID)

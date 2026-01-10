@@ -36,7 +36,7 @@ type CreateBudgetRequest struct {
 }
 
 type budgetService struct {
-	repo        domain.BudgetRepository
+	repo         domain.BudgetRepository
 	categoryRepo domain.CategoryRepository
 }
 
@@ -47,32 +47,38 @@ func NewBudgetService(repo domain.BudgetRepository, categoryRepo domain.Category
 func (s *budgetService) Create(ctx context.Context, userID string, req CreateBudgetRequest) (*BudgetWithStats, error) {
 	period := strings.TrimSpace(req.Period)
 	if period != "month" && period != "week" && period != "custom" {
-		return nil, errors.New("period is invalid")
+		return nil, ValidationError("period is invalid", nil)
 	}
 
 	amount := strings.TrimSpace(req.Amount)
 	if amount == "" {
-		return nil, errors.New("amount is required")
+		return nil, ValidationError("amount is required", nil)
 	}
 	if !isValidDecimalLocal(amount) {
-		return nil, errors.New("amount must be a decimal string")
+		return nil, ValidationError("amount must be a decimal string", nil)
 	}
 
 	categoryID := normalizeOptionalString(req.CategoryID)
 	if categoryID == nil {
-		return nil, errors.New("category_id is required")
+		return nil, ValidationError("category_id is required", map[string]any{"field": "category_id"})
 	}
 	cat, err := s.categoryRepo.GetCategory(ctx, userID, *categoryID)
 	if err != nil {
+		if errors.Is(err, domain.ErrCategoryNotFound) {
+			return nil, NotFoundErrorWithCause("category not found", nil, err)
+		}
 		return nil, err
 	}
 	if cat == nil || !cat.IsActive {
-		return nil, errors.New("category_id is invalid")
+		return nil, ValidationError("category_id is invalid", map[string]any{"field": "category_id"})
 	}
 	if cat.IsSystem {
-		return nil, errors.New("category_id is invalid")
+		return nil, ValidationError("category_id is invalid", map[string]any{"field": "category_id"})
 	}
 	if _, err := s.categoryRepo.GetCategory(ctx, userID, *categoryID); err != nil {
+		if errors.Is(err, domain.ErrCategoryNotFound) {
+			return nil, NotFoundErrorWithCause("category not found", nil, err)
+		}
 		return nil, err
 	}
 
@@ -84,7 +90,7 @@ func (s *budgetService) Create(ctx context.Context, userID string, req CreateBud
 	alert := req.AlertThresholdPercent
 	if alert != nil {
 		if *alert < 0 || *alert > 100 {
-			return nil, errors.New("alert_threshold_percent must be between 0 and 100")
+			return nil, ValidationError("alert_threshold_percent must be between 0 and 100", nil)
 		}
 	} else {
 		v := 80
@@ -95,24 +101,24 @@ func (s *budgetService) Create(ctx context.Context, userID string, req CreateBud
 	if over != nil {
 		v := *over
 		if v != "reset" && v != "carry_forward" && v != "accumulate" {
-			return nil, errors.New("rollover_mode is invalid")
+			return nil, ValidationError("rollover_mode is invalid", nil)
 		}
 	}
 
 	now := time.Now().UTC()
 	b := domain.Budget{
-		ID:                   uuid.NewString(),
-		UserID:               userID,
-		Name:                 normalizeOptionalString(req.Name),
-		Period:               period,
-		PeriodStart:          &start,
-		PeriodEnd:            &end,
-		Amount:               amount,
+		ID:                    uuid.NewString(),
+		UserID:                userID,
+		Name:                  normalizeOptionalString(req.Name),
+		Period:                period,
+		PeriodStart:           &start,
+		PeriodEnd:             &end,
+		Amount:                amount,
 		AlertThresholdPercent: alert,
-		RolloverMode:         over,
-		CategoryID:           categoryID,
-		CreatedAt:            now,
-		UpdatedAt:            now,
+		RolloverMode:          over,
+		CategoryID:            categoryID,
+		CreatedAt:             now,
+		UpdatedAt:             now,
 	}
 
 	if err := s.repo.CreateBudget(ctx, userID, b); err != nil {
@@ -129,6 +135,9 @@ func (s *budgetService) Create(ctx context.Context, userID string, req CreateBud
 func (s *budgetService) Get(ctx context.Context, userID string, budgetID string) (*BudgetWithStats, error) {
 	b, err := s.repo.GetBudget(ctx, userID, budgetID)
 	if err != nil {
+		if errors.Is(err, domain.ErrBudgetNotFound) {
+			return nil, NotFoundErrorWithCause("budget not found", nil, err)
+		}
 		return nil, err
 	}
 	return s.withStats(ctx, userID, *b)
@@ -195,31 +204,31 @@ func normalizeBudgetPeriod(period string, startIn *string, endIn *string) (strin
 
 	if period == "custom" {
 		if startStr == "" {
-			return "", "", errors.New("period_start is required")
+			return "", "", ValidationError("period_start is required", nil)
 		}
 		if endStr == "" {
-			return "", "", errors.New("period_end is required")
+			return "", "", ValidationError("period_end is required", nil)
 		}
 		start, err := time.Parse("2006-01-02", startStr)
 		if err != nil {
-			return "", "", errors.New("period_start is invalid")
+			return "", "", ValidationError("period_start is invalid", nil)
 		}
 		end, err := time.Parse("2006-01-02", endStr)
 		if err != nil {
-			return "", "", errors.New("period_end is invalid")
+			return "", "", ValidationError("period_end is invalid", nil)
 		}
 		if end.Before(start) {
-			return "", "", errors.New("period_end must be >= period_start")
+			return "", "", ValidationError("period_end must be >= period_start", nil)
 		}
 		return startStr, endStr, nil
 	}
 
 	if startStr == "" {
-		return "", "", errors.New("period_start is required")
+		return "", "", ValidationError("period_start is required", nil)
 	}
 	start, err := time.Parse("2006-01-02", startStr)
 	if err != nil {
-		return "", "", errors.New("period_start is invalid")
+		return "", "", ValidationError("period_start is invalid", nil)
 	}
 
 	var end time.Time
@@ -230,7 +239,7 @@ func normalizeBudgetPeriod(period string, startIn *string, endIn *string) (strin
 	case "week":
 		end = start.AddDate(0, 0, 6)
 	default:
-		return "", "", errors.New("period is invalid")
+		return "", "", ValidationError("period is invalid", nil)
 	}
 
 	return startStr, end.Format("2006-01-02"), nil

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
@@ -73,7 +73,28 @@ func (r *AccountRepo) CreateAccountWithOwner(ctx context.Context, account domain
 			ownerUserID,
 			ownerUserID,
 		)
-		return err
+		if err != nil {
+			return err
+		}
+
+		// Broker accounts must always have an investment_accounts extension row.
+		if account.AccountType == "broker" {
+			_, err := tx.Exec(ctx, `
+				INSERT INTO investment_accounts (
+					id, account_id, created_at, updated_at
+				) VALUES ($1,$2,$3,$4)
+			`,
+				uuid.NewString(),
+				account.ID,
+				account.CreatedAt,
+				account.UpdatedAt,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 }
 

@@ -26,24 +26,24 @@ type CreateTransactionLineItemRequest struct {
 }
 
 type CreateTransactionRequest struct {
-	ClientID     *string `json:"client_id,omitempty"`
-	ExternalRef  *string `json:"external_ref,omitempty"`
-	Type         string  `json:"type"`
-	OccurredAt   *string `json:"occurred_at,omitempty"`
-	OccurredDate *string `json:"occurred_date,omitempty"`
-	OccurredTime *string `json:"occurred_time,omitempty"`
-	Amount       string  `json:"amount"`
-	FromAmount   *string `json:"from_amount,omitempty"`
-	ToAmount     *string `json:"to_amount,omitempty"`
-	Description  *string `json:"description,omitempty"`
-	AccountID    *string `json:"account_id,omitempty"`
-	FromAccountID *string `json:"from_account_id,omitempty"`
-	ToAccountID   *string `json:"to_account_id,omitempty"`
-	ExchangeRate *string `json:"exchange_rate,omitempty"`
-	Counterparty *string `json:"counterparty,omitempty"`
-	Notes        *string `json:"notes,omitempty"`
-	TagIDs       []string `json:"tag_ids,omitempty"`
-	LineItems    []CreateTransactionLineItemRequest `json:"line_items,omitempty"`
+	ClientID      *string                            `json:"client_id,omitempty"`
+	ExternalRef   *string                            `json:"external_ref,omitempty"`
+	Type          string                             `json:"type"`
+	OccurredAt    *string                            `json:"occurred_at,omitempty"`
+	OccurredDate  *string                            `json:"occurred_date,omitempty"`
+	OccurredTime  *string                            `json:"occurred_time,omitempty"`
+	Amount        string                             `json:"amount"`
+	FromAmount    *string                            `json:"from_amount,omitempty"`
+	ToAmount      *string                            `json:"to_amount,omitempty"`
+	Description   *string                            `json:"description,omitempty"`
+	AccountID     *string                            `json:"account_id,omitempty"`
+	FromAccountID *string                            `json:"from_account_id,omitempty"`
+	ToAccountID   *string                            `json:"to_account_id,omitempty"`
+	ExchangeRate  *string                            `json:"exchange_rate,omitempty"`
+	Counterparty  *string                            `json:"counterparty,omitempty"`
+	Notes         *string                            `json:"notes,omitempty"`
+	TagIDs        []string                           `json:"tag_ids,omitempty"`
+	LineItems     []CreateTransactionLineItemRequest `json:"line_items,omitempty"`
 }
 
 type ListTransactionsRequest struct {
@@ -71,15 +71,15 @@ func NewTransactionService(repo domain.TransactionRepository) TransactionService
 func (s *transactionService) Create(ctx context.Context, userID string, req CreateTransactionRequest) (*domain.Transaction, error) {
 	kind := strings.TrimSpace(req.Type)
 	if kind != "expense" && kind != "income" && kind != "transfer" {
-		return nil, errors.New("type is invalid")
+		return nil, ValidationError("type is invalid", nil)
 	}
 
 	amount := strings.TrimSpace(req.Amount)
 	if amount == "" {
-		return nil, errors.New("amount is required")
+		return nil, ValidationError("amount is required", nil)
 	}
 	if !isValidDecimal(amount) {
-		return nil, errors.New("amount must be a decimal string")
+		return nil, ValidationError("amount must be a decimal string", nil)
 	}
 
 	fromAmount := normalizeOptionalString(req.FromAmount)
@@ -90,7 +90,7 @@ func (s *transactionService) Create(ctx context.Context, userID string, req Crea
 			fromAmount = nil
 		} else {
 			if !isValidDecimal(v) {
-				return nil, errors.New("from_amount must be a decimal string")
+				return nil, ValidationError("from_amount must be a decimal string", nil)
 			}
 			fromAmount = &v
 		}
@@ -101,13 +101,13 @@ func (s *transactionService) Create(ctx context.Context, userID string, req Crea
 			toAmount = nil
 		} else {
 			if !isValidDecimal(v) {
-				return nil, errors.New("to_amount must be a decimal string")
+				return nil, ValidationError("to_amount must be a decimal string", nil)
 			}
 			toAmount = &v
 		}
 	}
 	if (fromAmount != nil) != (toAmount != nil) {
-		return nil, errors.New("from_amount and to_amount must be provided together")
+		return nil, ValidationError("from_amount and to_amount must be provided together", nil)
 	}
 
 	occurredAt, occurredDate, err := normalizeOccurredAt(req.OccurredAt, req.OccurredDate, req.OccurredTime)
@@ -122,14 +122,14 @@ func (s *transactionService) Create(ctx context.Context, userID string, req Crea
 		for _, li := range req.LineItems {
 			liAmt := strings.TrimSpace(li.Amount)
 			if liAmt == "" {
-				return nil, errors.New("line_items.amount is required")
+				return nil, ValidationError("line_items.amount is required", nil)
 			}
 			if !isValidDecimal(liAmt) {
-				return nil, errors.New("line_items.amount must be a decimal string")
+				return nil, ValidationError("line_items.amount must be a decimal string", nil)
 			}
 			r, ok := new(big.Rat).SetString(liAmt)
 			if !ok {
-				return nil, errors.New("line_items.amount must be a decimal string")
+				return nil, ValidationError("line_items.amount must be a decimal string", nil)
 			}
 			sum.Add(sum, r)
 
@@ -142,10 +142,10 @@ func (s *transactionService) Create(ctx context.Context, userID string, req Crea
 		}
 		total, ok := new(big.Rat).SetString(amount)
 		if !ok {
-			return nil, errors.New("amount must be a decimal string")
+			return nil, ValidationError("amount must be a decimal string", nil)
 		}
 		if sum.Cmp(total) != 0 {
-			return nil, errors.New("line_items total must equal amount")
+			return nil, ValidationError("line_items total must equal amount", nil)
 		}
 	}
 
@@ -153,27 +153,27 @@ func (s *transactionService) Create(ctx context.Context, userID string, req Crea
 	id := uuid.NewString()
 
 	tx := domain.Transaction{
-		ID:           id,
-		ClientID:     normalizeOptionalString(req.ClientID),
-		ExternalRef:  normalizeOptionalString(req.ExternalRef),
-		Type:         kind,
-		OccurredAt:   occurredAt,
-		OccurredDate: occurredDate,
-		Amount:       amount,
-		FromAmount:   fromAmount,
-		ToAmount:     toAmount,
-		Description:  normalizeOptionalString(req.Description),
-		AccountID:    normalizeOptionalString(req.AccountID),
+		ID:            id,
+		ClientID:      normalizeOptionalString(req.ClientID),
+		ExternalRef:   normalizeOptionalString(req.ExternalRef),
+		Type:          kind,
+		OccurredAt:    occurredAt,
+		OccurredDate:  occurredDate,
+		Amount:        amount,
+		FromAmount:    fromAmount,
+		ToAmount:      toAmount,
+		Description:   normalizeOptionalString(req.Description),
+		AccountID:     normalizeOptionalString(req.AccountID),
 		FromAccountID: normalizeOptionalString(req.FromAccountID),
 		ToAccountID:   normalizeOptionalString(req.ToAccountID),
-		ExchangeRate: normalizeOptionalString(req.ExchangeRate),
-		Counterparty: normalizeOptionalString(req.Counterparty),
-		Notes:        normalizeOptionalString(req.Notes),
-		Status:       "posted",
-		CreatedAt:    now,
-		UpdatedAt:    now,
-		CreatedBy:    &userID,
-		UpdatedBy:    &userID,
+		ExchangeRate:  normalizeOptionalString(req.ExchangeRate),
+		Counterparty:  normalizeOptionalString(req.Counterparty),
+		Notes:         normalizeOptionalString(req.Notes),
+		Status:        "posted",
+		CreatedAt:     now,
+		UpdatedAt:     now,
+		CreatedBy:     &userID,
+		UpdatedBy:     &userID,
 	}
 
 	if err := validateTransactionLinkage(tx); err != nil {
@@ -182,11 +182,20 @@ func (s *transactionService) Create(ctx context.Context, userID string, req Crea
 
 	tagIDs := normalizeTagIDs(req.TagIDs)
 	if err := s.repo.CreateTransaction(ctx, userID, tx, lineItems, tagIDs); err != nil {
+		if errors.Is(err, domain.ErrTransactionForbidden) {
+			return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+		}
 		return nil, err
 	}
 
 	created, err := s.repo.GetTransaction(ctx, userID, id)
 	if err != nil {
+		if errors.Is(err, domain.ErrTransactionNotFound) {
+			return nil, NotFoundErrorWithCause("transaction not found", nil, err)
+		}
+		if errors.Is(err, domain.ErrTransactionForbidden) {
+			return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+		}
 		return nil, err
 	}
 	return created, nil
@@ -216,7 +225,17 @@ func normalizeTagIDs(in []string) []string {
 }
 
 func (s *transactionService) Get(ctx context.Context, userID string, transactionID string) (*domain.Transaction, error) {
-	return s.repo.GetTransaction(ctx, userID, transactionID)
+	tx, err := s.repo.GetTransaction(ctx, userID, transactionID)
+	if err != nil {
+		if errors.Is(err, domain.ErrTransactionNotFound) {
+			return nil, NotFoundErrorWithCause("transaction not found", nil, err)
+		}
+		if errors.Is(err, domain.ErrTransactionForbidden) {
+			return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		return nil, err
+	}
+	return tx, nil
 }
 
 func (s *transactionService) List(ctx context.Context, userID string, req ListTransactionsRequest) ([]domain.Transaction, *string, error) {
@@ -231,7 +250,7 @@ func (s *transactionService) List(ctx context.Context, userID string, req ListTr
 		if v != "" {
 			t, err := parseTimeOrDate(v)
 			if err != nil {
-				return nil, nil, errors.New("from is invalid")
+				return nil, nil, ValidationError("from is invalid", nil)
 			}
 			filter.From = &t
 		}
@@ -241,7 +260,7 @@ func (s *transactionService) List(ctx context.Context, userID string, req ListTr
 		if v != "" {
 			t, err := parseTimeOrDate(v)
 			if err != nil {
-				return nil, nil, errors.New("to is invalid")
+				return nil, nil, ValidationError("to is invalid", nil)
 			}
 			filter.To = &t
 		}
@@ -256,34 +275,54 @@ func (s *transactionService) Patch(ctx context.Context, userID string, transacti
 		Notes:        normalizeOptionalString(req.Notes),
 		Counterparty: normalizeOptionalString(req.Counterparty),
 	}
-	return s.repo.PatchTransaction(ctx, userID, transactionID, patch)
+	tx, err := s.repo.PatchTransaction(ctx, userID, transactionID, patch)
+	if err != nil {
+		if errors.Is(err, domain.ErrTransactionNotFound) {
+			return nil, NotFoundErrorWithCause("transaction not found", nil, err)
+		}
+		if errors.Is(err, domain.ErrTransactionForbidden) {
+			return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		return nil, err
+	}
+	return tx, nil
 }
 
 func (s *transactionService) Delete(ctx context.Context, userID string, transactionID string) error {
-	return s.repo.DeleteTransaction(ctx, userID, transactionID)
+	err := s.repo.DeleteTransaction(ctx, userID, transactionID)
+	if err != nil {
+		if errors.Is(err, domain.ErrTransactionNotFound) {
+			return NotFoundErrorWithCause("transaction not found", nil, err)
+		}
+		if errors.Is(err, domain.ErrTransactionForbidden) {
+			return ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		return err
+	}
+	return nil
 }
 
 func validateTransactionLinkage(tx domain.Transaction) error {
 	switch tx.Type {
 	case "expense", "income":
 		if tx.AccountID == nil {
-			return errors.New("account_id is required")
+			return ValidationError("account_id is required", nil)
 		}
 		if tx.FromAccountID != nil || tx.ToAccountID != nil {
-			return errors.New("from_account_id/to_account_id must be empty")
+			return ValidationError("from_account_id/to_account_id must be empty", nil)
 		}
 	case "transfer":
 		if tx.FromAccountID == nil {
-			return errors.New("from_account_id is required")
+			return ValidationError("from_account_id is required", nil)
 		}
 		if tx.ToAccountID == nil {
-			return errors.New("to_account_id is required")
+			return ValidationError("to_account_id is required", nil)
 		}
 		if tx.AccountID != nil {
-			return errors.New("account_id must be empty")
+			return ValidationError("account_id must be empty", nil)
 		}
 	default:
-		return errors.New("type is invalid")
+		return ValidationError("type is invalid", nil)
 	}
 	return nil
 }
@@ -294,18 +333,18 @@ func normalizeOccurredAt(occurredAt, occurredDate, occurredTime *string) (time.T
 		if v != "" {
 			t, err := time.Parse(time.RFC3339, v)
 			if err != nil {
-				return time.Time{}, "", errors.New("occurred_at is invalid")
+				return time.Time{}, "", ValidationError("occurred_at is invalid", nil)
 			}
 			return t.UTC(), t.UTC().Format("2006-01-02"), nil
 		}
 	}
 
 	if occurredDate == nil || strings.TrimSpace(*occurredDate) == "" {
-		return time.Time{}, "", errors.New("occurred_date is required")
+		return time.Time{}, "", ValidationError("occurred_date is required", nil)
 	}
 	d, err := time.Parse("2006-01-02", strings.TrimSpace(*occurredDate))
 	if err != nil {
-		return time.Time{}, "", errors.New("occurred_date is invalid")
+		return time.Time{}, "", ValidationError("occurred_date is invalid", nil)
 	}
 
 	h := 0
@@ -315,7 +354,7 @@ func normalizeOccurredAt(occurredAt, occurredDate, occurredTime *string) (time.T
 		if v != "" {
 			tm, err := time.Parse("15:04", v)
 			if err != nil {
-				return time.Time{}, "", errors.New("occurred_time is invalid")
+				return time.Time{}, "", ValidationError("occurred_time is invalid", nil)
 			}
 			h = tm.Hour()
 			m = tm.Minute()

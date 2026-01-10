@@ -55,7 +55,7 @@ func normalizeAccountColor(in *string) (*string, error) {
 		"orange": {},
 	}
 	if _, ok := allowed[v]; !ok {
-		return nil, errors.New("color is invalid")
+		return nil, ValidationError("color is invalid", map[string]any{"field": "color"})
 	}
 	return &v, nil
 }
@@ -68,7 +68,7 @@ func toString(p *string) string {
 }
 
 type accountService struct {
-	repo domain.AccountRepository
+	repo     domain.AccountRepository
 	userRepo domain.UserRepository
 }
 
@@ -87,12 +87,12 @@ func (s *accountService) GetAccount(ctx context.Context, userID string, accountI
 func (s *accountService) CreateAccount(ctx context.Context, userID string, req CreateAccountRequest) (*domain.Account, error) {
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		return nil, errors.New("name is required")
+		return nil, ValidationError("name is required", map[string]any{"field": "name"})
 	}
 
 	accountType := strings.TrimSpace(req.AccountType)
 	if !isValidAccountType(accountType) {
-		return nil, errors.New("account_type is invalid")
+		return nil, ValidationError("account_type is invalid", map[string]any{"field": "account_type"})
 	}
 
 	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
@@ -100,7 +100,7 @@ func (s *accountService) CreateAccount(ctx context.Context, userID string, req C
 		currency = s.defaultCurrencyForUser(ctx, userID)
 	}
 	if len(currency) != 3 {
-		return nil, errors.New("currency must be ISO4217")
+		return nil, ValidationError("currency must be ISO4217", map[string]any{"field": "currency"})
 	}
 
 	accountNumber := normalizeOptionalString(req.AccountNumber)
@@ -112,10 +112,10 @@ func (s *accountService) CreateAccount(ctx context.Context, userID string, req C
 
 	parentID := normalizeOptionalString(req.ParentAccountID)
 	if (accountType == "card" || accountType == "savings") && parentID == nil {
-		return nil, errors.New("parent_account_id is required")
+		return nil, ValidationError("parent_account_id is required", map[string]any{"field": "parent_account_id"})
 	}
 	if (accountType == "bank" || accountType == "wallet" || accountType == "cash" || accountType == "broker") && parentID != nil {
-		return nil, errors.New("parent_account_id must be empty")
+		return nil, ValidationError("parent_account_id must be empty", map[string]any{"field": "parent_account_id"})
 	}
 
 	// Note: business rule validation about parent type (card->bank, savings->bank|wallet)
@@ -123,16 +123,22 @@ func (s *accountService) CreateAccount(ctx context.Context, userID string, req C
 	if parentID != nil {
 		parent, err := s.repo.GetAccountForUser(ctx, userID, *parentID)
 		if err != nil {
+			if errors.Is(err, domain.ErrAccountNotFound) {
+				return nil, NotFoundErrorWithCause("account not found", nil, err)
+			}
+			if errors.Is(err, domain.ErrAccountForbidden) {
+				return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+			}
 			return nil, err
 		}
 		switch accountType {
 		case "card":
 			if parent.AccountType != "bank" {
-				return nil, errors.New("parent account must be bank")
+				return nil, ValidationError("parent account must be bank", map[string]any{"field": "parent_account_id"})
 			}
 		case "savings":
 			if parent.AccountType != "bank" && parent.AccountType != "wallet" {
-				return nil, errors.New("parent account must be bank or wallet")
+				return nil, ValidationError("parent account must be bank or wallet", map[string]any{"field": "parent_account_id"})
 			}
 		}
 	}
@@ -193,24 +199,44 @@ func (s *accountService) defaultCurrencyForUser(ctx context.Context, userID stri
 
 func (s *accountService) PatchAccount(ctx context.Context, userID string, accountID string, patch domain.AccountPatch) (*domain.Account, error) {
 	if strings.TrimSpace(accountID) == "" {
-		return nil, domain.ErrAccountInvalidInput
+		return nil, ValidationErrorWithCause("invalid account input", nil, domain.ErrAccountInvalidInput)
 	}
 	if patch.Name == nil && patch.Status == nil && patch.Color == nil {
-		return nil, domain.ErrAccountInvalidInput
+		return nil, ValidationErrorWithCause("invalid account input", nil, domain.ErrAccountInvalidInput)
 	}
 	if patch.Color != nil {
 		if _, err := normalizeAccountColor(patch.Color); err != nil {
-			return nil, domain.ErrAccountInvalidInput
+			return nil, ValidationErrorWithCause("invalid account input", nil, domain.ErrAccountInvalidInput)
 		}
 	}
-	return s.repo.PatchAccount(ctx, userID, accountID, patch)
+	acc, err := s.repo.PatchAccount(ctx, userID, accountID, patch)
+	if err != nil {
+		if errors.Is(err, domain.ErrAccountForbidden) {
+			return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		if errors.Is(err, domain.ErrAccountNotFound) {
+			return nil, NotFoundErrorWithCause("account not found", nil, err)
+		}
+		return nil, err
+	}
+	return acc, nil
 }
 
 func (s *accountService) DeleteAccount(ctx context.Context, userID string, accountID string) error {
 	if strings.TrimSpace(accountID) == "" {
-		return domain.ErrAccountInvalidInput
+		return ValidationErrorWithCause("invalid account input", nil, domain.ErrAccountInvalidInput)
 	}
-	return s.repo.DeleteAccount(ctx, userID, accountID)
+	err := s.repo.DeleteAccount(ctx, userID, accountID)
+	if err != nil {
+		if errors.Is(err, domain.ErrAccountForbidden) {
+			return ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		if errors.Is(err, domain.ErrAccountNotFound) {
+			return NotFoundErrorWithCause("account not found", nil, err)
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *accountService) ListAccountBalances(ctx context.Context, userID string) ([]domain.AccountBalance, error) {
@@ -220,6 +246,12 @@ func (s *accountService) ListAccountBalances(ctx context.Context, userID string)
 func (s *accountService) ListAccountShares(ctx context.Context, userID string, accountID string) ([]domain.AccountShare, error) {
 	// Ensure account exists & user can access it at all (avoid leaking)
 	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+		if errors.Is(err, domain.ErrAccountForbidden) {
+			return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		if errors.Is(err, domain.ErrAccountNotFound) {
+			return nil, NotFoundErrorWithCause("account not found", nil, err)
+		}
 		return nil, err
 	}
 	return s.repo.ListAccountShares(ctx, userID, accountID)
@@ -229,14 +261,20 @@ func (s *accountService) UpsertAccountShare(ctx context.Context, userID string, 
 	login = strings.TrimSpace(login)
 	permission = strings.TrimSpace(permission)
 	if login == "" {
-		return nil, domain.ErrAccountShareInvalidInput
+		return nil, InvalidRequestErrorWithCause("invalid request", nil, domain.ErrAccountShareInvalidInput)
 	}
 	if permission != "viewer" && permission != "editor" {
-		return nil, domain.ErrAccountShareInvalidInput
+		return nil, InvalidRequestErrorWithCause("invalid request", nil, domain.ErrAccountShareInvalidInput)
 	}
 
 	// Ensure account exists & user can access it at all (avoid leaking)
 	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+		if errors.Is(err, domain.ErrAccountForbidden) {
+			return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		if errors.Is(err, domain.ErrAccountNotFound) {
+			return nil, NotFoundErrorWithCause("account not found", nil, err)
+		}
 		return nil, err
 	}
 
@@ -249,29 +287,58 @@ func (s *accountService) UpsertAccountShare(ctx context.Context, userID string, 
 		target, err = s.userRepo.FindUserByPhone(ctx, login)
 	}
 	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return nil, InvalidRequestErrorWithCause("user not found", nil, err)
+		}
 		return nil, err
 	}
 	if target == nil {
-		return nil, domain.ErrUserNotFound
+		return nil, InvalidRequestErrorWithCause("user not found", nil, domain.ErrUserNotFound)
 	}
 	if target.ID == userID {
-		return nil, domain.ErrAccountShareInvalidInput
+		return nil, InvalidRequestErrorWithCause("invalid request", nil, domain.ErrAccountShareInvalidInput)
 	}
 
-	return s.repo.UpsertAccountShare(ctx, userID, accountID, target.ID, permission)
+	item, err := s.repo.UpsertAccountShare(ctx, userID, accountID, target.ID, permission)
+	if err != nil {
+		if errors.Is(err, domain.ErrAccountForbidden) || errors.Is(err, domain.ErrAccountShareForbidden) {
+			return nil, ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		if errors.Is(err, domain.ErrAccountNotFound) {
+			return nil, NotFoundErrorWithCause("account not found", nil, err)
+		}
+		return nil, err
+	}
+	return item, nil
 }
 
 func (s *accountService) RevokeAccountShare(ctx context.Context, userID string, accountID string, targetUserID string) error {
 	if strings.TrimSpace(targetUserID) == "" {
-		return domain.ErrAccountShareInvalidInput
+		return InvalidRequestErrorWithCause("invalid request", nil, domain.ErrAccountShareInvalidInput)
 	}
 
 	// Ensure account exists & user can access it at all (avoid leaking)
 	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+		if errors.Is(err, domain.ErrAccountForbidden) {
+			return ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		if errors.Is(err, domain.ErrAccountNotFound) {
+			return NotFoundErrorWithCause("account not found", nil, err)
+		}
 		return err
 	}
 
-	return s.repo.RevokeAccountShare(ctx, userID, accountID, targetUserID)
+	err := s.repo.RevokeAccountShare(ctx, userID, accountID, targetUserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrAccountForbidden) || errors.Is(err, domain.ErrAccountShareForbidden) {
+			return ForbiddenErrorWithCause("forbidden", nil, err)
+		}
+		if errors.Is(err, domain.ErrAccountNotFound) {
+			return NotFoundErrorWithCause("account not found", nil, err)
+		}
+		return err
+	}
+	return nil
 }
 
 func isValidAccountType(t string) bool {

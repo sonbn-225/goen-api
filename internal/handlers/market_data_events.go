@@ -5,8 +5,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/auth"
-	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
 type RefreshSecurityEventsResponse struct {
@@ -29,13 +27,8 @@ type RefreshSecurityEventsResponse struct {
 // @Router /securities/{securityId}/events/refresh [post]
 func RefreshSecurityEvents(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
-			return
-		}
-		if d.Redis == nil {
-			apierror.Write(w, http.StatusServiceUnavailable, "dependency_unavailable", "redis is not configured", nil)
 			return
 		}
 
@@ -45,33 +38,16 @@ func RefreshSecurityEvents(d Deps) http.HandlerFunc {
 			return
 		}
 
-		if _, err := d.InvestmentService.GetSecurity(r.Context(), uid, securityID); err != nil {
-			if err == domain.ErrSecurityNotFound {
-				apierror.Write(w, http.StatusNotFound, "not_found", "security not found", nil)
+		force := r.URL.Query().Get("force")
+		resp, err := d.MarketDataService.EnqueueSecurityEvents(r.Context(), uid, securityID, force)
+		if err != nil {
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
-		force := r.URL.Query().Get("force")
-
-		stream := "goen:market_data:jobs"
-		values := map[string]any{
-			"job_type":             "vnstock.security_events",
-			"security_id":          securityID,
-			"requested_by_user_id": uid,
-		}
-		if force != "" {
-			values["force"] = force
-		}
-
-		id, err := d.Redis.XAdd(r.Context(), stream, values)
-		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
-			return
-		}
-
-		writeJSON(w, http.StatusAccepted, RefreshSecurityEventsResponse{Stream: stream, MessageID: id})
+		writeJSON(w, http.StatusAccepted, RefreshSecurityEventsResponse{Stream: resp.Stream, MessageID: resp.MessageID})
 	}
 }

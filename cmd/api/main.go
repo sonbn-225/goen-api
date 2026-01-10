@@ -19,8 +19,8 @@ import (
 	"time"
 
 	_ "github.com/sonbn-225/goen-api/docs"
+	"github.com/sonbn-225/goen-api/internal/app"
 	"github.com/sonbn-225/goen-api/internal/config"
-	"github.com/sonbn-225/goen-api/internal/httpapi"
 )
 
 func main() {
@@ -32,10 +32,15 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	slog.SetDefault(logger)
 
+	a := app.New(cfg)
+
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr(),
-		Handler:           httpapi.NewRouter(cfg),
+		Handler:           a.Handler,
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	go func() {
@@ -55,4 +60,5 @@ func main() {
 
 	logger.Info("shutting down")
 	_ = srv.Shutdown(ctx)
+	a.Close(ctx)
 }

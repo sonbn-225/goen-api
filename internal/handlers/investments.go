@@ -1,14 +1,10 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/auth"
-	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/services"
 )
 
@@ -23,15 +19,17 @@ import (
 // @Router /investment-accounts [get]
 func ListInvestmentAccounts(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		items, err := d.InvestmentService.ListInvestmentAccounts(r.Context(), uid)
 		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			if writeServiceError(w, err) {
+				return
+			}
+			writeInternalError(w, err)
 			return
 		}
 
@@ -54,25 +52,22 @@ func ListInvestmentAccounts(d Deps) http.HandlerFunc {
 // @Router /investment-accounts [post]
 func CreateInvestmentAccount(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		var req services.CreateInvestmentAccountRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		item, err := d.InvestmentService.CreateInvestmentAccount(r.Context(), uid, req)
 		if err != nil {
-			if errors.Is(err, domain.ErrInvestmentForbidden) {
-				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -94,9 +89,8 @@ func CreateInvestmentAccount(d Deps) http.HandlerFunc {
 // @Router /investment-accounts/{investmentAccountId} [get]
 func GetInvestmentAccount(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -108,15 +102,10 @@ func GetInvestmentAccount(d Deps) http.HandlerFunc {
 
 		item, err := d.InvestmentService.GetInvestmentAccount(r.Context(), uid, id)
 		if err != nil {
-			if errors.Is(err, domain.ErrInvestmentAccountNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "investment account not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			if errors.Is(err, domain.ErrInvestmentForbidden) {
-				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
-				return
-			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -135,15 +124,17 @@ func GetInvestmentAccount(d Deps) http.HandlerFunc {
 // @Router /securities [get]
 func ListSecurities(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
 		items, err := d.InvestmentService.ListSecurities(r.Context(), uid)
 		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			if writeServiceError(w, err) {
+				return
+			}
+			writeInternalError(w, err)
 			return
 		}
 
@@ -164,9 +155,8 @@ func ListSecurities(d Deps) http.HandlerFunc {
 // @Router /securities/{securityId} [get]
 func GetSecurity(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -178,11 +168,10 @@ func GetSecurity(d Deps) http.HandlerFunc {
 
 		item, err := d.InvestmentService.GetSecurity(r.Context(), uid, id)
 		if err != nil {
-			if errors.Is(err, domain.ErrSecurityNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "security not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -205,9 +194,8 @@ func GetSecurity(d Deps) http.HandlerFunc {
 // @Router /securities/{securityId}/prices-daily [get]
 func ListSecurityPricesDaily(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -231,7 +219,10 @@ func ListSecurityPricesDaily(d Deps) http.HandlerFunc {
 
 		items, err := d.InvestmentService.ListSecurityPrices(r.Context(), uid, securityID, fromPtr, toPtr)
 		if err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			if writeServiceError(w, err) {
+				return
+			}
+			writeInternalError(w, err)
 			return
 		}
 
@@ -254,9 +245,8 @@ func ListSecurityPricesDaily(d Deps) http.HandlerFunc {
 // @Router /securities/{securityId}/events [get]
 func ListSecurityEvents(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -280,7 +270,10 @@ func ListSecurityEvents(d Deps) http.HandlerFunc {
 
 		items, err := d.InvestmentService.ListSecurityEvents(r.Context(), uid, securityID, fromPtr, toPtr)
 		if err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			if writeServiceError(w, err) {
+				return
+			}
+			writeInternalError(w, err)
 			return
 		}
 
@@ -302,9 +295,8 @@ func ListSecurityEvents(d Deps) http.HandlerFunc {
 // @Router /investment-accounts/{investmentAccountId}/trades [get]
 func ListTrades(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -316,15 +308,10 @@ func ListTrades(d Deps) http.HandlerFunc {
 
 		items, err := d.InvestmentService.ListTrades(r.Context(), uid, investmentAccountID)
 		if err != nil {
-			if errors.Is(err, domain.ErrInvestmentAccountNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "investment account not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			if errors.Is(err, domain.ErrInvestmentForbidden) {
-				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
-				return
-			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -349,9 +336,8 @@ func ListTrades(d Deps) http.HandlerFunc {
 // @Router /investment-accounts/{investmentAccountId}/trades [post]
 func CreateTrade(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -362,26 +348,16 @@ func CreateTrade(d Deps) http.HandlerFunc {
 		}
 
 		var req services.CreateTradeRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		item, err := d.InvestmentService.CreateTrade(r.Context(), uid, investmentAccountID, req)
 		if err != nil {
-			if errors.Is(err, domain.ErrInvestmentAccountNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "investment account not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			if errors.Is(err, domain.ErrSecurityNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "security not found", nil)
-				return
-			}
-			if errors.Is(err, domain.ErrInvestmentForbidden) {
-				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
-				return
-			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -403,9 +379,8 @@ func CreateTrade(d Deps) http.HandlerFunc {
 // @Router /investment-accounts/{investmentAccountId}/holdings [get]
 func ListHoldings(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -417,15 +392,10 @@ func ListHoldings(d Deps) http.HandlerFunc {
 
 		items, err := d.InvestmentService.ListHoldings(r.Context(), uid, investmentAccountID)
 		if err != nil {
-			if errors.Is(err, domain.ErrInvestmentAccountNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "investment account not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			if errors.Is(err, domain.ErrInvestmentForbidden) {
-				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
-				return
-			}
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -449,9 +419,8 @@ func ListHoldings(d Deps) http.HandlerFunc {
 // @Router /investment-accounts/{investmentAccountId}/security-event-elections [get]
 func ListSecurityEventElections(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -469,15 +438,10 @@ func ListSecurityEventElections(d Deps) http.HandlerFunc {
 
 		items, err := d.InvestmentService.ListSecurityEventElections(r.Context(), uid, investmentAccountID, statusPtr)
 		if err != nil {
-			if errors.Is(err, domain.ErrInvestmentAccountNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "investment account not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			if errors.Is(err, domain.ErrInvestmentForbidden) {
-				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
-				return
-			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 
@@ -502,9 +466,8 @@ func ListSecurityEventElections(d Deps) http.HandlerFunc {
 // @Router /investment-accounts/{investmentAccountId}/security-event-elections [post]
 func UpsertSecurityEventElection(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
 			return
 		}
 
@@ -515,26 +478,16 @@ func UpsertSecurityEventElection(d Deps) http.HandlerFunc {
 		}
 
 		var req services.UpsertSecurityEventElectionRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
 		item, err := d.InvestmentService.UpsertSecurityEventElection(r.Context(), uid, investmentAccountID, req)
 		if err != nil {
-			if errors.Is(err, domain.ErrInvestmentAccountNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "investment account not found", nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			if errors.Is(err, domain.ErrSecurityEventNotFound) {
-				apierror.Write(w, http.StatusNotFound, "not_found", "security event not found", nil)
-				return
-			}
-			if errors.Is(err, domain.ErrInvestmentForbidden) {
-				apierror.Write(w, http.StatusForbidden, "forbidden", "forbidden", nil)
-				return
-			}
-			apierror.Write(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+			writeInternalError(w, err)
 			return
 		}
 

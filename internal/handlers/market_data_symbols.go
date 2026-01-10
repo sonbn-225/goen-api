@@ -1,13 +1,11 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/apierror"
-	"github.com/sonbn-225/goen-api/internal/auth"
 )
 
 type RefreshMarketDataManyResponse struct {
@@ -39,59 +37,6 @@ func parseBoolDefault(raw string, def bool) bool {
 	}
 }
 
-func loadSecurityIDsBySymbols(d Deps, r *http.Request, symbols []string) (map[string]string, error) {
-	if d.DB == nil {
-		return nil, nil
-	}
-	pool, err := d.DB.Pool(r.Context())
-	if err != nil {
-		return nil, err
-	}
-	if pool == nil {
-		return nil, nil
-	}
-
-	cleaned := make([]string, 0, len(symbols))
-	seen := map[string]struct{}{}
-	for _, s := range symbols {
-		sym := strings.ToUpper(strings.TrimSpace(s))
-		if sym == "" {
-			continue
-		}
-		if _, ok := seen[sym]; ok {
-			continue
-		}
-		seen[sym] = struct{}{}
-		cleaned = append(cleaned, sym)
-	}
-	if len(cleaned) == 0 {
-		return map[string]string{}, nil
-	}
-
-	rows, err := pool.Query(r.Context(), `
-		SELECT symbol, id
-		FROM securities
-		WHERE symbol = ANY($1)
-	`, cleaned)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := map[string]string{}
-	for rows.Next() {
-		var sym, id string
-		if err := rows.Scan(&sym, &id); err != nil {
-			return nil, err
-		}
-		out[strings.ToUpper(strings.TrimSpace(sym))] = id
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // RefreshMarketDataBySymbol godoc
 // @Summary Enqueue vnstock refresh for a symbol
 // @Description Enqueue vnstock jobs for a ticker symbol (prices/events). Requires the symbol to exist in securities catalog.
@@ -110,17 +55,8 @@ func loadSecurityIDsBySymbols(d Deps, r *http.Request, symbols []string) (map[st
 // @Router /market-data/vnstock/sync-symbol/{symbol} [post]
 func RefreshMarketDataBySymbol(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
-			return
-		}
-		if d.Redis == nil {
-			apierror.Write(w, http.StatusServiceUnavailable, "dependency_unavailable", "redis is not configured", nil)
-			return
-		}
-		if d.DB == nil {
-			apierror.Write(w, http.StatusServiceUnavailable, "dependency_unavailable", "postgres is not configured", nil)
 			return
 		}
 
@@ -137,59 +73,16 @@ func RefreshMarketDataBySymbol(d Deps) http.HandlerFunc {
 			return
 		}
 		force := r.URL.Query().Get("force")
-
-		idsBySymbol, err := loadSecurityIDsBySymbols(d, r, []string{symbol})
+		resp, err := d.MarketDataService.EnqueueBySymbol(r.Context(), uid, symbol, includePrices, includeEvents, force)
 		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
-			return
-		}
-		securityID, found := idsBySymbol[symbol]
-		if !found || securityID == "" {
-			apierror.Write(w, http.StatusNotFound, "not_found", "security symbol not found", map[string]any{"symbol": symbol})
-			return
-		}
-
-		stream := "goen:market_data:jobs"
-		messageIDs := []string{}
-		enqueued := 0
-
-		if includePrices {
-			values := map[string]any{
-				"job_type":             "vnstock.prices_daily",
-				"security_id":          securityID,
-				"requested_by_user_id": uid,
-			}
-			if force != "" {
-				values["force"] = force
-			}
-			id, err := d.Redis.XAdd(r.Context(), stream, values)
-			if err != nil {
-				apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			if writeServiceError(w, err) {
 				return
 			}
-			messageIDs = append(messageIDs, id)
-			enqueued++
+			writeInternalError(w, err)
+			return
 		}
 
-		if includeEvents {
-			values := map[string]any{
-				"job_type":             "vnstock.security_events",
-				"security_id":          securityID,
-				"requested_by_user_id": uid,
-			}
-			if force != "" {
-				values["force"] = force
-			}
-			id, err := d.Redis.XAdd(r.Context(), stream, values)
-			if err != nil {
-				apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
-				return
-			}
-			messageIDs = append(messageIDs, id)
-			enqueued++
-		}
-
-		writeJSON(w, http.StatusAccepted, RefreshMarketDataManyResponse{Stream: stream, Enqueued: enqueued, MessageIDs: messageIDs})
+		writeJSON(w, http.StatusAccepted, RefreshMarketDataManyResponse{Stream: resp.Stream, Enqueued: resp.Enqueued, MessageIDs: resp.MessageIDs})
 	}
 }
 
@@ -209,25 +102,13 @@ func RefreshMarketDataBySymbol(d Deps) http.HandlerFunc {
 // @Router /market-data/vnstock/sync-symbols [post]
 func RefreshMarketDataBySymbols(d Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := auth.UserIDFromContext(r.Context())
+		uid, ok := requireUserID(w, r)
 		if !ok {
-			apierror.Write(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
-			return
-		}
-		if d.Redis == nil {
-			apierror.Write(w, http.StatusServiceUnavailable, "dependency_unavailable", "redis is not configured", nil)
-			return
-		}
-		if d.DB == nil {
-			apierror.Write(w, http.StatusServiceUnavailable, "dependency_unavailable", "postgres is not configured", nil)
 			return
 		}
 
 		var req VnstockSyncSymbolsRequest
-		dec := json.NewDecoder(r.Body)
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&req); err != nil {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "invalid json body", nil)
+		if ok := decodeJSON(w, r, &req); !ok {
 			return
 		}
 
@@ -258,80 +139,15 @@ func RefreshMarketDataBySymbols(d Deps) http.HandlerFunc {
 			}
 		}
 
-		// Resolve security IDs from symbols
-		cleaned := make([]string, 0, len(req.Symbols))
-		seen := map[string]struct{}{}
-		for _, s := range req.Symbols {
-			sym := strings.ToUpper(strings.TrimSpace(s))
-			if sym == "" {
-				continue
-			}
-			if _, ok := seen[sym]; ok {
-				continue
-			}
-			seen[sym] = struct{}{}
-			cleaned = append(cleaned, sym)
-		}
-		if len(cleaned) == 0 {
-			apierror.Write(w, http.StatusBadRequest, "validation_error", "symbols is required", map[string]any{"field": "symbols"})
-			return
-		}
-
-		idsBySymbol, err := loadSecurityIDsBySymbols(d, r, cleaned)
+		resp, err := d.MarketDataService.EnqueueBySymbols(r.Context(), uid, req.Symbols, includePrices, includeEvents, force)
 		if err != nil {
-			apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+			if writeServiceError(w, err) {
+				return
+			}
+			writeInternalError(w, err)
 			return
 		}
 
-		notFound := []string{}
-		stream := "goen:market_data:jobs"
-		messageIDs := []string{}
-		enqueued := 0
-
-		for _, sym := range cleaned {
-			securityID, ok := idsBySymbol[sym]
-			if !ok || securityID == "" {
-				notFound = append(notFound, sym)
-				continue
-			}
-
-			if includePrices {
-				values := map[string]any{
-					"job_type":             "vnstock.prices_daily",
-					"security_id":          securityID,
-					"requested_by_user_id": uid,
-				}
-				if force != "" {
-					values["force"] = force
-				}
-				id, err := d.Redis.XAdd(r.Context(), stream, values)
-				if err != nil {
-					apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
-					return
-				}
-				messageIDs = append(messageIDs, id)
-				enqueued++
-			}
-
-			if includeEvents {
-				values := map[string]any{
-					"job_type":             "vnstock.security_events",
-					"security_id":          securityID,
-					"requested_by_user_id": uid,
-				}
-				if force != "" {
-					values["force"] = force
-				}
-				id, err := d.Redis.XAdd(r.Context(), stream, values)
-				if err != nil {
-					apierror.Write(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
-					return
-				}
-				messageIDs = append(messageIDs, id)
-				enqueued++
-			}
-		}
-
-		writeJSON(w, http.StatusAccepted, RefreshMarketDataManyResponse{Stream: stream, Enqueued: enqueued, MessageIDs: messageIDs, NotFound: notFound})
+		writeJSON(w, http.StatusAccepted, RefreshMarketDataManyResponse{Stream: resp.Stream, Enqueued: resp.Enqueued, MessageIDs: resp.MessageIDs, NotFound: resp.NotFound})
 	}
 }

@@ -69,10 +69,10 @@ func (s *authService) Signup(ctx context.Context, req SignupRequest) (*AuthRespo
 
 	// Basic Validation
 	if email == "" && phone == "" {
-		return nil, errors.New("email or phone is required")
+		return nil, ValidationError("email or phone is required", nil)
 	}
 	if len(password) < 8 {
-		return nil, errors.New("password must be at least 8 characters")
+		return nil, ValidationError("password must be at least 8 characters", nil)
 	}
 
 	// Prepare User Entity
@@ -112,6 +112,9 @@ func (s *authService) Signup(ctx context.Context, req SignupRequest) (*AuthRespo
 
 	// Persist
 	if err := s.userRepo.CreateUser(ctx, newUser); err != nil {
+		if errors.Is(err, domain.ErrUserAlreadyExists) {
+			return nil, ConflictErrorWithCause("user already exists", nil, err)
+		}
 		return nil, err
 	}
 
@@ -134,7 +137,7 @@ func (s *authService) Signin(ctx context.Context, req SigninRequest) (*AuthRespo
 	password := req.Password
 
 	if login == "" || password == "" {
-		return nil, errors.New("login and password required")
+		return nil, ValidationError("login and password required", nil)
 	}
 
 	var user *domain.UserWithPassword
@@ -149,14 +152,14 @@ func (s *authService) Signin(ctx context.Context, req SigninRequest) (*AuthRespo
 
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			return nil, errors.New("invalid credentials")
+			return nil, UnauthorizedErrorWithCause("invalid credentials", nil, domain.ErrInvalidCredentials)
 		}
 		return nil, err
 	}
 
 	// Check password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return nil, errors.New("invalid credentials")
+		return nil, UnauthorizedErrorWithCause("invalid credentials", nil, domain.ErrInvalidCredentials)
 	}
 
 	// Generate Token
@@ -176,6 +179,9 @@ func (s *authService) Signin(ctx context.Context, req SigninRequest) (*AuthRespo
 func (s *authService) GetMe(ctx context.Context, userID string) (*domain.User, error) {
 	user, err := s.userRepo.FindUserByID(ctx, userID)
 	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return nil, UnauthorizedErrorWithCause("user not found", nil, err)
+		}
 		return nil, err
 	}
 	return user, nil
@@ -244,6 +250,9 @@ func (s *authService) UpdateMySettings(ctx context.Context, userID string, patch
 
 	updated, err := s.userRepo.UpdateUserSettings(ctx, userID, patch)
 	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return nil, UnauthorizedErrorWithCause("user not found", nil, err)
+		}
 		return nil, err
 	}
 

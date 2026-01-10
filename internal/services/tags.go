@@ -32,7 +32,7 @@ func NewTagService(repo domain.TagRepository) TagService {
 func (s *tagService) Create(ctx context.Context, userID string, req CreateTagRequest) (*domain.Tag, error) {
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		return nil, errors.New("name is required")
+		return nil, ValidationError("name is required", map[string]any{"field": "name"})
 	}
 
 	color := normalizeOptionalString(req.Color)
@@ -59,7 +59,14 @@ func (s *tagService) Create(ctx context.Context, userID string, req CreateTagReq
 }
 
 func (s *tagService) Get(ctx context.Context, userID string, tagID string) (*domain.Tag, error) {
-	return s.repo.GetTag(ctx, userID, tagID)
+	t, err := s.repo.GetTag(ctx, userID, tagID)
+	if err != nil {
+		if errors.Is(err, domain.ErrTagNotFound) {
+			return nil, NotFoundErrorWithCause("tag not found", nil, err)
+		}
+		return nil, err
+	}
+	return t, nil
 }
 
 func (s *tagService) List(ctx context.Context, userID string) ([]domain.Tag, error) {

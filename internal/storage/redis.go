@@ -66,3 +66,11 @@ func (r *Redis) XAdd(ctx context.Context, stream string, values map[string]any) 
 	}
 	return r.client.XAdd(ctx, &redis.XAddArgs{Stream: stream, Values: values}).Result()
 }
+
+func (r *Redis) Close() {
+	if r == nil || r.client == nil {
+		return
+	}
+	_ = r.client.Close()
+	r.client = nil
+}

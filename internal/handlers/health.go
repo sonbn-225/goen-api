@@ -2,31 +2,9 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
-
-	"github.com/sonbn-225/goen-api/internal/config"
-	"github.com/sonbn-225/goen-api/internal/services"
-	"github.com/sonbn-225/goen-api/internal/storage"
 )
-
-type Deps struct {
-	Cfg         *config.Config
-	DB          *storage.Postgres
-	Redis       *storage.Redis
-	AuthService services.AuthService
-	AccountService services.AccountService
-	AuditService services.AuditService
-	TransactionService services.TransactionService
-	CategoryService services.CategoryService
-	TagService services.TagService
-	BudgetService services.BudgetService
-	SavingsService services.SavingsService
-	RotatingSavingsService services.RotatingSavingsService
-	DebtService services.DebtService
-	InvestmentService services.InvestmentService
-}
 
 type HealthResponse struct {
 	Status string            `json:"status"`
@@ -59,37 +37,17 @@ func Readyz(d Deps) http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 
-		checks := map[string]string{}
+		checks, ready := d.DiagnosticsService.Readiness(ctx)
 		statusCode := http.StatusOK
-
-		if d.DB != nil {
-			if err := d.DB.Ping(ctx); err != nil {
-				checks["postgres"] = "error"
-				statusCode = http.StatusServiceUnavailable
-			} else {
-				checks["postgres"] = "ok"
-			}
-		}
-		if d.Redis != nil {
-			if err := d.Redis.Ping(ctx); err != nil {
-				checks["redis"] = "error"
-				statusCode = http.StatusServiceUnavailable
-			} else {
-				checks["redis"] = "ok"
-			}
+		if !ready {
+			statusCode = http.StatusServiceUnavailable
 		}
 
 		resp := HealthResponse{Status: "ok", Checks: checks}
-		if statusCode != http.StatusOK {
+		if !ready {
 			resp.Status = "unready"
 		}
 
 		writeJSON(w, statusCode, resp)
 	}
-}
-
-func writeJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
 }
