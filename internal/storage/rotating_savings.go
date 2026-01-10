@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 type RotatingSavingsRepo struct {
@@ -19,7 +20,7 @@ func NewRotatingSavingsRepo(db *Postgres) *RotatingSavingsRepo {
 
 func (r *RotatingSavingsRepo) CreateGroup(ctx context.Context, userID string, g domain.RotatingSavingsGroup) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -52,7 +53,7 @@ func (r *RotatingSavingsRepo) CreateGroup(ctx context.Context, userID string, g 
 
 func (r *RotatingSavingsRepo) GetGroup(ctx context.Context, userID string, groupID string) (*domain.RotatingSavingsGroup, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -94,7 +95,7 @@ func (r *RotatingSavingsRepo) GetGroup(ctx context.Context, userID string, group
 		&g.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrRotatingSavingsGroupNotFound
+			return nil, apperrors.ErrRotatingSavingsGroupNotFound
 		}
 		return nil, err
 	}
@@ -111,7 +112,7 @@ func (r *RotatingSavingsRepo) GetGroup(ctx context.Context, userID string, group
 
 func (r *RotatingSavingsRepo) ListGroups(ctx context.Context, userID string) ([]domain.RotatingSavingsGroup, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -178,7 +179,7 @@ func (r *RotatingSavingsRepo) ListGroups(ctx context.Context, userID string) ([]
 
 func (r *RotatingSavingsRepo) CreateContribution(ctx context.Context, userID string, c domain.RotatingSavingsContribution) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -212,7 +213,7 @@ func (r *RotatingSavingsRepo) CreateContribution(ctx context.Context, userID str
 
 func (r *RotatingSavingsRepo) ListContributions(ctx context.Context, userID string, groupID string) ([]domain.RotatingSavingsContribution, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
@@ -25,7 +25,7 @@ func NewUserRepo(db *Postgres) *UserRepo {
 
 func (r *UserRepo) CreateUser(ctx context.Context, u domain.UserWithPassword) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -45,7 +45,7 @@ func (r *UserRepo) CreateUser(ctx context.Context, u domain.UserWithPassword) er
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-			return domain.ErrUserAlreadyExists
+			return apperrors.ErrUserAlreadyExists
 		}
 		return err
 	}
@@ -62,7 +62,7 @@ func (r *UserRepo) FindUserByPhone(ctx context.Context, phone string) (*domain.U
 
 func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*domain.User, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -88,7 +88,7 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*domain.User, e
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrUserNotFound
+			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*domain.User, e
 
 func (r *UserRepo) findOneUser(ctx context.Context, whereClause string, args ...any) (*domain.UserWithPassword, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -130,7 +130,7 @@ func (r *UserRepo) findOneUser(ctx context.Context, whereClause string, args ...
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrUserNotFound
+			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (r *UserRepo) findOneUser(ctx context.Context, whereClause string, args ...
 
 func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID string, patch map[string]any) (*domain.User, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -169,7 +169,7 @@ func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID string, patch 
 	var settingsJSON []byte
 	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrUserNotFound
+			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, err
 	}
@@ -187,8 +187,4 @@ func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID string, patch 
 // DEPRECATED: Use goose migrations instead.
 func EnsureUsersSchema(ctx context.Context, db *Postgres) error {
 	return nil
-}
-
-func normalizeEmail(email string) string {
-	return strings.ToLower(strings.TrimSpace(email))
 }

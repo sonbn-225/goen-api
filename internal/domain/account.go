@@ -2,14 +2,7 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"time"
-)
-
-var (
-	ErrAccountNotFound     = errors.New("account not found")
-	ErrAccountForbidden    = errors.New("account forbidden")
-	ErrAccountInvalidInput = errors.New("invalid account input")
 )
 
 type Account struct {

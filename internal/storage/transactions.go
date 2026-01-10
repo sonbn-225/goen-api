@@ -2,15 +2,14 @@ package storage
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
@@ -24,7 +23,7 @@ func NewTransactionRepo(db *Postgres) *TransactionRepo {
 
 func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, tx domain.Transaction, lineItems []domain.TransactionLineItem, tagIDs []string) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -44,7 +43,7 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 		switch tx.Type {
 		case "expense", "income":
 			if tx.AccountID == nil || strings.TrimSpace(*tx.AccountID) == "" {
-				return errors.New("account_id is required")
+				return apperrors.ErrAccountIDRequired
 			}
 			if err := requireAccountPermission(ctx, dbtx, userID, *tx.AccountID, true); err != nil {
 				return err
@@ -54,10 +53,10 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 			}
 		case "transfer":
 			if tx.FromAccountID == nil || strings.TrimSpace(*tx.FromAccountID) == "" {
-				return errors.New("from_account_id is required")
+				return apperrors.ErrFromAccountIDRequired
 			}
 			if tx.ToAccountID == nil || strings.TrimSpace(*tx.ToAccountID) == "" {
-				return errors.New("to_account_id is required")
+				return apperrors.ErrToAccountIDRequired
 			}
 			if err := requireAccountPermission(ctx, dbtx, userID, *tx.FromAccountID, true); err != nil {
 				return err
@@ -80,7 +79,7 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 			if err != nil {
 				return err
 			}
-			fx := strings.ToUpper(strings.TrimSpace(fromCur)) != strings.ToUpper(strings.TrimSpace(toCur))
+			fx := !strings.EqualFold(strings.TrimSpace(fromCur), strings.TrimSpace(toCur))
 
 			// Default amounts for same-currency transfers.
 			if tx.FromAmount == nil {
@@ -88,13 +87,13 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 			}
 			if tx.ToAmount == nil {
 				if fx {
-					return errors.New("to_amount is required for FX transfer")
+					return apperrors.ErrFXAmountsRequired
 				}
 				tx.ToAmount = &tx.Amount
 			}
 			if fx {
 				if tx.FromAmount == nil || tx.ToAmount == nil {
-					return errors.New("from_amount and to_amount are required for FX transfer")
+					return apperrors.ErrFXAmountsRequired
 				}
 			}
 
@@ -109,7 +108,7 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 				}
 			}
 		default:
-			return errors.New("type is invalid")
+			return apperrors.ErrTransactionInvalidType
 		}
 
 		_, err := dbtx.Exec(ctx, `
@@ -166,7 +165,7 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 					return err
 				}
 				if !ok {
-					return errors.New("category_id is invalid")
+					return apperrors.ErrCategoryIDInvalid
 				}
 			}
 			_, err := dbtx.Exec(ctx, `
@@ -189,7 +188,7 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 				return err
 			}
 			if okCount != len(tagIDs) {
-				return errors.New("tag_ids contains invalid tag")
+				return apperrors.ErrTagIDsInvalid
 			}
 
 			_, err = dbtx.Exec(ctx, `
@@ -215,63 +214,9 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 	})
 }
 
-func requireAccountActive(ctx context.Context, dbtx pgx.Tx, accountID string) error {
-	var status string
-	err := dbtx.QueryRow(ctx, `
-		SELECT status
-		FROM accounts
-		WHERE id = $1 AND deleted_at IS NULL
-	`, accountID).Scan(&status)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return errors.New("account not found")
-		}
-		return err
-	}
-	if status != "active" {
-		return errors.New("account is closed")
-	}
-	return nil
-}
-
-func getAccountCurrency(ctx context.Context, dbtx pgx.Tx, accountID string) (string, error) {
-	var currency string
-	err := dbtx.QueryRow(ctx, `
-		SELECT currency
-		FROM accounts
-		WHERE id = $1 AND deleted_at IS NULL
-	`, accountID).Scan(&currency)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", errors.New("account not found")
-		}
-		return "", err
-	}
-	return currency, nil
-}
-
-// computeExchangeRate returns to_amount / from_amount rounded to 8 decimals.
-// Returns nil when from_amount is zero (cannot compute).
-func computeExchangeRate(fromAmount string, toAmount string) (*string, error) {
-	fromRat, ok := new(big.Rat).SetString(strings.TrimSpace(fromAmount))
-	if !ok {
-		return nil, errors.New("from_amount must be a decimal string")
-	}
-	toRat, ok := new(big.Rat).SetString(strings.TrimSpace(toAmount))
-	if !ok {
-		return nil, errors.New("to_amount must be a decimal string")
-	}
-	if fromRat.Cmp(new(big.Rat)) == 0 {
-		return nil, nil
-	}
-	rate := new(big.Rat).Quo(toRat, fromRat)
-	v := rate.FloatString(8)
-	return &v, nil
-}
-
 func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, transactionID string) (*domain.Transaction, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -357,7 +302,7 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 		&t.TagIDs,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrTransactionNotFound
+			return nil, apperrors.ErrTransactionNotFound
 		}
 		return nil, err
 	}
@@ -384,14 +329,14 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	
+
 	t.LineItems = items
 	return &t, nil
 }
 
 func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, filter domain.TransactionListFilter) ([]domain.Transaction, *string, error) {
 	if r.db == nil {
-		return nil, nil, errors.New("database not ready")
+		return nil, nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -408,7 +353,7 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 
 	cursorTime, cursorID, err := decodeCursor(filter.Cursor)
 	if err != nil {
-		return nil, nil, errors.New("invalid cursor")
+		return nil, nil, apperrors.ErrInvalidCursor
 	}
 
 	args := []any{userID}
@@ -549,7 +494,7 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 
 func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, transactionID string, patch domain.TransactionPatch) (*domain.Transaction, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -571,14 +516,14 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 		switch cur.Type {
 		case "expense", "income":
 			if cur.AccountID == nil {
-				return domain.ErrTransactionForbidden
+				return apperrors.ErrTransactionForbidden
 			}
 			if err := requireAccountPermission(ctx, dbtx, userID, *cur.AccountID, true); err != nil {
 				return err
 			}
 		case "transfer":
 			if cur.FromAccountID == nil || cur.ToAccountID == nil {
-				return domain.ErrTransactionForbidden
+				return apperrors.ErrTransactionForbidden
 			}
 			if err := requireAccountPermission(ctx, dbtx, userID, *cur.FromAccountID, true); err != nil {
 				return err
@@ -646,14 +591,14 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 		return nil, err
 	}
 	if updated == nil {
-		return nil, errors.New("patch failed")
+		return nil, apperrors.ErrTransactionPatchFailed
 	}
 	return updated, nil
 }
 
 func (r *TransactionRepo) DeleteTransaction(ctx context.Context, userID string, transactionID string) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -672,14 +617,14 @@ func (r *TransactionRepo) DeleteTransaction(ctx context.Context, userID string, 
 		switch cur.Type {
 		case "expense", "income":
 			if cur.AccountID == nil {
-				return domain.ErrTransactionForbidden
+				return apperrors.ErrTransactionForbidden
 			}
 			if err := requireAccountPermission(ctx, dbtx, userID, *cur.AccountID, true); err != nil {
 				return err
 			}
 		case "transfer":
 			if cur.FromAccountID == nil || cur.ToAccountID == nil {
-				return domain.ErrTransactionForbidden
+				return apperrors.ErrTransactionForbidden
 			}
 			if err := requireAccountPermission(ctx, dbtx, userID, *cur.FromAccountID, true); err != nil {
 				return err
@@ -700,7 +645,7 @@ func (r *TransactionRepo) DeleteTransaction(ctx context.Context, userID string, 
 			return err
 		}
 		if ct.RowsAffected() == 0 {
-			return domain.ErrTransactionNotFound
+			return apperrors.ErrTransactionNotFound
 		}
 
 		// Audit (UC-007)
@@ -719,53 +664,4 @@ func (r *TransactionRepo) DeleteTransaction(ctx context.Context, userID string, 
 		}
 		return nil
 	})
-}
-
-func requireAccountPermission(ctx context.Context, dbtx pgx.Tx, userID, accountID string, requireWrite bool) error {
-	var one int
-	permClause := ""
-	if requireWrite {
-		permClause = " AND ua.permission IN ('owner','editor')"
-	}
-	err := dbtx.QueryRow(ctx, `
-		SELECT 1
-		FROM user_accounts ua
-		WHERE ua.user_id = $1 AND ua.account_id = $2 AND ua.status = 'active'`+permClause+`
-	`, userID, accountID).Scan(&one)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.ErrTransactionForbidden
-		}
-		return err
-	}
-	return nil
-}
-
-func encodeCursor(occurredAt time.Time, id string) string {
-	raw := fmt.Sprintf("%s|%s", occurredAt.UTC().Format(time.RFC3339Nano), id)
-	return base64.RawURLEncoding.EncodeToString([]byte(raw))
-}
-
-func decodeCursor(cursor *string) (*time.Time, *string, error) {
-	if cursor == nil {
-		return nil, nil, nil
-	}
-	c := strings.TrimSpace(*cursor)
-	if c == "" {
-		return nil, nil, nil
-	}
-	b, err := base64.RawURLEncoding.DecodeString(c)
-	if err != nil {
-		return nil, nil, err
-	}
-	parts := strings.SplitN(string(b), "|", 2)
-	if len(parts) != 2 {
-		return nil, nil, errors.New("invalid cursor")
-	}
-	ts, err := time.Parse(time.RFC3339Nano, parts[0])
-	if err != nil {
-		return nil, nil, err
-	}
-	id := parts[1]
-	return &ts, &id, nil
 }

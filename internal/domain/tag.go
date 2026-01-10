@@ -2,12 +2,7 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"time"
-)
-
-var (
-	ErrTagNotFound = errors.New("tag not found")
 )
 
 type Tag struct {

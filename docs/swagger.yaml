@@ -1,18 +1,181 @@
 basePath: /api/v1
 definitions:
-  apierror.Envelope:
+  account.CreateAccountRequest:
     properties:
-      error:
-        $ref: '#/definitions/apierror.Error'
-    type: object
-  apierror.Error:
-    properties:
-      code:
+      account_number:
         type: string
+      account_type:
+        type: string
+      color:
+        type: string
+      currency:
+        type: string
+      name:
+        type: string
+      parent_account_id:
+        type: string
+    type: object
+  auth.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/domain.User'
+    type: object
+  auth.SigninRequest:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    type: object
+  auth.SignupRequest:
+    properties:
+      display_name:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+    type: object
+  budget.CreateRequest:
+    properties:
+      alert_threshold_percent:
+        type: integer
+      amount:
+        type: string
+      category_id:
+        type: string
+      name:
+        type: string
+      period:
+        type: string
+      period_end:
+        type: string
+      period_start:
+        type: string
+      rollover_mode:
+        type: string
+    type: object
+  budget.WithStats:
+    properties:
+      alert_threshold_percent:
+        type: integer
+      amount:
+        type: string
+      category_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      percent_used:
+        type: integer
+      period:
+        type: string
+      period_end:
+        type: string
+      period_start:
+        type: string
+      remaining:
+        type: string
+      rollover_mode:
+        type: string
+      spent:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  debt.CreateInstallmentRequest:
+    properties:
+      amount_due:
+        type: string
+      amount_paid:
+        type: string
+      due_date:
+        type: string
+      installment_no:
+        type: integer
+      status:
+        type: string
+    type: object
+  debt.CreatePaymentRequest:
+    properties:
+      interest_paid:
+        type: string
+      principal_paid:
+        type: string
+      transaction_id:
+        type: string
+    type: object
+  debt.CreateRequest:
+    properties:
+      account_id:
+        type: string
+      client_id:
+        type: string
+      direction:
+        type: string
+      due_date:
+        type: string
+      interest_rate:
+        type: string
+      interest_rule:
+        type: string
+      name:
+        type: string
+      principal:
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+    type: object
+  diagnostics.ConnectivityItem:
+    properties:
       details:
         additionalProperties: {}
         type: object
-      message:
+      error:
+        type: string
+      ok:
+        type: boolean
+    type: object
+  diagnostics.ConnectivityResponse:
+    properties:
+      postgres:
+        $ref: '#/definitions/diagnostics.ConnectivityItem'
+      redis:
+        $ref: '#/definitions/diagnostics.ConnectivityItem'
+    type: object
+  diagnostics.HealthResponse:
+    properties:
+      checks:
+        additionalProperties:
+          type: string
+        type: object
+      status:
+        type: string
+    type: object
+  diagnostics.PingResponse:
+    properties:
+      env:
+        type: string
+      request_id:
+        type: string
+      service:
+        type: string
+      time:
         type: string
     type: object
   domain.Account:
@@ -164,50 +327,6 @@ definitions:
       transaction_id:
         type: string
     type: object
-  domain.Holding:
-    properties:
-      as_of:
-        type: string
-      avg_cost:
-        type: string
-      broker_account_id:
-        type: string
-      cost_basis_total:
-        type: string
-      created_at:
-        type: string
-      id:
-        type: string
-      market_price:
-        type: string
-      market_value:
-        type: string
-      quantity:
-        type: string
-      security_id:
-        type: string
-      source_of_truth:
-        type: string
-      unrealized_pnl:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  domain.InvestmentAccount:
-    properties:
-      account_id:
-        type: string
-      created_at:
-        type: string
-      currency:
-        type: string
-      fee_settings: {}
-      id:
-        type: string
-      tax_settings: {}
-      updated_at:
-        type: string
-    type: object
   domain.RotatingSavingsContribution:
     properties:
       amount:
@@ -293,112 +412,6 @@ definitions:
       updated_at:
         type: string
     type: object
-  domain.Security:
-    properties:
-      asset_class:
-        type: string
-      created_at:
-        type: string
-      currency:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
-      symbol:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  domain.SecurityEvent:
-    properties:
-      cash_amount_per_share:
-        type: string
-      created_at:
-        type: string
-      currency:
-        type: string
-      effective_date:
-        type: string
-      event_type:
-        type: string
-      ex_date:
-        type: string
-      id:
-        type: string
-      note:
-        type: string
-      pay_date:
-        type: string
-      ratio_denominator:
-        type: string
-      ratio_numerator:
-        type: string
-      record_date:
-        type: string
-      security_id:
-        type: string
-      subscription_price:
-        type: string
-      updated_at:
-        type: string
-      vnstock_event_id:
-        type: string
-    type: object
-  domain.SecurityEventElection:
-    properties:
-      broker_account_id:
-        type: string
-      confirmed_at:
-        type: string
-      created_at:
-        type: string
-      elected_quantity:
-        type: string
-      entitled_quantity:
-        type: string
-      entitlement_date:
-        type: string
-      holding_quantity_at_entitlement_date:
-        type: string
-      id:
-        type: string
-      note:
-        type: string
-      security_event_id:
-        type: string
-      security_id:
-        type: string
-      status:
-        type: string
-      updated_at:
-        type: string
-      user_id:
-        type: string
-    type: object
-  domain.SecurityPriceDaily:
-    properties:
-      close:
-        type: string
-      created_at:
-        type: string
-      high:
-        type: string
-      id:
-        type: string
-      low:
-        type: string
-      open:
-        type: string
-      price_date:
-        type: string
-      security_id:
-        type: string
-      updated_at:
-        type: string
-      volume:
-        type: string
-    type: object
   domain.Tag:
     properties:
       color:
@@ -412,39 +425,6 @@ definitions:
       updated_at:
         type: string
       user_id:
-        type: string
-    type: object
-  domain.Trade:
-    properties:
-      broker_account_id:
-        type: string
-      client_id:
-        type: string
-      created_at:
-        type: string
-      fee_transaction_id:
-        type: string
-      fees:
-        type: string
-      id:
-        type: string
-      note:
-        type: string
-      occurred_at:
-        type: string
-      price:
-        type: string
-      quantity:
-        type: string
-      security_id:
-        type: string
-      side:
-        type: string
-      tax_transaction_id:
-        type: string
-      taxes:
-        type: string
-      updated_at:
         type: string
     type: object
   domain.Transaction:
@@ -543,96 +523,33 @@ definitions:
       updated_at:
         type: string
     type: object
-  handlers.ConnectivityItem:
-    properties:
-      details:
-        additionalProperties: {}
-        type: object
-      error:
-        type: string
-      ok:
-        type: boolean
-    type: object
-  handlers.ConnectivityResponse:
-    properties:
-      postgres:
-        $ref: '#/definitions/handlers.ConnectivityItem'
-      redis:
-        $ref: '#/definitions/handlers.ConnectivityItem'
-    type: object
-  handlers.CreateTransactionBody:
-    properties:
-      account_id:
-        type: string
-      amount:
-        type: string
-      client_id:
-        type: string
-      counterparty:
-        type: string
-      currency:
-        type: string
-      description:
-        type: string
-      exchange_rate:
-        type: string
-      external_ref:
-        type: string
-      from_account_id:
-        type: string
-      from_amount:
-        type: string
-      line_items:
-        items:
-          $ref: '#/definitions/services.CreateTransactionLineItemRequest'
-        type: array
-      notes:
-        type: string
-      occurred_at:
-        type: string
-      occurred_date:
-        type: string
-      occurred_time:
-        type: string
-      tag_ids:
-        items:
-          type: string
-        type: array
-      to_account_id:
-        type: string
-      to_amount:
-        type: string
-      type:
-        type: string
-    type: object
-  handlers.GlobalMarketDataStatusResponse:
+  marketdata.GlobalStatus:
     properties:
       market_sync:
-        $ref: '#/definitions/services.MarketDataSyncState'
+        $ref: '#/definitions/marketdata.SyncState'
       rate_limit:
-        $ref: '#/definitions/services.MarketDataRateLimit'
+        $ref: '#/definitions/marketdata.RateLimit'
     type: object
-  handlers.HealthResponse:
+  marketdata.RateLimit:
     properties:
-      checks:
-        additionalProperties:
-          type: string
-        type: object
-      status:
-        type: string
+      hour_reset_in_seconds:
+        type: number
+      minute_reset_in_seconds:
+        type: number
+      per_hour:
+        type: integer
+      per_minute:
+        type: integer
+      remaining_hour:
+        type: integer
+      remaining_minute:
+        type: integer
+      used_hour:
+        type: integer
+      used_minute:
+        type: integer
     type: object
-  handlers.PingResponse:
-    properties:
-      env:
-        type: string
-      request_id:
-        type: string
-      service:
-        type: string
-      time:
-        type: string
-    type: object
-  handlers.RefreshMarketDataManyResponse:
+  marketdata.RefreshManyResponse:
     properties:
       enqueued:
         type: integer
@@ -647,48 +564,46 @@ definitions:
       stream:
         type: string
     type: object
-  handlers.RefreshMarketDataResponse:
+  marketdata.RefreshOneResponse:
     properties:
       message_id:
         type: string
       stream:
         type: string
     type: object
-  handlers.RefreshPricesDailyResponse:
-    properties:
-      message_id:
-        type: string
-      stream:
-        type: string
-    type: object
-  handlers.RefreshSecurityEventsResponse:
-    properties:
-      message_id:
-        type: string
-      stream:
-        type: string
-    type: object
-  handlers.SecurityMarketDataStatusResponse:
+  marketdata.SecurityStatus:
     properties:
       prices_daily:
-        $ref: '#/definitions/services.MarketDataSyncState'
+        $ref: '#/definitions/marketdata.SyncState'
       rate_limit:
-        $ref: '#/definitions/services.MarketDataRateLimit'
+        $ref: '#/definitions/marketdata.RateLimit'
       security_events:
-        $ref: '#/definitions/services.MarketDataSyncState'
+        $ref: '#/definitions/marketdata.SyncState'
       security_id:
         type: string
     type: object
-  handlers.TransactionListResponse:
+  marketdata.SyncState:
     properties:
-      data:
-        items:
-          $ref: '#/definitions/domain.Transaction'
-        type: array
-      next_cursor:
+      cooldown_seconds:
+        type: integer
+      last_error:
+        type: string
+      last_failure_at:
+        type: string
+      last_started_at:
+        type: string
+      last_status:
+        type: string
+      last_success_at:
+        type: string
+      min_interval_seconds:
+        type: integer
+      next_due_at:
+        type: string
+      sync_key:
         type: string
     type: object
-  handlers.VnstockSyncSymbolsRequest:
+  marketdata.SyncSymbolsRequest:
     properties:
       force:
         type: boolean
@@ -701,147 +616,22 @@ definitions:
           type: string
         type: array
     type: object
-  services.AuthResponse:
+  response.ErrorBody:
     properties:
-      access_token:
+      code:
         type: string
-      expires_in:
-        type: integer
-      token_type:
-        type: string
-      user:
-        $ref: '#/definitions/domain.User'
-    type: object
-  services.BudgetWithStats:
-    properties:
-      alert_threshold_percent:
-        type: integer
-      amount:
-        type: string
-      category_id:
-        type: string
-      created_at:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
-      percent_used:
-        type: integer
-      period:
-        type: string
-      period_end:
-        type: string
-      period_start:
-        type: string
-      remaining:
-        type: string
-      rollover_mode:
-        type: string
-      spent:
-        type: string
-      updated_at:
-        type: string
-      user_id:
+      details:
+        additionalProperties: {}
+        type: object
+      message:
         type: string
     type: object
-  services.CreateAccountRequest:
+  response.ErrorEnvelope:
     properties:
-      account_number:
-        type: string
-      account_type:
-        type: string
-      color:
-        type: string
-      currency:
-        type: string
-      name:
-        type: string
-      parent_account_id:
-        type: string
+      error:
+        $ref: '#/definitions/response.ErrorBody'
     type: object
-  services.CreateBudgetRequest:
-    properties:
-      alert_threshold_percent:
-        type: integer
-      amount:
-        type: string
-      category_id:
-        type: string
-      name:
-        type: string
-      period:
-        type: string
-      period_end:
-        type: string
-      period_start:
-        type: string
-      rollover_mode:
-        type: string
-    type: object
-  services.CreateDebtInstallmentRequest:
-    properties:
-      amount_due:
-        type: string
-      amount_paid:
-        type: string
-      due_date:
-        type: string
-      installment_no:
-        type: integer
-      status:
-        type: string
-    type: object
-  services.CreateDebtPaymentRequest:
-    properties:
-      interest_paid:
-        type: string
-      principal_paid:
-        type: string
-      transaction_id:
-        type: string
-    type: object
-  services.CreateDebtRequest:
-    properties:
-      account_id:
-        type: string
-      client_id:
-        type: string
-      direction:
-        type: string
-      due_date:
-        type: string
-      interest_rate:
-        type: string
-      interest_rule:
-        type: string
-      name:
-        type: string
-      principal:
-        type: string
-      start_date:
-        type: string
-      status:
-        type: string
-    type: object
-  services.CreateInvestmentAccountRequest:
-    properties:
-      account_id:
-        type: string
-      broker_account_color:
-        type: string
-      broker_account_currency:
-        type: string
-      broker_account_name:
-        type: string
-      broker_account_number:
-        type: string
-      fee_settings: {}
-      parent_account_id:
-        type: string
-      tax_settings: {}
-    type: object
-  services.CreateRotatingSavingsContributionRequest:
+  rotatingsavings.CreateContributionRequest:
     properties:
       account_id:
         type: string
@@ -860,7 +650,7 @@ definitions:
       occurred_time:
         type: string
     type: object
-  services.CreateRotatingSavingsGroupRequest:
+  rotatingsavings.CreateGroupRequest:
     properties:
       account_id:
         type: string
@@ -881,7 +671,7 @@ definitions:
       status:
         type: string
     type: object
-  services.CreateSavingsInstrumentRequest:
+  savings.CreateRequest:
     properties:
       accrued_interest:
         type: string
@@ -906,92 +696,7 @@ definitions:
       term_months:
         type: integer
     type: object
-  services.CreateTagRequest:
-    properties:
-      color:
-        type: string
-      name:
-        type: string
-    type: object
-  services.CreateTradeRequest:
-    properties:
-      client_id:
-        type: string
-      fee_transaction_id:
-        type: string
-      fees:
-        type: string
-      note:
-        type: string
-      occurred_at:
-        type: string
-      occurred_date:
-        type: string
-      occurred_time:
-        type: string
-      price:
-        type: string
-      quantity:
-        type: string
-      security_id:
-        type: string
-      side:
-        type: string
-      tax_transaction_id:
-        type: string
-      taxes:
-        type: string
-    type: object
-  services.CreateTransactionLineItemRequest:
-    properties:
-      amount:
-        type: string
-      category_id:
-        type: string
-      note:
-        type: string
-    type: object
-  services.MarketDataRateLimit:
-    properties:
-      hour_reset_in_seconds:
-        type: number
-      minute_reset_in_seconds:
-        type: number
-      per_hour:
-        type: integer
-      per_minute:
-        type: integer
-      remaining_hour:
-        type: integer
-      remaining_minute:
-        type: integer
-      used_hour:
-        type: integer
-      used_minute:
-        type: integer
-    type: object
-  services.MarketDataSyncState:
-    properties:
-      cooldown_seconds:
-        type: integer
-      last_error:
-        type: string
-      last_failure_at:
-        type: string
-      last_started_at:
-        type: string
-      last_status:
-        type: string
-      last_success_at:
-        type: string
-      min_interval_seconds:
-        type: integer
-      next_due_at:
-        type: string
-      sync_key:
-        type: string
-    type: object
-  services.PatchSavingsInstrumentRequest:
+  savings.PatchRequest:
     properties:
       accrued_interest:
         type: string
@@ -1010,42 +715,83 @@ definitions:
       term_months:
         type: integer
     type: object
-  services.PatchTransactionRequest:
+  tag.CreateTagRequest:
+    properties:
+      color:
+        type: string
+      name:
+        type: string
+    type: object
+  transaction.CreateBody:
+    properties:
+      account_id:
+        type: string
+      amount:
+        type: string
+      client_id:
+        type: string
+      counterparty:
+        type: string
+      currency:
+        type: string
+      description:
+        type: string
+      exchange_rate:
+        type: string
+      external_ref:
+        type: string
+      from_account_id:
+        type: string
+      from_amount:
+        type: string
+      line_items:
+        items:
+          $ref: '#/definitions/transaction.CreateLineItemRequest'
+        type: array
+      notes:
+        type: string
+      occurred_at:
+        type: string
+      occurred_date:
+        type: string
+      occurred_time:
+        type: string
+      tag_ids:
+        items:
+          type: string
+        type: array
+      to_account_id:
+        type: string
+      to_amount:
+        type: string
+      type:
+        type: string
+    type: object
+  transaction.CreateLineItemRequest:
+    properties:
+      amount:
+        type: string
+      category_id:
+        type: string
+      note:
+        type: string
+    type: object
+  transaction.ListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/domain.Transaction'
+        type: array
+      next_cursor:
+        type: string
+    type: object
+  transaction.PatchRequest:
     properties:
       counterparty:
         type: string
       description:
         type: string
       notes:
-        type: string
-    type: object
-  services.SigninRequest:
-    properties:
-      login:
-        type: string
-      password:
-        type: string
-    type: object
-  services.SignupRequest:
-    properties:
-      displayName:
-        type: string
-      email:
-        type: string
-      password:
-        type: string
-      phone:
-        type: string
-    type: object
-  services.UpsertSecurityEventElectionRequest:
-    properties:
-      elected_quantity:
-        type: string
-      note:
-        type: string
-      security_event_id:
-        type: string
-      status:
         type: string
     type: object
 info:
@@ -1070,11 +816,11 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List accounts
       tags:
       - accounts
@@ -1083,16 +829,12 @@ paths:
       - application/json
       description: Create a new financial account for the current user.
       parameters:
-      - description: Client instance ID (recommended)
-        in: header
-        name: X-Client-Id
-        type: string
       - description: Create account request
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.CreateAccountRequest'
+          $ref: '#/definitions/account.CreateAccountRequest'
       produces:
       - application/json
       responses:
@@ -1103,19 +845,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Create account
       tags:
       - accounts
@@ -1134,19 +872,19 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Delete account
       tags:
       - accounts
@@ -1168,22 +906,22 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Get account
       tags:
       - accounts
     patch:
       consumes:
       - application/json
-      description: Update an account (owner-only). Supports name and status (active|closed).
+      description: Update an account (owner-only).
       parameters:
       - description: Account ID
         in: path
@@ -1206,23 +944,23 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Patch account
       tags:
       - accounts
@@ -1241,18 +979,16 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List account balances
       tags:
       - accounts
   /auth/me:
     get:
-      consumes:
-      - application/json
       description: Get current logged in user information.
       produces:
       - application/json
@@ -1264,11 +1000,11 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Get current user
       tags:
       - auth
@@ -1276,9 +1012,9 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Merge-patch current user's settings (JSON object) into stored settings.
+      description: Merge-patch current user's settings.
       parameters:
-      - description: Settings patch (JSON object)
+      - description: Settings patch
         in: body
         name: body
         required: true
@@ -1294,15 +1030,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Update current user settings
       tags:
       - auth
@@ -1312,35 +1048,31 @@ paths:
       - application/json
       description: Sign in with email/phone and password.
       parameters:
-      - description: Client instance ID (recommended)
-        in: header
-        name: X-Client-Id
-        type: string
       - description: Signin request
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.SigninRequest'
+          $ref: '#/definitions/auth.SigninRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.AuthResponse'
+            $ref: '#/definitions/auth.AuthResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Signin
       tags:
       - auth
@@ -1350,41 +1082,37 @@ paths:
       - application/json
       description: Create a new user account (email or phone required).
       parameters:
-      - description: Client instance ID (recommended)
-        in: header
-        name: X-Client-Id
-        type: string
       - description: Signup request
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.SignupRequest'
+          $ref: '#/definitions/auth.SignupRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.AuthResponse'
+            $ref: '#/definitions/auth.AuthResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Signup
       tags:
       - auth
   /budgets:
     get:
-      description: List budgets owned by current user; includes computed spent/remaining.
+      description: List budgets owned by current user.
       produces:
       - application/json
       responses:
@@ -1392,59 +1120,55 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/services.BudgetWithStats'
+              $ref: '#/definitions/budget.WithStats'
             type: array
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List budgets
       tags:
       - budgets
     post:
       consumes:
       - application/json
-      description: Create a new budget owned by current user.
+      description: Create a new budget.
       parameters:
       - description: Create budget request
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.CreateBudgetRequest'
+          $ref: '#/definitions/budget.CreateRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.BudgetWithStats'
+            $ref: '#/definitions/budget.WithStats'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Create budget
       tags:
       - budgets
   /budgets/{budgetId}:
     get:
-      description: Get a single budget owned by current user; includes computed spent/remaining.
+      description: Get a single budget.
       parameters:
       - description: Budget ID
         in: path
@@ -1457,26 +1181,25 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.BudgetWithStats'
+            $ref: '#/definitions/budget.WithStats'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Get budget
       tags:
       - budgets
   /categories:
     get:
-      description: List categories accessible to current user (includes global default
-        categories).
+      description: List categories accessible to current user.
       produces:
       - application/json
       responses:
@@ -1489,17 +1212,17 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List categories
       tags:
       - categories
   /categories/{categoryId}:
     get:
-      description: Get a single category owned by current user.
+      description: Get a single category.
       parameters:
       - description: Category ID
         in: path
@@ -1516,15 +1239,15 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Get category
       tags:
       - categories
@@ -1537,11 +1260,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.ConnectivityResponse'
+            $ref: '#/definitions/diagnostics.ConnectivityResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/handlers.ConnectivityResponse'
+            $ref: '#/definitions/diagnostics.ConnectivityResponse'
       summary: Connectivity probe
       tags:
       - meta
@@ -1560,25 +1283,25 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List debts
       tags:
       - debts
     post:
       consumes:
       - application/json
-      description: Create a new debt owned by current user.
+      description: Create a new debt.
       parameters:
       - description: Create debt request
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.CreateDebtRequest'
+          $ref: '#/definitions/debt.CreateRequest'
       produces:
       - application/json
       responses:
@@ -1589,21 +1312,21 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Create debt
       tags:
       - debts
   /debts/{debtId}:
     get:
-      description: Get a single debt owned by current user.
+      description: Get a single debt.
       parameters:
       - description: Debt ID
         in: path
@@ -1620,15 +1343,15 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Get debt
       tags:
       - debts
@@ -1653,15 +1376,15 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List debt installments
       tags:
       - debts
@@ -1680,7 +1403,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.CreateDebtInstallmentRequest'
+          $ref: '#/definitions/debt.CreateInstallmentRequest'
       produces:
       - application/json
       responses:
@@ -1691,19 +1414,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Create debt installment
       tags:
       - debts
@@ -1728,23 +1451,22 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List debt payments
       tags:
       - debts
     post:
       consumes:
       - application/json
-      description: Link a transaction as a payment/collection for a debt and update
-        outstanding.
+      description: Link a transaction as a payment/collection for a debt.
       parameters:
       - description: Debt ID
         in: path
@@ -1756,7 +1478,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.CreateDebtPaymentRequest'
+          $ref: '#/definitions/debt.CreatePaymentRequest'
       produces:
       - application/json
       responses:
@@ -1767,19 +1489,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Create debt payment link
       tags:
       - debts
@@ -1792,316 +1514,10 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.HealthResponse'
+            $ref: '#/definitions/diagnostics.HealthResponse'
       summary: Health check
       tags:
       - meta
-  /investment-accounts:
-    get:
-      description: List investment accounts accessible by current user.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/domain.InvestmentAccount'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: List investment accounts
-      tags:
-      - investments
-    post:
-      consumes:
-      - application/json
-      description: Create a 1-1 investment extension for a broker account.
-      parameters:
-      - description: Create investment account request
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/services.CreateInvestmentAccountRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.InvestmentAccount'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: Create investment account
-      tags:
-      - investments
-  /investment-accounts/{investmentAccountId}:
-    get:
-      description: Get a single investment account.
-      parameters:
-      - description: Investment account ID
-        in: path
-        name: investmentAccountId
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.InvestmentAccount'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: Get investment account
-      tags:
-      - investments
-  /investment-accounts/{investmentAccountId}/holdings:
-    get:
-      description: List holdings for a broker investment account.
-      parameters:
-      - description: Investment account ID
-        in: path
-        name: investmentAccountId
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/domain.Holding'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: List holdings
-      tags:
-      - investments
-  /investment-accounts/{investmentAccountId}/security-event-elections:
-    get:
-      description: List elections for a broker investment account.
-      parameters:
-      - description: Investment account ID
-        in: path
-        name: investmentAccountId
-        required: true
-        type: string
-      - description: 'Filter by status: draft|confirmed|cancelled'
-        in: query
-        name: status
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/domain.SecurityEventElection'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: List security event elections
-      tags:
-      - investments
-    post:
-      consumes:
-      - application/json
-      description: Create or update an election for the given broker investment account.
-      parameters:
-      - description: Investment account ID
-        in: path
-        name: investmentAccountId
-        required: true
-        type: string
-      - description: Upsert election request
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/services.UpsertSecurityEventElectionRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.SecurityEventElection'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: Upsert security event election
-      tags:
-      - investments
-  /investment-accounts/{investmentAccountId}/trades:
-    get:
-      description: List trades for a broker investment account.
-      parameters:
-      - description: Investment account ID
-        in: path
-        name: investmentAccountId
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/domain.Trade'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: List trades
-      tags:
-      - investments
-    post:
-      consumes:
-      - application/json
-      description: Create a trade; optionally auto-creates fee/tax expense transactions.
-      parameters:
-      - description: Investment account ID
-        in: path
-        name: investmentAccountId
-        required: true
-        type: string
-      - description: Create trade request
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/services.CreateTradeRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.Trade'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: Create trade
-      tags:
-      - investments
   /market-data/vnstock/status:
     get:
       description: Returns global worker rate-limit remaining and market sync last
@@ -2112,28 +1528,28 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.GlobalMarketDataStatusResponse'
+            $ref: '#/definitions/marketdata.GlobalStatus'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Global market-data worker status
       tags:
       - investments
   /market-data/vnstock/sync-all:
     post:
-      description: Enqueue a vnstock job; worker will sync securities catalog then
-        fan-out daily prices and events jobs.
+      description: Enqueue a vnstock job to sync securities catalog then fan-out daily
+        prices and events jobs.
       parameters:
       - description: Bypass caching (1/true)
         in: query
         name: force
         type: string
-      - description: Full price history (only applies when include_prices=1)
+      - description: Full price history
         in: query
         name: full
         type: string
@@ -2151,26 +1567,25 @@ paths:
         "202":
           description: Accepted
           schema:
-            $ref: '#/definitions/handlers.RefreshMarketDataResponse'
+            $ref: '#/definitions/marketdata.RefreshOneResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Enqueue market-wide sync (vnstock)
       tags:
       - investments
   /market-data/vnstock/sync-symbol/{symbol}:
     post:
-      description: Enqueue vnstock jobs for a ticker symbol (prices/events). Requires
-        the symbol to exist in securities catalog.
+      description: Enqueue vnstock jobs for a ticker symbol.
       parameters:
       - description: Ticker symbol (e.g. FPT)
         in: path
@@ -2195,27 +1610,27 @@ paths:
         "202":
           description: Accepted
           schema:
-            $ref: '#/definitions/handlers.RefreshMarketDataManyResponse'
+            $ref: '#/definitions/marketdata.RefreshManyResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Enqueue vnstock refresh for a symbol
       tags:
       - investments
@@ -2223,8 +1638,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Enqueue vnstock jobs for a list of ticker symbols. Requires symbols
-        to exist in securities catalog.
+      description: Enqueue vnstock jobs for a list of ticker symbols.
       parameters:
       - description: Bypass caching (1/true)
         in: query
@@ -2235,30 +1649,30 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.VnstockSyncSymbolsRequest'
+          $ref: '#/definitions/marketdata.SyncSymbolsRequest'
       produces:
       - application/json
       responses:
         "202":
           description: Accepted
           schema:
-            $ref: '#/definitions/handlers.RefreshMarketDataManyResponse'
+            $ref: '#/definitions/marketdata.RefreshManyResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Enqueue vnstock refresh for a list of symbols
       tags:
       - investments
@@ -2271,7 +1685,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.PingResponse'
+            $ref: '#/definitions/diagnostics.PingResponse'
       summary: Ping
       tags:
       - meta
@@ -2284,11 +1698,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.HealthResponse'
+            $ref: '#/definitions/diagnostics.HealthResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/handlers.HealthResponse'
+            $ref: '#/definitions/diagnostics.HealthResponse'
       summary: Readiness check
       tags:
       - meta
@@ -2307,25 +1721,25 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List rotating savings groups
       tags:
       - rotating_savings
     post:
       consumes:
       - application/json
-      description: Create a new rotating savings group (hụi/họ) owned by current user.
+      description: Create a new rotating savings group.
       parameters:
       - description: Create group request
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.CreateRotatingSavingsGroupRequest'
+          $ref: '#/definitions/rotatingsavings.CreateGroupRequest'
       produces:
       - application/json
       responses:
@@ -2336,21 +1750,21 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Create rotating savings group
       tags:
       - rotating_savings
   /rotating-savings/groups/{groupId}:
     get:
-      description: Get a rotating savings group owned by current user.
+      description: Get a rotating savings group.
       parameters:
       - description: Group ID
         in: path
@@ -2367,22 +1781,21 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Get rotating savings group
       tags:
       - rotating_savings
   /rotating-savings/groups/{groupId}/contributions:
     get:
-      description: List contributions/payouts for a rotating savings group owned by
-        current user.
+      description: List contributions/payouts for a group.
       parameters:
       - description: Group ID
         in: path
@@ -2401,23 +1814,22 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List rotating savings contributions
       tags:
       - rotating_savings
     post:
       consumes:
       - application/json
-      description: Create a contribution/payout. Server will create the underlying
-        Transaction and link 1-1.
+      description: Create a contribution/payout.
       parameters:
       - description: Group ID
         in: path
@@ -2429,7 +1841,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.CreateRotatingSavingsContributionRequest'
+          $ref: '#/definitions/rotatingsavings.CreateContributionRequest'
       produces:
       - application/json
       responses:
@@ -2440,19 +1852,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Create rotating savings contribution
       tags:
       - rotating_savings
@@ -2471,25 +1883,25 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List savings instruments
       tags:
       - savings
     post:
       consumes:
       - application/json
-      description: Create a new SavingsInstrument (1-1 extension of a savings Account).
+      description: Create a new savings instrument.
       parameters:
       - description: Create savings instrument request
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.CreateSavingsInstrumentRequest'
+          $ref: '#/definitions/savings.CreateRequest'
       produces:
       - application/json
       responses:
@@ -2500,29 +1912,27 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Create savings instrument
       tags:
       - savings
   /savings/instruments/{instrumentId}:
     delete:
-      description: Delete an existing SavingsInstrument accessible to current user.
+      description: Delete a savings instrument.
       parameters:
       - description: Savings instrument ID
         in: path
         name: instrumentId
         required: true
         type: string
-      produces:
-      - application/json
       responses:
         "200":
           description: OK
@@ -2533,20 +1943,20 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Delete savings instrument
       tags:
       - savings
     get:
-      description: Get a single SavingsInstrument accessible to current user.
+      description: Get a single savings instrument.
       parameters:
       - description: Savings instrument ID
         in: path
@@ -2563,23 +1973,22 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Get savings instrument
       tags:
       - savings
     patch:
       consumes:
       - application/json
-      description: Patch fields of an existing SavingsInstrument accessible to current
-        user.
+      description: Patch a savings instrument.
       parameters:
       - description: Savings instrument ID
         in: path
@@ -2591,7 +2000,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.PatchSavingsInstrumentRequest'
+          $ref: '#/definitions/savings.PatchRequest'
       produces:
       - application/json
       responses:
@@ -2602,121 +2011,25 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Patch savings instrument
       tags:
       - savings
-  /securities:
-    get:
-      description: List securities from global catalog.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/domain.Security'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: List securities
-      tags:
-      - investments
-  /securities/{securityId}:
-    get:
-      description: Get a single security.
-      parameters:
-      - description: Security ID
-        in: path
-        name: securityId
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.Security'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: Get security
-      tags:
-      - investments
-  /securities/{securityId}/events:
-    get:
-      description: Read-only security events (populated by market data service).
-      parameters:
-      - description: Security ID
-        in: path
-        name: securityId
-        required: true
-        type: string
-      - description: From date (YYYY-MM-DD)
-        in: query
-        name: from
-        type: string
-      - description: To date (YYYY-MM-DD)
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/domain.SecurityEvent'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: List security events
-      tags:
-      - investments
   /securities/{securityId}/events/refresh:
     post:
-      description: Enqueue a vnstock job; worker will fetch corporate actions/events
-        and upsert into security_events.
+      description: Enqueue a vnstock job; worker will fetch corporate actions/events.
       parameters:
       - description: Security ID
         in: path
@@ -2729,34 +2042,33 @@ paths:
         "202":
           description: Accepted
           schema:
-            $ref: '#/definitions/handlers.RefreshSecurityEventsResponse'
+            $ref: '#/definitions/marketdata.RefreshOneResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Enqueue refresh security events
       tags:
       - investments
   /securities/{securityId}/market-data/status:
     get:
-      description: Returns last sync timestamps, cooldown to next allowed sync, and
-        current worker rate-limit remaining (best-effort).
+      description: Returns last sync timestamps, cooldown, and rate-limit (best-effort).
       parameters:
       - description: Security ID
         in: path
@@ -2769,65 +2081,24 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.SecurityMarketDataStatusResponse'
+            $ref: '#/definitions/marketdata.SecurityStatus'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Market data status for a security
-      tags:
-      - investments
-  /securities/{securityId}/prices-daily:
-    get:
-      description: Read-only daily prices (populated by market data service).
-      parameters:
-      - description: Security ID
-        in: path
-        name: securityId
-        required: true
-        type: string
-      - description: From date (YYYY-MM-DD)
-        in: query
-        name: from
-        type: string
-      - description: To date (YYYY-MM-DD)
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/domain.SecurityPriceDaily'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
-      summary: List daily prices for security
       tags:
       - investments
   /securities/{securityId}/prices-daily/refresh:
@@ -2848,8 +2119,7 @@ paths:
         in: query
         name: to
         type: string
-      - description: Fetch full history (1/true). If set and from is empty, worker
-          uses VNSTOCK_FULL_HISTORY_START_DATE.
+      - description: Fetch full history (1/true)
         in: query
         name: full
         type: string
@@ -2859,27 +2129,27 @@ paths:
         "202":
           description: Accepted
           schema:
-            $ref: '#/definitions/handlers.RefreshPricesDailyResponse'
+            $ref: '#/definitions/marketdata.RefreshOneResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Enqueue refresh daily prices for security
       tags:
       - investments
@@ -2898,25 +2168,25 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List tags
       tags:
       - tags
     post:
       consumes:
       - application/json
-      description: Create a new tag owned by current user.
+      description: Create a new tag.
       parameters:
       - description: Create tag request
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.CreateTagRequest'
+          $ref: '#/definitions/tag.CreateTagRequest'
       produces:
       - application/json
       responses:
@@ -2927,21 +2197,21 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Create tag
       tags:
       - tags
   /tags/{tagId}:
     get:
-      description: Get a single tag owned by current user.
+      description: Get a single tag.
       parameters:
       - description: Tag ID
         in: path
@@ -2958,22 +2228,21 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Get tag
       tags:
       - tags
   /transactions:
     get:
-      description: List transactions visible to current user; supports filtering by
-        account and time range.
+      description: List transactions visible to current user.
       parameters:
       - description: Filter by account id
         in: query
@@ -3001,19 +2270,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.TransactionListResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/transaction.ListResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List transactions
       tags:
       - transactions
@@ -3022,16 +2287,12 @@ paths:
       - application/json
       description: Create a new transaction (expense/income/transfer).
       parameters:
-      - description: Client instance ID (recommended)
-        in: header
-        name: X-Client-Id
-        type: string
       - description: Create transaction request
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.CreateTransactionBody'
+          $ref: '#/definitions/transaction.CreateBody'
       produces:
       - application/json
       responses:
@@ -3042,19 +2303,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Create transaction
       tags:
       - transactions
@@ -3067,32 +2324,26 @@ paths:
         name: transactionId
         required: true
         type: string
-      produces:
-      - application/json
       responses:
         "204":
           description: No Content
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Delete transaction
       tags:
       - transactions
     get:
-      description: Get a single transaction if visible to current user.
+      description: Get a single transaction.
       parameters:
       - description: Transaction ID
         in: path
@@ -3109,22 +2360,22 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Get transaction
       tags:
       - transactions
     patch:
       consumes:
       - application/json
-      description: 'Merge-patch transaction fields (MVP: description/notes/counterparty).'
+      description: Merge-patch transaction fields.
       parameters:
       - description: Transaction ID
         in: path
@@ -3136,7 +2387,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/services.PatchTransactionRequest'
+          $ref: '#/definitions/transaction.PatchRequest'
       produces:
       - application/json
       responses:
@@ -3147,30 +2398,25 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: Patch transaction
       tags:
       - transactions
   /transactions/{transactionId}/debt-links:
     get:
-      description: List debt payment links for a transaction accessible by current
-        user.
+      description: List debt payment links for a transaction.
       parameters:
       - description: Transaction ID
         in: path
@@ -3189,19 +2435,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apierror.Envelope'
+            $ref: '#/definitions/response.ErrorEnvelope'
       summary: List debt links for transaction
       tags:
       - debts

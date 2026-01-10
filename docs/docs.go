@@ -38,13 +38,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -63,18 +63,12 @@ const docTemplate = `{
                 "summary": "Create account",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Client instance ID (recommended)",
-                        "name": "X-Client-Id",
-                        "in": "header"
-                    },
-                    {
                         "description": "Create account request",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.CreateAccountRequest"
+                            "$ref": "#/definitions/account.CreateAccountRequest"
                         }
                     }
                 ],
@@ -88,25 +82,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -135,13 +123,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -176,19 +164,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -215,31 +203,31 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "patch": {
-                "description": "Update an account (owner-only). Supports name and status (active|closed).",
+                "description": "Update an account (owner-only).",
                 "consumes": [
                     "application/json"
                 ],
@@ -278,31 +266,31 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -311,9 +299,6 @@ const docTemplate = `{
         "/auth/me": {
             "get": {
                 "description": "Get current logged in user information.",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -331,13 +316,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -345,7 +330,7 @@ const docTemplate = `{
         },
         "/auth/me/settings": {
             "patch": {
-                "description": "Merge-patch current user's settings (JSON object) into stored settings.",
+                "description": "Merge-patch current user's settings.",
                 "consumes": [
                     "application/json"
                 ],
@@ -358,7 +343,7 @@ const docTemplate = `{
                 "summary": "Update current user settings",
                 "parameters": [
                     {
-                        "description": "Settings patch (JSON object)",
+                        "description": "Settings patch",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -377,19 +362,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -410,18 +395,12 @@ const docTemplate = `{
                 "summary": "Signin",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Client instance ID (recommended)",
-                        "name": "X-Client-Id",
-                        "in": "header"
-                    },
-                    {
                         "description": "Signin request",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.SigninRequest"
+                            "$ref": "#/definitions/auth.SigninRequest"
                         }
                     }
                 ],
@@ -429,25 +408,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.AuthResponse"
+                            "$ref": "#/definitions/auth.AuthResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -468,18 +447,12 @@ const docTemplate = `{
                 "summary": "Signup",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Client instance ID (recommended)",
-                        "name": "X-Client-Id",
-                        "in": "header"
-                    },
-                    {
                         "description": "Signup request",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.SignupRequest"
+                            "$ref": "#/definitions/auth.SignupRequest"
                         }
                     }
                 ],
@@ -487,25 +460,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.AuthResponse"
+                            "$ref": "#/definitions/auth.AuthResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -513,7 +486,7 @@ const docTemplate = `{
         },
         "/budgets": {
             "get": {
-                "description": "List budgets owned by current user; includes computed spent/remaining.",
+                "description": "List budgets owned by current user.",
                 "produces": [
                     "application/json"
                 ],
@@ -527,26 +500,26 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/services.BudgetWithStats"
+                                "$ref": "#/definitions/budget.WithStats"
                             }
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "post": {
-                "description": "Create a new budget owned by current user.",
+                "description": "Create a new budget.",
                 "consumes": [
                     "application/json"
                 ],
@@ -564,7 +537,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.CreateBudgetRequest"
+                            "$ref": "#/definitions/budget.CreateRequest"
                         }
                     }
                 ],
@@ -572,31 +545,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.BudgetWithStats"
+                            "$ref": "#/definitions/budget.WithStats"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -604,7 +571,7 @@ const docTemplate = `{
         },
         "/budgets/{budgetId}": {
             "get": {
-                "description": "Get a single budget owned by current user; includes computed spent/remaining.",
+                "description": "Get a single budget.",
                 "produces": [
                     "application/json"
                 ],
@@ -625,25 +592,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.BudgetWithStats"
+                            "$ref": "#/definitions/budget.WithStats"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -651,7 +618,7 @@ const docTemplate = `{
         },
         "/categories": {
             "get": {
-                "description": "List categories accessible to current user (includes global default categories).",
+                "description": "List categories accessible to current user.",
                 "produces": [
                     "application/json"
                 ],
@@ -672,13 +639,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -686,7 +653,7 @@ const docTemplate = `{
         },
         "/categories/{categoryId}": {
             "get": {
-                "description": "Get a single category owned by current user.",
+                "description": "Get a single category.",
                 "produces": [
                     "application/json"
                 ],
@@ -713,19 +680,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -745,13 +712,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.ConnectivityResponse"
+                            "$ref": "#/definitions/diagnostics.ConnectivityResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/handlers.ConnectivityResponse"
+                            "$ref": "#/definitions/diagnostics.ConnectivityResponse"
                         }
                     }
                 }
@@ -780,19 +747,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "post": {
-                "description": "Create a new debt owned by current user.",
+                "description": "Create a new debt.",
                 "consumes": [
                     "application/json"
                 ],
@@ -810,7 +777,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.CreateDebtRequest"
+                            "$ref": "#/definitions/debt.CreateRequest"
                         }
                     }
                 ],
@@ -824,19 +791,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -844,7 +811,7 @@ const docTemplate = `{
         },
         "/debts/{debtId}": {
             "get": {
-                "description": "Get a single debt owned by current user.",
+                "description": "Get a single debt.",
                 "produces": [
                     "application/json"
                 ],
@@ -871,19 +838,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -921,19 +888,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -964,7 +931,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.CreateDebtInstallmentRequest"
+                            "$ref": "#/definitions/debt.CreateInstallmentRequest"
                         }
                     }
                 ],
@@ -978,25 +945,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -1034,25 +1001,25 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "post": {
-                "description": "Link a transaction as a payment/collection for a debt and update outstanding.",
+                "description": "Link a transaction as a payment/collection for a debt.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1077,7 +1044,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.CreateDebtPaymentRequest"
+                            "$ref": "#/definitions/debt.CreatePaymentRequest"
                         }
                     }
                 ],
@@ -1091,25 +1058,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -1129,469 +1096,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.HealthResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/investment-accounts": {
-            "get": {
-                "description": "List investment accounts accessible by current user.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "List investment accounts",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/domain.InvestmentAccount"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Create a 1-1 investment extension for a broker account.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "Create investment account",
-                "parameters": [
-                    {
-                        "description": "Create investment account request",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.CreateInvestmentAccountRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/domain.InvestmentAccount"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/investment-accounts/{investmentAccountId}": {
-            "get": {
-                "description": "Get a single investment account.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "Get investment account",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Investment account ID",
-                        "name": "investmentAccountId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/domain.InvestmentAccount"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/investment-accounts/{investmentAccountId}/holdings": {
-            "get": {
-                "description": "List holdings for a broker investment account.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "List holdings",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Investment account ID",
-                        "name": "investmentAccountId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/domain.Holding"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/investment-accounts/{investmentAccountId}/security-event-elections": {
-            "get": {
-                "description": "List elections for a broker investment account.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "List security event elections",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Investment account ID",
-                        "name": "investmentAccountId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by status: draft|confirmed|cancelled",
-                        "name": "status",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/domain.SecurityEventElection"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Create or update an election for the given broker investment account.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "Upsert security event election",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Investment account ID",
-                        "name": "investmentAccountId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Upsert election request",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.UpsertSecurityEventElectionRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/domain.SecurityEventElection"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/investment-accounts/{investmentAccountId}/trades": {
-            "get": {
-                "description": "List trades for a broker investment account.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "List trades",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Investment account ID",
-                        "name": "investmentAccountId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/domain.Trade"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Create a trade; optionally auto-creates fee/tax expense transactions.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "Create trade",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Investment account ID",
-                        "name": "investmentAccountId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Create trade request",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.CreateTradeRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/domain.Trade"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/diagnostics.HealthResponse"
                         }
                     }
                 }
@@ -1611,19 +1116,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.GlobalMarketDataStatusResponse"
+                            "$ref": "#/definitions/marketdata.GlobalStatus"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -1631,7 +1136,7 @@ const docTemplate = `{
         },
         "/market-data/vnstock/sync-all": {
             "post": {
-                "description": "Enqueue a vnstock job; worker will sync securities catalog then fan-out daily prices and events jobs.",
+                "description": "Enqueue a vnstock job to sync securities catalog then fan-out daily prices and events jobs.",
                 "produces": [
                     "application/json"
                 ],
@@ -1648,7 +1153,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Full price history (only applies when include_prices=1)",
+                        "description": "Full price history",
                         "name": "full",
                         "in": "query"
                     },
@@ -1669,25 +1174,25 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RefreshMarketDataResponse"
+                            "$ref": "#/definitions/marketdata.RefreshOneResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -1695,7 +1200,7 @@ const docTemplate = `{
         },
         "/market-data/vnstock/sync-symbol/{symbol}": {
             "post": {
-                "description": "Enqueue vnstock jobs for a ticker symbol (prices/events). Requires the symbol to exist in securities catalog.",
+                "description": "Enqueue vnstock jobs for a ticker symbol.",
                 "produces": [
                     "application/json"
                 ],
@@ -1734,37 +1239,37 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RefreshMarketDataManyResponse"
+                            "$ref": "#/definitions/marketdata.RefreshManyResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -1772,7 +1277,7 @@ const docTemplate = `{
         },
         "/market-data/vnstock/sync-symbols": {
             "post": {
-                "description": "Enqueue vnstock jobs for a list of ticker symbols. Requires symbols to exist in securities catalog.",
+                "description": "Enqueue vnstock jobs for a list of ticker symbols.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1796,7 +1301,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.VnstockSyncSymbolsRequest"
+                            "$ref": "#/definitions/marketdata.SyncSymbolsRequest"
                         }
                     }
                 ],
@@ -1804,31 +1309,31 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RefreshMarketDataManyResponse"
+                            "$ref": "#/definitions/marketdata.RefreshManyResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -1848,7 +1353,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.PingResponse"
+                            "$ref": "#/definitions/diagnostics.PingResponse"
                         }
                     }
                 }
@@ -1868,13 +1373,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.HealthResponse"
+                            "$ref": "#/definitions/diagnostics.HealthResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/handlers.HealthResponse"
+                            "$ref": "#/definitions/diagnostics.HealthResponse"
                         }
                     }
                 }
@@ -1903,19 +1408,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "post": {
-                "description": "Create a new rotating savings group (hụi/họ) owned by current user.",
+                "description": "Create a new rotating savings group.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1933,7 +1438,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.CreateRotatingSavingsGroupRequest"
+                            "$ref": "#/definitions/rotatingsavings.CreateGroupRequest"
                         }
                     }
                 ],
@@ -1947,19 +1452,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -1967,7 +1472,7 @@ const docTemplate = `{
         },
         "/rotating-savings/groups/{groupId}": {
             "get": {
-                "description": "Get a rotating savings group owned by current user.",
+                "description": "Get a rotating savings group.",
                 "produces": [
                     "application/json"
                 ],
@@ -1994,19 +1499,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -2014,7 +1519,7 @@ const docTemplate = `{
         },
         "/rotating-savings/groups/{groupId}/contributions": {
             "get": {
-                "description": "List contributions/payouts for a rotating savings group owned by current user.",
+                "description": "List contributions/payouts for a group.",
                 "produces": [
                     "application/json"
                 ],
@@ -2044,25 +1549,25 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "post": {
-                "description": "Create a contribution/payout. Server will create the underlying Transaction and link 1-1.",
+                "description": "Create a contribution/payout.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2087,7 +1592,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.CreateRotatingSavingsContributionRequest"
+                            "$ref": "#/definitions/rotatingsavings.CreateContributionRequest"
                         }
                     }
                 ],
@@ -2101,25 +1606,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -2148,19 +1653,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "post": {
-                "description": "Create a new SavingsInstrument (1-1 extension of a savings Account).",
+                "description": "Create a new savings instrument.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2178,7 +1683,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.CreateSavingsInstrumentRequest"
+                            "$ref": "#/definitions/savings.CreateRequest"
                         }
                     }
                 ],
@@ -2192,19 +1697,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -2212,7 +1717,7 @@ const docTemplate = `{
         },
         "/savings/instruments/{instrumentId}": {
             "get": {
-                "description": "Get a single SavingsInstrument accessible to current user.",
+                "description": "Get a single savings instrument.",
                 "produces": [
                     "application/json"
                 ],
@@ -2239,28 +1744,25 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "delete": {
-                "description": "Delete an existing SavingsInstrument accessible to current user.",
-                "produces": [
-                    "application/json"
-                ],
+                "description": "Delete a savings instrument.",
                 "tags": [
                     "savings"
                 ],
@@ -2287,25 +1789,25 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "patch": {
-                "description": "Patch fields of an existing SavingsInstrument accessible to current user.",
+                "description": "Patch a savings instrument.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2330,7 +1832,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.PatchSavingsInstrumentRequest"
+                            "$ref": "#/definitions/savings.PatchRequest"
                         }
                     }
                 ],
@@ -2344,169 +1846,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/securities": {
-            "get": {
-                "description": "List securities from global catalog.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "List securities",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/domain.Security"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/securities/{securityId}": {
-            "get": {
-                "description": "Get a single security.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "Get security",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "securityId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/domain.Security"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/securities/{securityId}/events": {
-            "get": {
-                "description": "Read-only security events (populated by market data service).",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "List security events",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "securityId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "From date (YYYY-MM-DD)",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "To date (YYYY-MM-DD)",
-                        "name": "to",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/domain.SecurityEvent"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -2514,7 +1872,7 @@ const docTemplate = `{
         },
         "/securities/{securityId}/events/refresh": {
             "post": {
-                "description": "Enqueue a vnstock job; worker will fetch corporate actions/events and upsert into security_events.",
+                "description": "Enqueue a vnstock job; worker will fetch corporate actions/events.",
                 "produces": [
                     "application/json"
                 ],
@@ -2535,37 +1893,37 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RefreshSecurityEventsResponse"
+                            "$ref": "#/definitions/marketdata.RefreshOneResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -2573,7 +1931,7 @@ const docTemplate = `{
         },
         "/securities/{securityId}/market-data/status": {
             "get": {
-                "description": "Returns last sync timestamps, cooldown to next allowed sync, and current worker rate-limit remaining (best-effort).",
+                "description": "Returns last sync timestamps, cooldown, and rate-limit (best-effort).",
                 "produces": [
                     "application/json"
                 ],
@@ -2594,93 +1952,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.SecurityMarketDataStatusResponse"
+                            "$ref": "#/definitions/marketdata.SecurityStatus"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/securities/{securityId}/prices-daily": {
-            "get": {
-                "description": "Read-only daily prices (populated by market data service).",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "investments"
-                ],
-                "summary": "List daily prices for security",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "securityId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "From date (YYYY-MM-DD)",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "To date (YYYY-MM-DD)",
-                        "name": "to",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/domain.SecurityPriceDaily"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -2718,7 +2014,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Fetch full history (1/true). If set and from is empty, worker uses VNSTOCK_FULL_HISTORY_START_DATE.",
+                        "description": "Fetch full history (1/true)",
                         "name": "full",
                         "in": "query"
                     }
@@ -2727,37 +2023,37 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RefreshPricesDailyResponse"
+                            "$ref": "#/definitions/marketdata.RefreshOneResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -2786,19 +2082,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "post": {
-                "description": "Create a new tag owned by current user.",
+                "description": "Create a new tag.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2816,7 +2112,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.CreateTagRequest"
+                            "$ref": "#/definitions/tag.CreateTagRequest"
                         }
                     }
                 ],
@@ -2830,19 +2126,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -2850,7 +2146,7 @@ const docTemplate = `{
         },
         "/tags/{tagId}": {
             "get": {
-                "description": "Get a single tag owned by current user.",
+                "description": "Get a single tag.",
                 "produces": [
                     "application/json"
                 ],
@@ -2877,19 +2173,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -2897,7 +2193,7 @@ const docTemplate = `{
         },
         "/transactions": {
             "get": {
-                "description": "List transactions visible to current user; supports filtering by account and time range.",
+                "description": "List transactions visible to current user.",
                 "produces": [
                     "application/json"
                 ],
@@ -2941,25 +2237,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.TransactionListResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/transaction.ListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -2978,18 +2268,12 @@ const docTemplate = `{
                 "summary": "Create transaction",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Client instance ID (recommended)",
-                        "name": "X-Client-Id",
-                        "in": "header"
-                    },
-                    {
                         "description": "Create transaction request",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.CreateTransactionBody"
+                            "$ref": "#/definitions/transaction.CreateBody"
                         }
                     }
                 ],
@@ -3003,25 +2287,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -3029,7 +2307,7 @@ const docTemplate = `{
         },
         "/transactions/{transactionId}": {
             "get": {
-                "description": "Get a single transaction if visible to current user.",
+                "description": "Get a single transaction.",
                 "produces": [
                     "application/json"
                 ],
@@ -3056,28 +2334,25 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "delete": {
                 "description": "Soft delete a transaction.",
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "transactions"
                 ],
@@ -3098,31 +2373,25 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
             },
             "patch": {
-                "description": "Merge-patch transaction fields (MVP: description/notes/counterparty).",
+                "description": "Merge-patch transaction fields.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3147,7 +2416,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.PatchTransactionRequest"
+                            "$ref": "#/definitions/transaction.PatchRequest"
                         }
                     }
                 ],
@@ -3161,31 +2430,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -3193,7 +2456,7 @@ const docTemplate = `{
         },
         "/transactions/{transactionId}/debt-links": {
             "get": {
-                "description": "List debt payment links for a transaction accessible by current user.",
+                "description": "List debt payment links for a transaction.",
                 "produces": [
                     "application/json"
                 ],
@@ -3223,25 +2486,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/apierror.Envelope"
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -3249,25 +2512,275 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "apierror.Envelope": {
+        "account.CreateAccountRequest": {
             "type": "object",
             "properties": {
-                "error": {
-                    "$ref": "#/definitions/apierror.Error"
+                "account_number": {
+                    "type": "string"
+                },
+                "account_type": {
+                    "type": "string"
+                },
+                "color": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_account_id": {
+                    "type": "string"
                 }
             }
         },
-        "apierror.Error": {
+        "auth.AuthResponse": {
             "type": "object",
             "properties": {
-                "code": {
+                "access_token": {
                     "type": "string"
                 },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "token_type": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/domain.User"
+                }
+            }
+        },
+        "auth.SigninRequest": {
+            "type": "object",
+            "properties": {
+                "login": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "auth.SignupRequest": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                }
+            }
+        },
+        "budget.CreateRequest": {
+            "type": "object",
+            "properties": {
+                "alert_threshold_percent": {
+                    "type": "integer"
+                },
+                "amount": {
+                    "type": "string"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "period": {
+                    "type": "string"
+                },
+                "period_end": {
+                    "type": "string"
+                },
+                "period_start": {
+                    "type": "string"
+                },
+                "rollover_mode": {
+                    "type": "string"
+                }
+            }
+        },
+        "budget.WithStats": {
+            "type": "object",
+            "properties": {
+                "alert_threshold_percent": {
+                    "type": "integer"
+                },
+                "amount": {
+                    "type": "string"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "percent_used": {
+                    "type": "integer"
+                },
+                "period": {
+                    "type": "string"
+                },
+                "period_end": {
+                    "type": "string"
+                },
+                "period_start": {
+                    "type": "string"
+                },
+                "remaining": {
+                    "type": "string"
+                },
+                "rollover_mode": {
+                    "type": "string"
+                },
+                "spent": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "debt.CreateInstallmentRequest": {
+            "type": "object",
+            "properties": {
+                "amount_due": {
+                    "type": "string"
+                },
+                "amount_paid": {
+                    "type": "string"
+                },
+                "due_date": {
+                    "type": "string"
+                },
+                "installment_no": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "debt.CreatePaymentRequest": {
+            "type": "object",
+            "properties": {
+                "interest_paid": {
+                    "type": "string"
+                },
+                "principal_paid": {
+                    "type": "string"
+                },
+                "transaction_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "debt.CreateRequest": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "direction": {
+                    "type": "string"
+                },
+                "due_date": {
+                    "type": "string"
+                },
+                "interest_rate": {
+                    "type": "string"
+                },
+                "interest_rule": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "principal": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "diagnostics.ConnectivityItem": {
+            "type": "object",
+            "properties": {
                 "details": {
                     "type": "object",
                     "additionalProperties": {}
                 },
-                "message": {
+                "error": {
+                    "type": "string"
+                },
+                "ok": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "diagnostics.ConnectivityResponse": {
+            "type": "object",
+            "properties": {
+                "postgres": {
+                    "$ref": "#/definitions/diagnostics.ConnectivityItem"
+                },
+                "redis": {
+                    "$ref": "#/definitions/diagnostics.ConnectivityItem"
+                }
+            }
+        },
+        "diagnostics.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "checks": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "diagnostics.PingResponse": {
+            "type": "object",
+            "properties": {
+                "env": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "service": {
+                    "type": "string"
+                },
+                "time": {
                     "type": "string"
                 }
             }
@@ -3499,72 +3012,6 @@ const docTemplate = `{
                 }
             }
         },
-        "domain.Holding": {
-            "type": "object",
-            "properties": {
-                "as_of": {
-                    "type": "string"
-                },
-                "avg_cost": {
-                    "type": "string"
-                },
-                "broker_account_id": {
-                    "type": "string"
-                },
-                "cost_basis_total": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "market_price": {
-                    "type": "string"
-                },
-                "market_value": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "string"
-                },
-                "security_id": {
-                    "type": "string"
-                },
-                "source_of_truth": {
-                    "type": "string"
-                },
-                "unrealized_pnl": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "domain.InvestmentAccount": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "fee_settings": {},
-                "id": {
-                    "type": "string"
-                },
-                "tax_settings": {},
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
         "domain.RotatingSavingsContribution": {
             "type": "object",
             "properties": {
@@ -3694,167 +3141,6 @@ const docTemplate = `{
                 }
             }
         },
-        "domain.Security": {
-            "type": "object",
-            "properties": {
-                "asset_class": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "symbol": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "domain.SecurityEvent": {
-            "type": "object",
-            "properties": {
-                "cash_amount_per_share": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "effective_date": {
-                    "type": "string"
-                },
-                "event_type": {
-                    "type": "string"
-                },
-                "ex_date": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "note": {
-                    "type": "string"
-                },
-                "pay_date": {
-                    "type": "string"
-                },
-                "ratio_denominator": {
-                    "type": "string"
-                },
-                "ratio_numerator": {
-                    "type": "string"
-                },
-                "record_date": {
-                    "type": "string"
-                },
-                "security_id": {
-                    "type": "string"
-                },
-                "subscription_price": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "vnstock_event_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "domain.SecurityEventElection": {
-            "type": "object",
-            "properties": {
-                "broker_account_id": {
-                    "type": "string"
-                },
-                "confirmed_at": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "elected_quantity": {
-                    "type": "string"
-                },
-                "entitled_quantity": {
-                    "type": "string"
-                },
-                "entitlement_date": {
-                    "type": "string"
-                },
-                "holding_quantity_at_entitlement_date": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "note": {
-                    "type": "string"
-                },
-                "security_event_id": {
-                    "type": "string"
-                },
-                "security_id": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "domain.SecurityPriceDaily": {
-            "type": "object",
-            "properties": {
-                "close": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "high": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "low": {
-                    "type": "string"
-                },
-                "open": {
-                    "type": "string"
-                },
-                "price_date": {
-                    "type": "string"
-                },
-                "security_id": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "volume": {
-                    "type": "string"
-                }
-            }
-        },
         "domain.Tag": {
             "type": "object",
             "properties": {
@@ -3874,56 +3160,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "domain.Trade": {
-            "type": "object",
-            "properties": {
-                "broker_account_id": {
-                    "type": "string"
-                },
-                "client_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "fee_transaction_id": {
-                    "type": "string"
-                },
-                "fees": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "note": {
-                    "type": "string"
-                },
-                "occurred_at": {
-                    "type": "string"
-                },
-                "price": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "string"
-                },
-                "security_id": {
-                    "type": "string"
-                },
-                "side": {
-                    "type": "string"
-                },
-                "tax_transaction_id": {
-                    "type": "string"
-                },
-                "taxes": {
-                    "type": "string"
-                },
-                "updated_at": {
                     "type": "string"
                 }
             }
@@ -4072,143 +3308,47 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.ConnectivityItem": {
-            "type": "object",
-            "properties": {
-                "details": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "error": {
-                    "type": "string"
-                },
-                "ok": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "handlers.ConnectivityResponse": {
-            "type": "object",
-            "properties": {
-                "postgres": {
-                    "$ref": "#/definitions/handlers.ConnectivityItem"
-                },
-                "redis": {
-                    "$ref": "#/definitions/handlers.ConnectivityItem"
-                }
-            }
-        },
-        "handlers.CreateTransactionBody": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "amount": {
-                    "type": "string"
-                },
-                "client_id": {
-                    "type": "string"
-                },
-                "counterparty": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "exchange_rate": {
-                    "type": "string"
-                },
-                "external_ref": {
-                    "type": "string"
-                },
-                "from_account_id": {
-                    "type": "string"
-                },
-                "from_amount": {
-                    "type": "string"
-                },
-                "line_items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/services.CreateTransactionLineItemRequest"
-                    }
-                },
-                "notes": {
-                    "type": "string"
-                },
-                "occurred_at": {
-                    "type": "string"
-                },
-                "occurred_date": {
-                    "type": "string"
-                },
-                "occurred_time": {
-                    "type": "string"
-                },
-                "tag_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "to_account_id": {
-                    "type": "string"
-                },
-                "to_amount": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.GlobalMarketDataStatusResponse": {
+        "marketdata.GlobalStatus": {
             "type": "object",
             "properties": {
                 "market_sync": {
-                    "$ref": "#/definitions/services.MarketDataSyncState"
+                    "$ref": "#/definitions/marketdata.SyncState"
                 },
                 "rate_limit": {
-                    "$ref": "#/definitions/services.MarketDataRateLimit"
+                    "$ref": "#/definitions/marketdata.RateLimit"
                 }
             }
         },
-        "handlers.HealthResponse": {
+        "marketdata.RateLimit": {
             "type": "object",
             "properties": {
-                "checks": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                "hour_reset_in_seconds": {
+                    "type": "number"
                 },
-                "status": {
-                    "type": "string"
+                "minute_reset_in_seconds": {
+                    "type": "number"
+                },
+                "per_hour": {
+                    "type": "integer"
+                },
+                "per_minute": {
+                    "type": "integer"
+                },
+                "remaining_hour": {
+                    "type": "integer"
+                },
+                "remaining_minute": {
+                    "type": "integer"
+                },
+                "used_hour": {
+                    "type": "integer"
+                },
+                "used_minute": {
+                    "type": "integer"
                 }
             }
         },
-        "handlers.PingResponse": {
-            "type": "object",
-            "properties": {
-                "env": {
-                    "type": "string"
-                },
-                "request_id": {
-                    "type": "string"
-                },
-                "service": {
-                    "type": "string"
-                },
-                "time": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.RefreshMarketDataManyResponse": {
+        "marketdata.RefreshManyResponse": {
             "type": "object",
             "properties": {
                 "enqueued": {
@@ -4231,7 +3371,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.RefreshMarketDataResponse": {
+        "marketdata.RefreshOneResponse": {
             "type": "object",
             "properties": {
                 "message_id": {
@@ -4242,60 +3382,56 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.RefreshPricesDailyResponse": {
-            "type": "object",
-            "properties": {
-                "message_id": {
-                    "type": "string"
-                },
-                "stream": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.RefreshSecurityEventsResponse": {
-            "type": "object",
-            "properties": {
-                "message_id": {
-                    "type": "string"
-                },
-                "stream": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.SecurityMarketDataStatusResponse": {
+        "marketdata.SecurityStatus": {
             "type": "object",
             "properties": {
                 "prices_daily": {
-                    "$ref": "#/definitions/services.MarketDataSyncState"
+                    "$ref": "#/definitions/marketdata.SyncState"
                 },
                 "rate_limit": {
-                    "$ref": "#/definitions/services.MarketDataRateLimit"
+                    "$ref": "#/definitions/marketdata.RateLimit"
                 },
                 "security_events": {
-                    "$ref": "#/definitions/services.MarketDataSyncState"
+                    "$ref": "#/definitions/marketdata.SyncState"
                 },
                 "security_id": {
                     "type": "string"
                 }
             }
         },
-        "handlers.TransactionListResponse": {
+        "marketdata.SyncState": {
             "type": "object",
             "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/domain.Transaction"
-                    }
+                "cooldown_seconds": {
+                    "type": "integer"
                 },
-                "next_cursor": {
+                "last_error": {
+                    "type": "string"
+                },
+                "last_failure_at": {
+                    "type": "string"
+                },
+                "last_started_at": {
+                    "type": "string"
+                },
+                "last_status": {
+                    "type": "string"
+                },
+                "last_success_at": {
+                    "type": "string"
+                },
+                "min_interval_seconds": {
+                    "type": "integer"
+                },
+                "next_due_at": {
+                    "type": "string"
+                },
+                "sync_key": {
                     "type": "string"
                 }
             }
         },
-        "handlers.VnstockSyncSymbolsRequest": {
+        "marketdata.SyncSymbolsRequest": {
             "type": "object",
             "properties": {
                 "force": {
@@ -4315,220 +3451,30 @@ const docTemplate = `{
                 }
             }
         },
-        "services.AuthResponse": {
+        "response.ErrorBody": {
             "type": "object",
             "properties": {
-                "access_token": {
+                "code": {
                     "type": "string"
                 },
-                "expires_in": {
-                    "type": "integer"
+                "details": {
+                    "type": "object",
+                    "additionalProperties": {}
                 },
-                "token_type": {
-                    "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/domain.User"
-                }
-            }
-        },
-        "services.BudgetWithStats": {
-            "type": "object",
-            "properties": {
-                "alert_threshold_percent": {
-                    "type": "integer"
-                },
-                "amount": {
-                    "type": "string"
-                },
-                "category_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "percent_used": {
-                    "type": "integer"
-                },
-                "period": {
-                    "type": "string"
-                },
-                "period_end": {
-                    "type": "string"
-                },
-                "period_start": {
-                    "type": "string"
-                },
-                "remaining": {
-                    "type": "string"
-                },
-                "rollover_mode": {
-                    "type": "string"
-                },
-                "spent": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
+                "message": {
                     "type": "string"
                 }
             }
         },
-        "services.CreateAccountRequest": {
+        "response.ErrorEnvelope": {
             "type": "object",
             "properties": {
-                "account_number": {
-                    "type": "string"
-                },
-                "account_type": {
-                    "type": "string"
-                },
-                "color": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "parent_account_id": {
-                    "type": "string"
+                "error": {
+                    "$ref": "#/definitions/response.ErrorBody"
                 }
             }
         },
-        "services.CreateBudgetRequest": {
-            "type": "object",
-            "properties": {
-                "alert_threshold_percent": {
-                    "type": "integer"
-                },
-                "amount": {
-                    "type": "string"
-                },
-                "category_id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "period": {
-                    "type": "string"
-                },
-                "period_end": {
-                    "type": "string"
-                },
-                "period_start": {
-                    "type": "string"
-                },
-                "rollover_mode": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.CreateDebtInstallmentRequest": {
-            "type": "object",
-            "properties": {
-                "amount_due": {
-                    "type": "string"
-                },
-                "amount_paid": {
-                    "type": "string"
-                },
-                "due_date": {
-                    "type": "string"
-                },
-                "installment_no": {
-                    "type": "integer"
-                },
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.CreateDebtPaymentRequest": {
-            "type": "object",
-            "properties": {
-                "interest_paid": {
-                    "type": "string"
-                },
-                "principal_paid": {
-                    "type": "string"
-                },
-                "transaction_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.CreateDebtRequest": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "client_id": {
-                    "type": "string"
-                },
-                "direction": {
-                    "type": "string"
-                },
-                "due_date": {
-                    "type": "string"
-                },
-                "interest_rate": {
-                    "type": "string"
-                },
-                "interest_rule": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "principal": {
-                    "type": "string"
-                },
-                "start_date": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.CreateInvestmentAccountRequest": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "broker_account_color": {
-                    "type": "string"
-                },
-                "broker_account_currency": {
-                    "type": "string"
-                },
-                "broker_account_name": {
-                    "type": "string"
-                },
-                "broker_account_number": {
-                    "type": "string"
-                },
-                "fee_settings": {},
-                "parent_account_id": {
-                    "type": "string"
-                },
-                "tax_settings": {}
-            }
-        },
-        "services.CreateRotatingSavingsContributionRequest": {
+        "rotatingsavings.CreateContributionRequest": {
             "type": "object",
             "properties": {
                 "account_id": {
@@ -4557,7 +3503,7 @@ const docTemplate = `{
                 }
             }
         },
-        "services.CreateRotatingSavingsGroupRequest": {
+        "rotatingsavings.CreateGroupRequest": {
             "type": "object",
             "properties": {
                 "account_id": {
@@ -4589,7 +3535,7 @@ const docTemplate = `{
                 }
             }
         },
-        "services.CreateSavingsInstrumentRequest": {
+        "savings.CreateRequest": {
             "type": "object",
             "properties": {
                 "accrued_interest": {
@@ -4627,137 +3573,7 @@ const docTemplate = `{
                 }
             }
         },
-        "services.CreateTagRequest": {
-            "type": "object",
-            "properties": {
-                "color": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.CreateTradeRequest": {
-            "type": "object",
-            "properties": {
-                "client_id": {
-                    "type": "string"
-                },
-                "fee_transaction_id": {
-                    "type": "string"
-                },
-                "fees": {
-                    "type": "string"
-                },
-                "note": {
-                    "type": "string"
-                },
-                "occurred_at": {
-                    "type": "string"
-                },
-                "occurred_date": {
-                    "type": "string"
-                },
-                "occurred_time": {
-                    "type": "string"
-                },
-                "price": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "string"
-                },
-                "security_id": {
-                    "type": "string"
-                },
-                "side": {
-                    "type": "string"
-                },
-                "tax_transaction_id": {
-                    "type": "string"
-                },
-                "taxes": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.CreateTransactionLineItemRequest": {
-            "type": "object",
-            "properties": {
-                "amount": {
-                    "type": "string"
-                },
-                "category_id": {
-                    "type": "string"
-                },
-                "note": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.MarketDataRateLimit": {
-            "type": "object",
-            "properties": {
-                "hour_reset_in_seconds": {
-                    "type": "number"
-                },
-                "minute_reset_in_seconds": {
-                    "type": "number"
-                },
-                "per_hour": {
-                    "type": "integer"
-                },
-                "per_minute": {
-                    "type": "integer"
-                },
-                "remaining_hour": {
-                    "type": "integer"
-                },
-                "remaining_minute": {
-                    "type": "integer"
-                },
-                "used_hour": {
-                    "type": "integer"
-                },
-                "used_minute": {
-                    "type": "integer"
-                }
-            }
-        },
-        "services.MarketDataSyncState": {
-            "type": "object",
-            "properties": {
-                "cooldown_seconds": {
-                    "type": "integer"
-                },
-                "last_error": {
-                    "type": "string"
-                },
-                "last_failure_at": {
-                    "type": "string"
-                },
-                "last_started_at": {
-                    "type": "string"
-                },
-                "last_status": {
-                    "type": "string"
-                },
-                "last_success_at": {
-                    "type": "string"
-                },
-                "min_interval_seconds": {
-                    "type": "integer"
-                },
-                "next_due_at": {
-                    "type": "string"
-                },
-                "sync_key": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.PatchSavingsInstrumentRequest": {
+        "savings.PatchRequest": {
             "type": "object",
             "properties": {
                 "accrued_interest": {
@@ -4786,7 +3602,114 @@ const docTemplate = `{
                 }
             }
         },
-        "services.PatchTransactionRequest": {
+        "tag.CreateTagRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "transaction.CreateBody": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "amount": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "counterparty": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "exchange_rate": {
+                    "type": "string"
+                },
+                "external_ref": {
+                    "type": "string"
+                },
+                "from_account_id": {
+                    "type": "string"
+                },
+                "from_amount": {
+                    "type": "string"
+                },
+                "line_items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/transaction.CreateLineItemRequest"
+                    }
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "occurred_date": {
+                    "type": "string"
+                },
+                "occurred_time": {
+                    "type": "string"
+                },
+                "tag_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "to_account_id": {
+                    "type": "string"
+                },
+                "to_amount": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "transaction.CreateLineItemRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                }
+            }
+        },
+        "transaction.ListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.Transaction"
+                    }
+                },
+                "next_cursor": {
+                    "type": "string"
+                }
+            }
+        },
+        "transaction.PatchRequest": {
             "type": "object",
             "properties": {
                 "counterparty": {
@@ -4796,51 +3719,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "notes": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.SigninRequest": {
-            "type": "object",
-            "properties": {
-                "login": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.SignupRequest": {
-            "type": "object",
-            "properties": {
-                "displayName": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                },
-                "phone": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.UpsertSecurityEventElectionRequest": {
-            "type": "object",
-            "properties": {
-                "elected_quantity": {
-                    "type": "string"
-                },
-                "note": {
-                    "type": "string"
-                },
-                "security_event_id": {
-                    "type": "string"
-                },
-                "status": {
                     "type": "string"
                 }
             }

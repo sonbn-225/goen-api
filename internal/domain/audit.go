@@ -2,12 +2,7 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"time"
-)
-
-var (
-	ErrAuditForbidden = errors.New("audit forbidden")
 )
 
 type AuditEvent struct {

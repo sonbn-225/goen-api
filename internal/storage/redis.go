@@ -2,11 +2,11 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 type Redis struct {
@@ -59,10 +59,10 @@ func (r *Redis) Probe(ctx context.Context) (map[string]any, error) {
 
 func (r *Redis) XAdd(ctx context.Context, stream string, values map[string]any) (string, error) {
 	if r == nil || r.client == nil {
-		return "", errors.New("redis not ready")
+		return "", apperrors.ErrRedisNotReady
 	}
 	if stream == "" {
-		return "", errors.New("stream is required")
+		return "", apperrors.ErrStreamRequired
 	}
 	return r.client.XAdd(ctx, &redis.XAddArgs{Stream: stream, Values: values}).Result()
 }
