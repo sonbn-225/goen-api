@@ -34,7 +34,7 @@ type Module struct {
 
 // ModuleDeps contains external dependencies required by the investment module.
 type ModuleDeps struct {
-	DB                 *storage.Postgres
+	Repo               domain.InvestmentRepository
 	Redis              *storage.Redis
 	Config             *config.Config
 	AccountService     AccountServiceDep
@@ -53,8 +53,7 @@ type TransactionServiceDep interface {
 
 // NewModule creates a new investment module with all dependencies wired.
 func NewModule(deps ModuleDeps) *Module {
-	repo := storage.NewInvestmentRepo(deps.DB)
-	svc := NewService(repo, deps.AccountService, deps.TransactionService, deps.Config, deps.Redis)
+	svc := NewService(deps.Repo, deps.AccountService, deps.TransactionService, deps.Config, deps.Redis)
 	h := NewHandler(svc)
 
 	return &Module{

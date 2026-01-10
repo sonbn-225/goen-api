@@ -3,7 +3,6 @@ package transaction
 
 import (
 	"github.com/sonbn-225/goen-api/internal/domain"
-	"github.com/sonbn-225/goen-api/internal/storage"
 )
 
 // Module represents the transaction module.
@@ -14,7 +13,6 @@ type Module struct {
 
 // ModuleDeps contains dependencies for the transaction module.
 type ModuleDeps struct {
-	DB   *storage.Postgres
 	Repo domain.TransactionRepository
 }
 

@@ -8,7 +8,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sonbn-225/goen-api/internal/config"
-	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/httpapi"
 	"github.com/sonbn-225/goen-api/internal/modules/account"
 	authMod "github.com/sonbn-225/goen-api/internal/modules/auth"
@@ -51,9 +50,12 @@ func New(cfg *config.Config) *App {
 	txRepo := storage.NewTransactionRepo(db)
 	budgetRepo := storage.NewBudgetRepo(db)
 	categoryRepo := storage.NewCategoryRepo(db)
+	tagRepo := storage.NewTagRepo(db)
+	userRepo := storage.NewUserRepo(db)
 	savingsRepo := storage.NewSavingsRepo(db)
 	rotatingSavingsRepo := storage.NewRotatingSavingsRepo(db)
 	debtRepo := storage.NewDebtRepo(db)
+	investmentRepo := storage.NewInvestmentRepo(db)
 
 	// Independent modules (no cross-module dependencies)
 	diagMod := diagnostics.NewModule(diagnostics.ModuleDeps{
@@ -63,21 +65,20 @@ func New(cfg *config.Config) *App {
 	})
 
 	authModule := authMod.NewModule(authMod.ModuleDeps{
-		DB:     db,
-		Config: cfg,
+		UserRepo: userRepo,
+		Config:   cfg,
 	})
 
 	categoryMod := category.NewModule(category.ModuleDeps{
-		DB: db,
+		Repo: categoryRepo,
 	})
 
 	tagMod := tag.NewModule(tag.ModuleDeps{
-		DB: db,
+		Repo: tagRepo,
 	})
 
 	// Transaction module
 	txMod := transaction.NewModule(transaction.ModuleDeps{
-		DB:   db,
 		Repo: txRepo,
 	})
 
@@ -90,55 +91,48 @@ func New(cfg *config.Config) *App {
 	// Account module (depends on audit)
 	auditSvc := &auditServiceAdapter{repo: auditRepo}
 	accountMod := account.NewModule(account.ModuleDeps{
-		DB:           db,
 		AccountRepo:  accountRepo,
-		UserRepo:     storage.NewUserRepo(db),
+		UserRepo:     userRepo,
 		AuditService: auditSvc,
 	})
-
-	// Adapters for cross-module dependencies
-	accountAdapter := &accountServiceAdapter{svc: accountMod.Service}
-	txAdapter := &txServiceAdapter{svc: txMod.Service}
 
 	// Savings module (depends on account and transaction services)
 	savingsMod := savings.NewModule(savings.ModuleDeps{
 		Repo:       savingsRepo,
-		AccountSvc: accountAdapter,
-		TxSvc:      txAdapter,
+		AccountSvc: accountMod.Service,
+		TxSvc:      txMod.Service,
 	})
 
 	// Debt module (depends on transaction service)
 	debtMod := debt.NewModule(debt.ModuleDeps{
 		Repo:  debtRepo,
-		TxSvc: txAdapter,
+		TxSvc: txMod.Service,
 	})
 
 	// Rotating Savings module (depends on account repo and transaction service)
-	// Use context-aware adapter for rotating savings
 	rotTxAdapter := &rotTxServiceAdapter{svc: txMod.Service}
 	rotMod := rotatingsavings.NewModule(rotatingsavings.ModuleDeps{
-		DB:          db,
 		Repo:        rotatingSavingsRepo,
 		AccountRepo: accountRepo,
 		TxSvc:       rotTxAdapter,
 	})
 
 	// Investment module (depends on account and transaction services)
+	investAccountAdapter := &investmentAccountServiceAdapter{svc: accountMod.Service}
 	investMod := investment.NewModule(investment.ModuleDeps{
-		DB:                 db,
+		Repo:               investmentRepo,
 		Redis:              redis,
 		Config:             cfg,
-		AccountService:     accountAdapter,
-		TransactionService: txAdapter,
+		AccountService:     investAccountAdapter,
+		TransactionService: txMod.Service,
 	})
 
 	// Market Data module (depends on investment service)
-	investAdapter := &investmentServiceAdapter{svc: investMod.Service}
 	marketDataMod := marketdata.NewModule(marketdata.ModuleDeps{
 		Cfg:       cfg,
-		DB:        db,
 		Redis:     redis,
-		InvestSvc: investAdapter,
+		Repo:      marketdata.NewPostgresRepo(db),
+		InvestSvc: investMod.Service,
 	})
 
 	// Create router
@@ -245,107 +239,4 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 	})
 
 	return r
-}
-
-// Adapters for cross-module communication
-
-type auditServiceAdapter struct {
-	repo domain.AuditRepository
-}
-
-func (a *auditServiceAdapter) ListAuditEvents(ctx interface{}, userID, accountID string, limit int) ([]domain.AuditEvent, error) {
-	c, ok := ctx.(context.Context)
-	if !ok {
-		return nil, nil
-	}
-	return a.repo.ListAuditEventsForAccount(c, userID, accountID, limit)
-}
-
-type accountServiceAdapter struct {
-	svc *account.Service
-}
-
-func (a *accountServiceAdapter) Create(ctx interface{}, userID string, req interface{}) (*domain.Account, error) {
-	c, ok := ctx.(context.Context)
-	if !ok {
-		return nil, nil
-	}
-	switch r := req.(type) {
-	case account.CreateAccountRequest:
-		return a.svc.Create(c, userID, r)
-	default:
-		return nil, nil
-	}
-}
-
-func (a *accountServiceAdapter) Get(ctx interface{}, userID, accountID string) (*domain.Account, error) {
-	c, ok := ctx.(context.Context)
-	if !ok {
-		return nil, nil
-	}
-	return a.svc.Get(c, userID, accountID)
-}
-
-func (a *accountServiceAdapter) Delete(ctx interface{}, userID, accountID string) error {
-	c, ok := ctx.(context.Context)
-	if !ok {
-		return nil
-	}
-	return a.svc.Delete(c, userID, accountID)
-}
-
-func (a *accountServiceAdapter) GetAccountByID(ctx context.Context, userID, accountID string) (*domain.Account, error) {
-	return a.svc.Get(ctx, userID, accountID)
-}
-
-type txServiceAdapter struct {
-	svc *transaction.Service
-}
-
-func (t *txServiceAdapter) Create(ctx interface{}, userID string, req interface{}) (*domain.Transaction, error) {
-	c, ok := ctx.(context.Context)
-	if !ok {
-		return nil, nil
-	}
-	switch r := req.(type) {
-	case transaction.CreateRequest:
-		return t.svc.Create(c, userID, r)
-	default:
-		return nil, nil
-	}
-}
-
-func (t *txServiceAdapter) Get(ctx interface{}, userID, transactionID string) (*domain.Transaction, error) {
-	c, ok := ctx.(context.Context)
-	if !ok {
-		return nil, nil
-	}
-	return t.svc.Get(c, userID, transactionID)
-}
-
-// rotTxServiceAdapter for rotatingsavings which expects context.Context
-type rotTxServiceAdapter struct {
-	svc *transaction.Service
-}
-
-func (t *rotTxServiceAdapter) Create(ctx context.Context, userID string, req interface{}) (*domain.Transaction, error) {
-	switch r := req.(type) {
-	case transaction.CreateRequest:
-		return t.svc.Create(ctx, userID, r)
-	default:
-		return nil, nil
-	}
-}
-
-type investmentServiceAdapter struct {
-	svc *investment.Service
-}
-
-func (i *investmentServiceAdapter) GetSecurity(ctx interface{}, userID, securityID string) (interface{}, error) {
-	c, ok := ctx.(context.Context)
-	if !ok {
-		return nil, nil
-	}
-	// investment.Service.GetSecurity only takes ctx and securityID
-	return i.svc.GetSecurity(c, securityID)
 }
