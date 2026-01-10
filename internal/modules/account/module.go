@@ -2,8 +2,9 @@
 package account
 
 import (
+	"context"
+
 	"github.com/sonbn-225/goen-api/internal/domain"
-	"github.com/sonbn-225/goen-api/internal/storage"
 )
 
 // Module represents the account module.
@@ -14,7 +15,6 @@ type Module struct {
 
 // ModuleDeps contains dependencies for the account module.
 type ModuleDeps struct {
-	DB           *storage.Postgres
 	AccountRepo  domain.AccountRepository
 	UserRepo     domain.UserRepository
 	AuditService AuditServiceInterface
@@ -22,7 +22,7 @@ type ModuleDeps struct {
 
 // AuditServiceInterface defines the audit service contract needed by account handlers.
 type AuditServiceInterface interface {
-	ListAuditEvents(ctx interface{}, userID, accountID string, limit int) ([]domain.AuditEvent, error)
+	ListAuditEvents(ctx context.Context, userID, accountID string, limit int) ([]domain.AuditEvent, error)
 }
 
 // NewModule creates a new account module.

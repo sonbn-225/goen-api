@@ -2,7 +2,6 @@ package marketdata
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -70,14 +69,14 @@ type GlobalStatus struct {
 // Service handles market data business logic.
 type Service struct {
 	cfg       *config.Config
-	db        *storage.Postgres
+	repo      Repository
 	redis     *storage.Redis
 	investSvc InvestmentServiceInterface
 }
 
 // NewService creates a new market data service.
-func NewService(cfg *config.Config, db *storage.Postgres, redis *storage.Redis, investSvc InvestmentServiceInterface) *Service {
-	return &Service{cfg: cfg, db: db, redis: redis, investSvc: investSvc}
+func NewService(cfg *config.Config, repo Repository, redis *storage.Redis, investSvc InvestmentServiceInterface) *Service {
+	return &Service{cfg: cfg, repo: repo, redis: redis, investSvc: investSvc}
 }
 
 func (s *Service) mapInvestmentError(err error) error {
@@ -99,7 +98,7 @@ func (s *Service) EnqueueSecurityPricesDaily(ctx context.Context, userID, securi
 		return RefreshOneResponse{}, apperrors.DependencyUnavailable("redis is not configured")
 	}
 
-	if _, err := s.investSvc.GetSecurity(ctx, userID, securityID); err != nil {
+	if _, err := s.investSvc.GetSecurity(ctx, securityID); err != nil {
 		return RefreshOneResponse{}, s.mapInvestmentError(err)
 	}
 
@@ -135,7 +134,7 @@ func (s *Service) EnqueueSecurityEvents(ctx context.Context, userID, securityID,
 		return RefreshOneResponse{}, apperrors.DependencyUnavailable("redis is not configured")
 	}
 
-	if _, err := s.investSvc.GetSecurity(ctx, userID, securityID); err != nil {
+	if _, err := s.investSvc.GetSecurity(ctx, securityID); err != nil {
 		return RefreshOneResponse{}, s.mapInvestmentError(err)
 	}
 
@@ -188,8 +187,8 @@ func (s *Service) EnqueueBySymbol(ctx context.Context, userID, symbol string, in
 	if s.redis == nil {
 		return RefreshManyResponse{}, apperrors.DependencyUnavailable("redis is not configured")
 	}
-	if s.db == nil {
-		return RefreshManyResponse{}, apperrors.DependencyUnavailable("postgres is not configured")
+	if s.repo == nil {
+		return RefreshManyResponse{}, apperrors.DependencyUnavailable("market data repository is not configured")
 	}
 
 	sym := strings.ToUpper(strings.TrimSpace(symbol))
@@ -197,7 +196,7 @@ func (s *Service) EnqueueBySymbol(ctx context.Context, userID, symbol string, in
 		return RefreshManyResponse{}, apperrors.Validation("symbol is required", map[string]any{"field": "symbol"})
 	}
 
-	idsBySymbol, err := s.loadSecurityIDsBySymbols(ctx, []string{sym})
+	idsBySymbol, err := s.repo.LoadSecurityIDsBySymbols(ctx, []string{sym})
 	if err != nil {
 		return RefreshManyResponse{}, err
 	}
@@ -214,8 +213,8 @@ func (s *Service) EnqueueBySymbols(ctx context.Context, userID string, symbols [
 	if s.redis == nil {
 		return RefreshManyResponse{}, apperrors.DependencyUnavailable("redis is not configured")
 	}
-	if s.db == nil {
-		return RefreshManyResponse{}, apperrors.DependencyUnavailable("postgres is not configured")
+	if s.repo == nil {
+		return RefreshManyResponse{}, apperrors.DependencyUnavailable("market data repository is not configured")
 	}
 	if len(symbols) == 0 {
 		return RefreshManyResponse{}, apperrors.Validation("symbols is required", map[string]any{"field": "symbols"})
@@ -238,7 +237,7 @@ func (s *Service) EnqueueBySymbols(ctx context.Context, userID string, symbols [
 		return RefreshManyResponse{}, apperrors.Validation("symbols is required", map[string]any{"field": "symbols"})
 	}
 
-	idsBySymbol, err := s.loadSecurityIDsBySymbols(ctx, cleaned)
+	idsBySymbol, err := s.repo.LoadSecurityIDsBySymbols(ctx, cleaned)
 	if err != nil {
 		return RefreshManyResponse{}, err
 	}
@@ -268,15 +267,15 @@ func (s *Service) EnqueueBySymbols(ctx context.Context, userID string, symbols [
 
 // GetSecurityStatus returns market data sync status for a security.
 func (s *Service) GetSecurityStatus(ctx context.Context, userID, securityID string) (SecurityStatus, error) {
-	if _, err := s.investSvc.GetSecurity(ctx, userID, securityID); err != nil {
+	if _, err := s.investSvc.GetSecurity(ctx, securityID); err != nil {
 		return SecurityStatus{}, s.mapInvestmentError(err)
 	}
 
-	prices, err := s.loadSyncState(ctx, "vnstock.prices_daily:"+securityID)
+	prices, err := s.repo.LoadSyncState(ctx, "vnstock.prices_daily:"+securityID)
 	if err != nil {
 		return SecurityStatus{}, err
 	}
-	events, err := s.loadSyncState(ctx, "vnstock.security_events:"+securityID)
+	events, err := s.repo.LoadSyncState(ctx, "vnstock.security_events:"+securityID)
 	if err != nil {
 		return SecurityStatus{}, err
 	}
@@ -288,7 +287,7 @@ func (s *Service) GetSecurityStatus(ctx context.Context, userID, securityID stri
 
 // GetGlobalStatus returns global market data sync status.
 func (s *Service) GetGlobalStatus(ctx context.Context, _ string) (GlobalStatus, error) {
-	marketSync, err := s.loadSyncState(ctx, "vnstock.market_sync")
+	marketSync, err := s.repo.LoadSyncState(ctx, "vnstock.market_sync")
 	if err != nil {
 		return GlobalStatus{}, err
 	}
@@ -336,98 +335,6 @@ func (s *Service) enqueueJobsForSecurityID(ctx context.Context, userID, security
 	}
 
 	return RefreshManyResponse{Stream: stream, Enqueued: enqueued, MessageIDs: messageIDs}, nil
-}
-
-func (s *Service) loadSecurityIDsBySymbols(ctx context.Context, symbols []string) (map[string]string, error) {
-	if s.db == nil {
-		return nil, nil
-	}
-	pool, err := s.db.Pool(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if pool == nil {
-		return nil, nil
-	}
-
-	rows, err := pool.Query(ctx, `
-		SELECT symbol, id
-		FROM securities
-		WHERE symbol = ANY($1)
-	`, symbols)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := map[string]string{}
-	for rows.Next() {
-		var sym, id string
-		if err := rows.Scan(&sym, &id); err != nil {
-			return nil, err
-		}
-		out[strings.ToUpper(strings.TrimSpace(sym))] = id
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (s *Service) loadSyncState(ctx context.Context, syncKey string) (*SyncState, error) {
-	if s.db == nil {
-		return nil, nil
-	}
-	pool, err := s.db.Pool(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if pool == nil {
-		return nil, nil
-	}
-
-	var (
-		minIntervalSeconds int
-		lastStartedAt      *time.Time
-		lastSuccessAt      *time.Time
-		lastFailureAt      *time.Time
-		lastStatus         string
-		lastError          *string
-	)
-
-	err = pool.QueryRow(ctx, `
-		SELECT min_interval_seconds, last_started_at, last_success_at, last_failure_at, last_status, last_error
-		FROM market_data_sync_states
-		WHERE sync_key = $1
-	`, syncKey).Scan(&minIntervalSeconds, &lastStartedAt, &lastSuccessAt, &lastFailureAt, &lastStatus, &lastError)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	st := &SyncState{
-		SyncKey:            syncKey,
-		MinIntervalSeconds: minIntervalSeconds,
-		LastStartedAt:      lastStartedAt,
-		LastSuccessAt:      lastSuccessAt,
-		LastFailureAt:      lastFailureAt,
-		LastStatus:         lastStatus,
-		LastError:          lastError,
-	}
-
-	if lastSuccessAt != nil {
-		next := lastSuccessAt.Add(time.Duration(minIntervalSeconds) * time.Second)
-		st.NextDueAt = &next
-		cd := int(time.Until(next).Seconds())
-		if cd < 0 {
-			cd = 0
-		}
-		st.CooldownSeconds = cd
-	}
-
-	return st, nil
 }
 
 func (s *Service) fetchRateLimit(ctx context.Context) (*RateLimit, error) {

@@ -2,8 +2,9 @@
 package category
 
 import (
+	"context"
+
 	"github.com/sonbn-225/goen-api/internal/domain"
-	"github.com/sonbn-225/goen-api/internal/storage"
 )
 
 // Module represents the category module.
@@ -14,13 +15,12 @@ type Module struct {
 
 // ModuleDeps contains dependencies for the category module.
 type ModuleDeps struct {
-	DB *storage.Postgres
+	Repo domain.CategoryRepository
 }
 
 // NewModule creates a new category module.
 func NewModule(deps ModuleDeps) *Module {
-	repo := storage.NewCategoryRepo(deps.DB)
-	svc := NewService(repo)
+	svc := NewService(deps.Repo)
 	h := NewHandler(svc)
 
 	return &Module{
@@ -31,6 +31,6 @@ func NewModule(deps ModuleDeps) *Module {
 
 // ServiceInterface defines the category service contract.
 type ServiceInterface interface {
-	Get(ctx interface{}, userID, categoryID string) (*domain.Category, error)
-	List(ctx interface{}, userID string) ([]domain.Category, error)
+	Get(ctx context.Context, userID, categoryID string) (*domain.Category, error)
+	List(ctx context.Context, userID string) ([]domain.Category, error)
 }
