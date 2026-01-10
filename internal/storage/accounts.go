@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 type AccountRepo struct {
@@ -21,7 +22,7 @@ func NewAccountRepo(db *Postgres) *AccountRepo {
 
 func (r *AccountRepo) CreateAccountWithOwner(ctx context.Context, account domain.Account, ownerUserID string) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -100,7 +101,7 @@ func (r *AccountRepo) CreateAccountWithOwner(ctx context.Context, account domain
 
 func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID string) ([]domain.Account, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -150,7 +151,7 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID string) ([
 
 func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID string, accountID string) (*domain.Account, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -185,7 +186,7 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID string, acco
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrAccountNotFound
+			return nil, apperrors.ErrAccountNotFound
 		}
 		return nil, err
 	}
@@ -194,10 +195,10 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID string, acco
 
 func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID string, accountID string, patch domain.AccountPatch) (*domain.Account, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	if strings.TrimSpace(accountID) == "" {
-		return nil, domain.ErrAccountInvalidInput
+		return nil, apperrors.ErrAccountInvalidInput
 	}
 
 	pool, err := r.db.Pool(ctx)
@@ -222,7 +223,7 @@ func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID string, acco
 		if patch.Name != nil {
 			name = strings.TrimSpace(*patch.Name)
 			if name == "" {
-				return domain.ErrAccountInvalidInput
+				return apperrors.ErrAccountInvalidInput
 			}
 		}
 
@@ -232,7 +233,7 @@ func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID string, acco
 		if patch.Status != nil {
 			s := strings.TrimSpace(*patch.Status)
 			if s != "active" && s != "closed" {
-				return domain.ErrAccountInvalidInput
+				return apperrors.ErrAccountInvalidInput
 			}
 			status = s
 			if status == "closed" {
@@ -267,7 +268,7 @@ func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID string, acco
 			return err
 		}
 		if ct.RowsAffected() == 0 {
-			return domain.ErrAccountNotFound
+			return apperrors.ErrAccountNotFound
 		}
 
 		updated, err := r.GetAccountForUser(ctx, actorUserID, accountID)
@@ -286,10 +287,10 @@ func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID string, acco
 
 func (r *AccountRepo) DeleteAccount(ctx context.Context, actorUserID string, accountID string) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	if strings.TrimSpace(accountID) == "" {
-		return domain.ErrAccountInvalidInput
+		return apperrors.ErrAccountInvalidInput
 	}
 
 	pool, err := r.db.Pool(ctx)
@@ -314,7 +315,7 @@ func (r *AccountRepo) DeleteAccount(ctx context.Context, actorUserID string, acc
 			return err
 		}
 		if ct.RowsAffected() == 0 {
-			return domain.ErrAccountNotFound
+			return apperrors.ErrAccountNotFound
 		}
 		return nil
 	})
@@ -322,7 +323,7 @@ func (r *AccountRepo) DeleteAccount(ctx context.Context, actorUserID string, acc
 
 func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID string) ([]domain.AccountBalance, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -373,7 +374,7 @@ func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID str
 
 func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID string, accountID string) ([]domain.AccountShare, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -433,17 +434,17 @@ func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID string,
 
 func (r *AccountRepo) UpsertAccountShare(ctx context.Context, actorUserID string, accountID string, targetUserID string, permission string) (*domain.AccountShare, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	permission = strings.TrimSpace(permission)
 	if permission != "viewer" && permission != "editor" {
-		return nil, domain.ErrAccountShareInvalidInput
+		return nil, apperrors.ErrAccountShareInvalidInput
 	}
 	if strings.TrimSpace(accountID) == "" || strings.TrimSpace(targetUserID) == "" {
-		return nil, domain.ErrAccountShareInvalidInput
+		return nil, apperrors.ErrAccountShareInvalidInput
 	}
 	if targetUserID == actorUserID {
-		return nil, domain.ErrAccountShareInvalidInput
+		return nil, apperrors.ErrAccountShareInvalidInput
 	}
 
 	pool, err := r.db.Pool(ctx)
@@ -468,7 +469,7 @@ func (r *AccountRepo) UpsertAccountShare(ctx context.Context, actorUserID string
 		`, accountID, targetUserID).Scan(&existingPerm)
 		if err == nil {
 			if existingPerm == "owner" {
-				return domain.ErrAccountShareInvalidInput
+				return apperrors.ErrAccountShareInvalidInput
 			}
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
@@ -526,13 +527,13 @@ func (r *AccountRepo) UpsertAccountShare(ctx context.Context, actorUserID string
 
 func (r *AccountRepo) RevokeAccountShare(ctx context.Context, actorUserID string, accountID string, targetUserID string) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	if strings.TrimSpace(accountID) == "" || strings.TrimSpace(targetUserID) == "" {
-		return domain.ErrAccountShareInvalidInput
+		return apperrors.ErrAccountShareInvalidInput
 	}
 	if targetUserID == actorUserID {
-		return domain.ErrAccountShareInvalidInput
+		return apperrors.ErrAccountShareInvalidInput
 	}
 
 	pool, err := r.db.Pool(ctx)
@@ -560,7 +561,7 @@ func (r *AccountRepo) RevokeAccountShare(ctx context.Context, actorUserID string
 			return err
 		}
 		if perm == "owner" {
-			return domain.ErrAccountShareInvalidInput
+			return apperrors.ErrAccountShareInvalidInput
 		}
 
 		_, err = tx.Exec(ctx, `
@@ -593,40 +594,9 @@ func requireAccountOwner(ctx context.Context, tx pgx.Tx, actorUserID string, acc
 	`, actorUserID, accountID).Scan(&one)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.ErrAccountShareForbidden
+			return apperrors.ErrAccountShareForbidden
 		}
 		return err
 	}
 	return nil
-}
-
-func requireAccountOwnerForAccount(ctx context.Context, tx pgx.Tx, actorUserID string, accountID string) error {
-	var one int
-	err := tx.QueryRow(ctx, `
-		SELECT 1
-		FROM user_accounts ua
-		WHERE ua.user_id = $1 AND ua.account_id = $2 AND ua.status = 'active' AND ua.permission = 'owner'
-	`, actorUserID, accountID).Scan(&one)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.ErrAccountForbidden
-		}
-		return err
-	}
-	return nil
-}
-
-func withTx(ctx context.Context, pool interface {
-	Begin(ctx context.Context) (pgx.Tx, error)
-}, fn func(tx pgx.Tx) error) error {
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	if err := fn(tx); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
 }

@@ -2,26 +2,20 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"time"
 )
 
-var (
-	ErrAccountShareForbidden    = errors.New("account share forbidden")
-	ErrAccountShareInvalidInput = errors.New("invalid account share input")
-)
-
 type AccountShare struct {
-	ID          string     `json:"id"`
-	AccountID   string     `json:"account_id"`
-	UserID      string     `json:"user_id"`
-	Permission  string     `json:"permission"`
-	Status      string     `json:"status"`
-	RevokedAt   *time.Time `json:"revoked_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	CreatedBy   *string    `json:"created_by,omitempty"`
-	UpdatedBy   *string    `json:"updated_by,omitempty"`
+	ID         string     `json:"id"`
+	AccountID  string     `json:"account_id"`
+	UserID     string     `json:"user_id"`
+	Permission string     `json:"permission"`
+	Status     string     `json:"status"`
+	RevokedAt  *time.Time `json:"revoked_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+	CreatedBy  *string    `json:"created_by,omitempty"`
+	UpdatedBy  *string    `json:"updated_by,omitempty"`
 
 	UserEmail       *string `json:"user_email,omitempty"`
 	UserPhone       *string `json:"user_phone,omitempty"`

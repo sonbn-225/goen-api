@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 type SavingsRepo struct {
@@ -19,7 +20,7 @@ func NewSavingsRepo(db *Postgres) *SavingsRepo {
 
 func (r *SavingsRepo) CreateSavingsInstrument(ctx context.Context, userID string, s domain.SavingsInstrument) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -53,7 +54,7 @@ func (r *SavingsRepo) CreateSavingsInstrument(ctx context.Context, userID string
 
 func (r *SavingsRepo) GetSavingsInstrument(ctx context.Context, userID string, savingsInstrumentID string) (*domain.SavingsInstrument, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -105,7 +106,7 @@ func (r *SavingsRepo) GetSavingsInstrument(ctx context.Context, userID string, s
 		&s.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrSavingsInstrumentNotFound
+			return nil, apperrors.ErrSavingsInstrumentNotFound
 		}
 		return nil, err
 	}
@@ -129,7 +130,7 @@ func (r *SavingsRepo) GetSavingsInstrument(ctx context.Context, userID string, s
 
 func (r *SavingsRepo) ListSavingsInstruments(ctx context.Context, userID string) ([]domain.SavingsInstrument, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -213,7 +214,7 @@ func (r *SavingsRepo) ListSavingsInstruments(ctx context.Context, userID string)
 
 func (r *SavingsRepo) UpdateSavingsInstrument(ctx context.Context, userID string, s domain.SavingsInstrument) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -254,14 +255,14 @@ func (r *SavingsRepo) UpdateSavingsInstrument(ctx context.Context, userID string
 		return err
 	}
 	if cmd.RowsAffected() == 0 {
-		return domain.ErrSavingsInstrumentNotFound
+		return apperrors.ErrSavingsInstrumentNotFound
 	}
 	return nil
 }
 
 func (r *SavingsRepo) DeleteSavingsInstrument(ctx context.Context, userID string, savingsInstrumentID string) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -278,7 +279,7 @@ func (r *SavingsRepo) DeleteSavingsInstrument(ctx context.Context, userID string
 		return err
 	}
 	if cmd.RowsAffected() == 0 {
-		return domain.ErrSavingsInstrumentNotFound
+		return apperrors.ErrSavingsInstrumentNotFound
 	}
 	return nil
 }

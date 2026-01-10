@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 type DebtRepo struct {
@@ -19,10 +20,10 @@ func NewDebtRepo(db *Postgres) *DebtRepo {
 
 func (r *DebtRepo) CreateDebt(ctx context.Context, debt domain.Debt) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	if debt.AccountID == nil || *debt.AccountID == "" {
-		return domain.ErrAccountInvalidInput
+		return apperrors.ErrAccountInvalidInput
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -73,18 +74,18 @@ func (r *DebtRepo) CreateDebt(ctx context.Context, debt domain.Debt) error {
 		var exists bool
 		if err := pool.QueryRow(ctx, `SELECT TRUE FROM accounts WHERE id = $1`, *debt.AccountID).Scan(&exists); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return domain.ErrAccountNotFound
+				return apperrors.ErrAccountNotFound
 			}
 			return err
 		}
-		return domain.ErrAccountForbidden
+		return apperrors.ErrAccountForbidden
 	}
 	return nil
 }
 
 func (r *DebtRepo) GetDebt(ctx context.Context, userID string, debtID string) (*domain.Debt, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -138,7 +139,7 @@ func (r *DebtRepo) GetDebt(ctx context.Context, userID string, debtID string) (*
 		&d.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrDebtNotFound
+			return nil, apperrors.ErrDebtNotFound
 		}
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func (r *DebtRepo) GetDebt(ctx context.Context, userID string, debtID string) (*
 
 func (r *DebtRepo) ListDebts(ctx context.Context, userID string) ([]domain.Debt, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -219,7 +220,7 @@ func (r *DebtRepo) ListDebts(ctx context.Context, userID string) ([]domain.Debt,
 
 func (r *DebtRepo) CreatePaymentLink(ctx context.Context, userID string, link domain.DebtPaymentLink, newOutstandingPrincipal string, newAccruedInterest string, newStatus string, closedAt *time.Time) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -231,7 +232,7 @@ func (r *DebtRepo) CreatePaymentLink(ctx context.Context, userID string, link do
 		var exists bool
 		if err := dbtx.QueryRow(ctx, `SELECT TRUE FROM debts WHERE id = $1 AND user_id = $2`, link.DebtID, userID).Scan(&exists); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return domain.ErrDebtNotFound
+				return apperrors.ErrDebtNotFound
 			}
 			return err
 		}
@@ -259,7 +260,7 @@ func (r *DebtRepo) CreatePaymentLink(ctx context.Context, userID string, link do
 
 func (r *DebtRepo) ListPaymentLinks(ctx context.Context, userID string, debtID string) ([]domain.DebtPaymentLink, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -301,7 +302,7 @@ func (r *DebtRepo) ListPaymentLinks(ctx context.Context, userID string, debtID s
 
 func (r *DebtRepo) ListPaymentLinksByTransaction(ctx context.Context, userID string, transactionID string) ([]domain.DebtPaymentLink, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -339,7 +340,7 @@ func (r *DebtRepo) ListPaymentLinksByTransaction(ctx context.Context, userID str
 
 func (r *DebtRepo) CreateInstallment(ctx context.Context, userID string, inst domain.DebtInstallment) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -360,7 +361,7 @@ func (r *DebtRepo) CreateInstallment(ctx context.Context, userID string, inst do
 
 func (r *DebtRepo) ListInstallments(ctx context.Context, userID string, debtID string) ([]domain.DebtInstallment, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {

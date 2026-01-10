@@ -2,27 +2,22 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"time"
 )
 
-var (
-	ErrRotatingSavingsGroupNotFound = errors.New("rotating savings group not found")
-)
-
 type RotatingSavingsGroup struct {
-	ID                 string   `json:"id"`
-	UserID             string   `json:"user_id"`
-	SelfLabel          *string  `json:"self_label,omitempty"`
-	AccountID          string   `json:"account_id"`
-	Name               string   `json:"name"`
-	Currency           string   `json:"currency"`
-	MemberCount        int      `json:"member_count"`
-	ContributionAmount string   `json:"contribution_amount"`
-	EarlyPayoutFeeRate *string  `json:"early_payout_fee_rate,omitempty"`
-	CycleFrequency     string   `json:"cycle_frequency"`
-	StartDate          string   `json:"start_date"`
-	Status             string   `json:"status"`
+	ID                 string    `json:"id"`
+	UserID             string    `json:"user_id"`
+	SelfLabel          *string   `json:"self_label,omitempty"`
+	AccountID          string    `json:"account_id"`
+	Name               string    `json:"name"`
+	Currency           string    `json:"currency"`
+	MemberCount        int       `json:"member_count"`
+	ContributionAmount string    `json:"contribution_amount"`
+	EarlyPayoutFeeRate *string   `json:"early_payout_fee_rate,omitempty"`
+	CycleFrequency     string    `json:"cycle_frequency"`
+	StartDate          string    `json:"start_date"`
+	Status             string    `json:"status"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }

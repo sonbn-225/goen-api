@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 type InvestmentRepo struct {
@@ -21,7 +22,7 @@ func NewInvestmentRepo(db *Postgres) *InvestmentRepo {
 
 func (r *InvestmentRepo) CreateInvestmentAccount(ctx context.Context, userID string, ia domain.InvestmentAccount) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -51,14 +52,14 @@ func (r *InvestmentRepo) CreateInvestmentAccount(ctx context.Context, userID str
 		return err
 	}
 	if cmd.RowsAffected() == 0 {
-		return domain.ErrInvestmentForbidden
+		return apperrors.ErrInvestmentForbidden
 	}
 	return nil
 }
 
 func (r *InvestmentRepo) GetInvestmentAccount(ctx context.Context, userID string, investmentAccountID string) (*domain.InvestmentAccount, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -78,7 +79,7 @@ func (r *InvestmentRepo) GetInvestmentAccount(ctx context.Context, userID string
 	var taxSettings any
 	if err := row.Scan(&out.ID, &out.AccountID, &out.Currency, &feeSettings, &taxSettings, &out.CreatedAt, &out.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrInvestmentAccountNotFound
+			return nil, apperrors.ErrInvestmentAccountNotFound
 		}
 		return nil, err
 	}
@@ -93,7 +94,7 @@ func (r *InvestmentRepo) GetInvestmentAccount(ctx context.Context, userID string
 
 func (r *InvestmentRepo) ListInvestmentAccounts(ctx context.Context, userID string) ([]domain.InvestmentAccount, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -134,7 +135,7 @@ func (r *InvestmentRepo) ListInvestmentAccounts(ctx context.Context, userID stri
 
 func (r *InvestmentRepo) GetSecurity(ctx context.Context, securityID string) (*domain.Security, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -150,7 +151,7 @@ func (r *InvestmentRepo) GetSecurity(ctx context.Context, securityID string) (*d
 	var s domain.Security
 	if err := row.Scan(&s.ID, &s.Symbol, &s.Name, &s.AssetClass, &s.Currency, &s.CreatedAt, &s.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrSecurityNotFound
+			return nil, apperrors.ErrSecurityNotFound
 		}
 		return nil, err
 	}
@@ -159,7 +160,7 @@ func (r *InvestmentRepo) GetSecurity(ctx context.Context, securityID string) (*d
 
 func (r *InvestmentRepo) ListSecurities(ctx context.Context) ([]domain.Security, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -189,7 +190,7 @@ func (r *InvestmentRepo) ListSecurities(ctx context.Context) ([]domain.Security,
 
 func (r *InvestmentRepo) ListSecurityPrices(ctx context.Context, securityID string, from *string, to *string) ([]domain.SecurityPriceDaily, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -243,7 +244,7 @@ func (r *InvestmentRepo) ListSecurityPrices(ctx context.Context, securityID stri
 
 func (r *InvestmentRepo) ListSecurityEvents(ctx context.Context, securityID string, from *string, to *string) ([]domain.SecurityEvent, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -306,7 +307,7 @@ func (r *InvestmentRepo) ListSecurityEvents(ctx context.Context, securityID stri
 
 func (r *InvestmentRepo) GetSecurityEvent(ctx context.Context, securityEventID string) (*domain.SecurityEvent, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -343,7 +344,7 @@ func (r *InvestmentRepo) GetSecurityEvent(ctx context.Context, securityEventID s
 		&e.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrSecurityEventNotFound
+			return nil, apperrors.ErrSecurityEventNotFound
 		}
 		return nil, err
 	}
@@ -360,7 +361,7 @@ func (r *InvestmentRepo) GetSecurityEvent(ctx context.Context, securityEventID s
 
 func (r *InvestmentRepo) UpsertSecurityEventElection(ctx context.Context, userID string, e domain.SecurityEventElection) (*domain.SecurityEventElection, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -416,7 +417,7 @@ func (r *InvestmentRepo) UpsertSecurityEventElection(ctx context.Context, userID
 		&out.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrInvestmentForbidden
+			return nil, apperrors.ErrInvestmentForbidden
 		}
 		return nil, err
 	}
@@ -428,7 +429,7 @@ func (r *InvestmentRepo) UpsertSecurityEventElection(ctx context.Context, userID
 
 func (r *InvestmentRepo) ListSecurityEventElections(ctx context.Context, userID string, brokerAccountID string, status *string) ([]domain.SecurityEventElection, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -488,7 +489,7 @@ func (r *InvestmentRepo) ListSecurityEventElections(ctx context.Context, userID 
 
 func (r *InvestmentRepo) CreateTrade(ctx context.Context, userID string, t domain.Trade) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -515,14 +516,14 @@ func (r *InvestmentRepo) CreateTrade(ctx context.Context, userID string, t domai
 		return err
 	}
 	if cmd.RowsAffected() == 0 {
-		return domain.ErrInvestmentForbidden
+		return apperrors.ErrInvestmentForbidden
 	}
 	return nil
 }
 
 func (r *InvestmentRepo) ListTrades(ctx context.Context, userID string, brokerAccountID string) ([]domain.Trade, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -574,7 +575,7 @@ func (r *InvestmentRepo) ListTrades(ctx context.Context, userID string, brokerAc
 
 func (r *InvestmentRepo) ListHoldings(ctx context.Context, userID string, brokerAccountID string) ([]domain.Holding, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -630,7 +631,7 @@ func (r *InvestmentRepo) ListHoldings(ctx context.Context, userID string, broker
 
 func (r *InvestmentRepo) GetHolding(ctx context.Context, userID string, brokerAccountID string, securityID string) (*domain.Holding, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -667,7 +668,7 @@ func (r *InvestmentRepo) GetHolding(ctx context.Context, userID string, brokerAc
 		&h.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrHoldingNotFound
+			return nil, apperrors.ErrHoldingNotFound
 		}
 		return nil, err
 	}
@@ -685,25 +686,6 @@ func nullStringPtr(ns sql.NullString) *string {
 		return nil
 	}
 	v := strings.TrimSpace(ns.String)
-	if v == "" {
-		return nil
-	}
-	return &v
-}
-
-func nullTimeToDatePtr(nt sql.NullTime) *string {
-	if !nt.Valid {
-		return nil
-	}
-	v := nt.Time.UTC().Format("2006-01-02")
-	return &v
-}
-
-func normalizeOptionalString(s *string) *string {
-	if s == nil {
-		return nil
-	}
-	v := strings.TrimSpace(*s)
 	if v == "" {
 		return nil
 	}

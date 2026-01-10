@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 type TagRepo struct {
@@ -20,7 +21,7 @@ func NewTagRepo(db *Postgres) *TagRepo {
 
 func (r *TagRepo) CreateTag(ctx context.Context, userID string, t domain.Tag) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -28,7 +29,7 @@ func (r *TagRepo) CreateTag(ctx context.Context, userID string, t domain.Tag) er
 	}
 
 	if strings.TrimSpace(userID) == "" {
-		return errors.New("userID is required")
+		return apperrors.ErrUserIDRequired
 	}
 	if strings.TrimSpace(t.UserID) == "" {
 		t.UserID = userID
@@ -43,7 +44,7 @@ func (r *TagRepo) CreateTag(ctx context.Context, userID string, t domain.Tag) er
 
 func (r *TagRepo) GetTag(ctx context.Context, userID string, tagID string) (*domain.Tag, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -60,7 +61,7 @@ func (r *TagRepo) GetTag(ctx context.Context, userID string, tagID string) (*dom
 	var colorNull sql.NullString
 	if err := row.Scan(&t.ID, &t.UserID, &t.Name, &colorNull, &t.CreatedAt, &t.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrTagNotFound
+			return nil, apperrors.ErrTagNotFound
 		}
 		return nil, err
 	}
@@ -72,7 +73,7 @@ func (r *TagRepo) GetTag(ctx context.Context, userID string, tagID string) (*dom
 
 func (r *TagRepo) ListTags(ctx context.Context, userID string) ([]domain.Tag, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {

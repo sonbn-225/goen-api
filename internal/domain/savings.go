@@ -2,16 +2,11 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"time"
 )
 
-var (
-	ErrSavingsInstrumentNotFound = errors.New("savings instrument not found")
-)
-
 type SavingsInstrument struct {
-	ID              string     `json:"id"`
+	ID               string     `json:"id"`
 	SavingsAccountID string     `json:"savings_account_id"`
 	ParentAccountID  string     `json:"parent_account_id"`
 	Principal        string     `json:"principal"`

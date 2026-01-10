@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 type AuditRepo struct {
@@ -21,7 +21,7 @@ func NewAuditRepo(db *Postgres) *AuditRepo {
 
 func (r *AuditRepo) ListAuditEventsForAccount(ctx context.Context, userID string, accountID string, limit int) ([]domain.AuditEvent, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	if limit <= 0 {
 		limit = 50
@@ -43,7 +43,7 @@ func (r *AuditRepo) ListAuditEventsForAccount(ctx context.Context, userID string
 		WHERE ua.user_id = $1 AND ua.account_id = $2 AND ua.status = 'active'
 	`, userID, accountID).Scan(&one); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrAuditForbidden
+			return nil, apperrors.ErrAuditForbidden
 		}
 		return nil, err
 	}
@@ -82,26 +82,4 @@ func (r *AuditRepo) ListAuditEventsForAccount(ctx context.Context, userID string
 	}
 
 	return items, nil
-}
-
-func insertAuditEvent(ctx context.Context, dbtx pgx.Tx, accountID string, actorUserID string, action string, entityType string, entityID string, occurredAt time.Time, diff any) error {
-	if accountID == "" || actorUserID == "" || action == "" || entityType == "" || entityID == "" {
-		return nil
-	}
-
-	var diffJSON []byte
-	if diff != nil {
-		b, err := json.Marshal(diff)
-		if err == nil {
-			diffJSON = b
-		}
-	}
-
-	id := uuid.NewString()
-
-	_, err := dbtx.Exec(ctx, `
-		INSERT INTO audit_events (id, account_id, actor_user_id, action, entity_type, entity_id, occurred_at, diff)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-	`, id, accountID, actorUserID, action, entityType, entityID, occurredAt, diffJSON)
-	return err
 }

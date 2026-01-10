@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 type CategoryRepo struct {
@@ -19,7 +20,7 @@ func NewCategoryRepo(db *Postgres) *CategoryRepo {
 
 func (r *CategoryRepo) GetCategory(ctx context.Context, userID string, categoryID string) (*domain.Category, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -53,7 +54,7 @@ func (r *CategoryRepo) GetCategory(ctx context.Context, userID string, categoryI
 		&deletedAtNull,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrCategoryNotFound
+			return nil, apperrors.ErrCategoryNotFound
 		}
 		return nil, err
 	}
@@ -78,7 +79,7 @@ func (r *CategoryRepo) GetCategory(ctx context.Context, userID string, categoryI
 
 func (r *CategoryRepo) ListCategories(ctx context.Context, userID string) ([]domain.Category, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 type BudgetRepo struct {
@@ -21,7 +22,7 @@ func NewBudgetRepo(db *Postgres) *BudgetRepo {
 
 func (r *BudgetRepo) CreateBudget(ctx context.Context, userID string, b domain.Budget) error {
 	if r.db == nil {
-		return errors.New("database not ready")
+		return apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -29,7 +30,7 @@ func (r *BudgetRepo) CreateBudget(ctx context.Context, userID string, b domain.B
 	}
 
 	if strings.TrimSpace(userID) == "" {
-		return errors.New("userID is required")
+		return apperrors.ErrUserIDRequired
 	}
 	if strings.TrimSpace(b.UserID) == "" {
 		b.UserID = userID
@@ -59,7 +60,7 @@ func (r *BudgetRepo) CreateBudget(ctx context.Context, userID string, b domain.B
 
 func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID string) (*domain.Budget, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -107,7 +108,7 @@ func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID stri
 		&b.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrBudgetNotFound
+			return nil, apperrors.ErrBudgetNotFound
 		}
 		return nil, err
 	}
@@ -137,7 +138,7 @@ func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID stri
 
 func (r *BudgetRepo) ListBudgets(ctx context.Context, userID string) ([]domain.Budget, error) {
 	if r.db == nil {
-		return nil, errors.New("database not ready")
+		return nil, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -225,7 +226,7 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID string) ([]domain.B
 
 func (r *BudgetRepo) ComputeSpent(ctx context.Context, userID string, categoryID string, startDate string, endDate string) (string, error) {
 	if r.db == nil {
-		return "", errors.New("database not ready")
+		return "", apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
