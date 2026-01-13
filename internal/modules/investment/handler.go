@@ -1,6 +1,7 @@
 package investment
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -23,12 +24,72 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler) http.Handler) {
 	r.With(authMiddleware).Get("/investment-accounts", h.ListInvestmentAccounts)
 	r.With(authMiddleware).Get("/investment-accounts/{investmentAccountId}", h.GetInvestmentAccount)
+	r.With(authMiddleware).Patch("/investment-accounts/{investmentAccountId}", h.PatchInvestmentAccount)
+	r.With(authMiddleware).Post("/investment-accounts/{investmentAccountId}/trades", h.CreateTrade)
 	r.With(authMiddleware).Get("/investment-accounts/{investmentAccountId}/trades", h.ListTrades)
 	r.With(authMiddleware).Get("/investment-accounts/{investmentAccountId}/holdings", h.ListHoldings)
 	r.With(authMiddleware).Get("/securities", h.ListSecurities)
 	r.With(authMiddleware).Get("/securities/{securityId}", h.GetSecurity)
 	r.With(authMiddleware).Get("/securities/{securityId}/prices-daily", h.ListSecurityPrices)
 	r.With(authMiddleware).Get("/securities/{securityId}/events", h.ListSecurityEvents)
+}
+
+// PatchInvestmentAccount handles PATCH /investment-accounts/{investmentAccountId}
+func (h *Handler) PatchInvestmentAccount(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	id := chi.URLParam(r, "investmentAccountId")
+	if id == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "investmentAccountId is required", nil)
+		return
+	}
+
+	var req PatchInvestmentAccountRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		return
+	}
+
+	account, err := h.svc.UpdateInvestmentAccountSettings(r.Context(), userID, id, req)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, account)
+}
+
+// CreateTrade handles POST /investment-accounts/{investmentAccountId}/trades
+func (h *Handler) CreateTrade(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	brokerAccountID := chi.URLParam(r, "investmentAccountId")
+	if brokerAccountID == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "investmentAccountId is required", nil)
+		return
+	}
+
+	var req CreateTradeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		return
+	}
+
+	trade, err := h.svc.CreateTrade(r.Context(), userID, brokerAccountID, req)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusCreated, trade)
 }
 
 // ListInvestmentAccounts handles GET /investment-accounts

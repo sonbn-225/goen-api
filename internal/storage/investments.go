@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
+	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
 type InvestmentRepo struct {
@@ -131,6 +131,61 @@ func (r *InvestmentRepo) ListInvestmentAccounts(ctx context.Context, userID stri
 		out = append(out, ia)
 	}
 	return out, rows.Err()
+}
+
+func (r *InvestmentRepo) UpdateInvestmentAccountSettings(ctx context.Context, userID string, investmentAccountID string, feeSettings any, taxSettings any) (*domain.InvestmentAccount, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Write requires owner/editor on underlying broker cash ledger.
+	row := pool.QueryRow(ctx, `
+		WITH ok AS (
+			SELECT 1
+			FROM investment_accounts ia
+			JOIN accounts a ON a.id = ia.account_id
+			JOIN user_accounts ua ON ua.account_id = a.id
+			WHERE ia.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
+			  AND ua.permission IN ('owner','editor')
+		)
+		UPDATE investment_accounts
+		SET fee_settings = COALESCE($3, fee_settings),
+		    tax_settings = COALESCE($4, tax_settings),
+		    updated_at = NOW()
+		WHERE id = $1 AND EXISTS (SELECT 1 FROM ok)
+		RETURNING id, account_id, fee_settings, tax_settings, created_at, updated_at
+	`, investmentAccountID, userID, feeSettings, taxSettings)
+
+	var out domain.InvestmentAccount
+	var fee any
+	var tax any
+	if err := row.Scan(&out.ID, &out.AccountID, &fee, &tax, &out.CreatedAt, &out.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.ErrInvestmentForbidden
+		}
+		return nil, err
+	}
+	if fee != nil {
+		out.FeeSettings = fee
+	}
+	if tax != nil {
+		out.TaxSettings = tax
+	}
+
+	// Fill currency via existing accessor (keeps output consistent with GetInvestmentAccount).
+	acc, err := r.GetInvestmentAccount(ctx, userID, out.ID)
+	if err == nil && acc != nil {
+		acc.FeeSettings = out.FeeSettings
+		acc.TaxSettings = out.TaxSettings
+		acc.CreatedAt = out.CreatedAt
+		acc.UpdatedAt = out.UpdatedAt
+		return acc, nil
+	}
+	return &out, nil
 }
 
 func (r *InvestmentRepo) GetSecurity(ctx context.Context, securityID string) (*domain.Security, error) {
@@ -679,6 +734,221 @@ func (r *InvestmentRepo) GetHolding(ctx context.Context, userID string, brokerAc
 	h.MarketValue = nullStringPtr(marketValue)
 	h.UnrealizedPnL = nullStringPtr(unrealizedPnL)
 	return &h, nil
+}
+
+func (r *InvestmentRepo) UpsertHolding(ctx context.Context, userID string, h domain.Holding) (*domain.Holding, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	row := pool.QueryRow(ctx, `
+		WITH ok AS (
+			SELECT 1
+			FROM investment_accounts ia
+			JOIN accounts a ON a.id = ia.account_id
+			JOIN user_accounts ua ON ua.account_id = a.id
+			WHERE ia.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
+			  AND ua.permission IN ('owner','editor')
+		)
+		INSERT INTO holdings (
+			id, broker_account_id, security_id, quantity, cost_basis_total, avg_cost, as_of, source_of_truth, created_at, updated_at
+		)
+		SELECT $3,$1,$4,$5::numeric,$6::numeric,$7::numeric,$8,$9,$10,$11
+		WHERE EXISTS (SELECT 1 FROM ok)
+		ON CONFLICT (broker_account_id, security_id)
+		DO UPDATE SET
+			quantity = EXCLUDED.quantity,
+			cost_basis_total = EXCLUDED.cost_basis_total,
+			avg_cost = EXCLUDED.avg_cost,
+			source_of_truth = EXCLUDED.source_of_truth,
+			updated_at = EXCLUDED.updated_at
+		WHERE EXISTS (SELECT 1 FROM ok)
+		RETURNING id, broker_account_id, security_id, quantity::text,
+		          cost_basis_total::text, avg_cost::text, market_price::text, market_value::text, unrealized_pnl::text,
+		          as_of, source_of_truth, created_at, updated_at
+	`, h.BrokerAccountID, userID, h.ID, h.SecurityID, h.Quantity, h.CostBasisTotal, h.AvgCost, h.AsOf, h.SourceOfTruth, h.CreatedAt, h.UpdatedAt)
+
+	var out domain.Holding
+	var costBasisTotal, avgCost, marketPrice, marketValue, unrealizedPnL sql.NullString
+	if err := row.Scan(
+		&out.ID,
+		&out.BrokerAccountID,
+		&out.SecurityID,
+		&out.Quantity,
+		&costBasisTotal,
+		&avgCost,
+		&marketPrice,
+		&marketValue,
+		&unrealizedPnL,
+		&out.AsOf,
+		&out.SourceOfTruth,
+		&out.CreatedAt,
+		&out.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.ErrInvestmentForbidden
+		}
+		return nil, err
+	}
+
+	out.CostBasisTotal = nullStringPtr(costBasisTotal)
+	out.AvgCost = nullStringPtr(avgCost)
+	out.MarketPrice = nullStringPtr(marketPrice)
+	out.MarketValue = nullStringPtr(marketValue)
+	out.UnrealizedPnL = nullStringPtr(unrealizedPnL)
+	return &out, nil
+}
+
+func (r *InvestmentRepo) ListShareLots(ctx context.Context, userID string, brokerAccountID string, securityID string) ([]domain.ShareLot, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT l.id, l.broker_account_id, l.security_id, l.quantity::text,
+		       l.acquisition_date::text, l.cost_basis_per_share::text, l.provenance::text, l.status::text,
+		       l.buy_trade_id, l.created_at, l.updated_at
+		FROM share_lots l
+		JOIN investment_accounts ia ON ia.id = l.broker_account_id
+		JOIN accounts a ON a.id = ia.account_id
+		JOIN user_accounts ua ON ua.account_id = a.id
+		WHERE l.broker_account_id = $1 AND l.security_id = $2
+		  AND ua.user_id = $3 AND ua.status = 'active' AND a.deleted_at IS NULL
+		ORDER BY l.acquisition_date ASC, l.created_at ASC
+	`, brokerAccountID, securityID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []domain.ShareLot{}
+	for rows.Next() {
+		var lot domain.ShareLot
+		if err := rows.Scan(
+			&lot.ID,
+			&lot.BrokerAccountID,
+			&lot.SecurityID,
+			&lot.Quantity,
+			&lot.AcquisitionDate,
+			&lot.CostBasisPer,
+			&lot.Provenance,
+			&lot.Status,
+			&lot.BuyTradeID,
+			&lot.CreatedAt,
+			&lot.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, lot)
+	}
+	return out, rows.Err()
+}
+
+func (r *InvestmentRepo) CreateShareLot(ctx context.Context, userID string, lot domain.ShareLot) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	cmd, err := pool.Exec(ctx, `
+		INSERT INTO share_lots (
+			id, broker_account_id, security_id, quantity, acquisition_date, cost_basis_per_share,
+			provenance, status, buy_trade_id, created_at, updated_at
+		)
+		SELECT $1,$2,$3,$4::numeric,$5::date,$6::numeric,$7::lot_provenance,$8::lot_status,$9,$10,$11
+		WHERE EXISTS (
+			SELECT 1
+			FROM investment_accounts ia
+			JOIN accounts a ON a.id = ia.account_id
+			JOIN user_accounts ua ON ua.account_id = a.id
+			WHERE ia.id = $2 AND ua.user_id = $12 AND ua.status = 'active' AND a.deleted_at IS NULL
+			  AND ua.permission IN ('owner','editor')
+		)
+	`, lot.ID, lot.BrokerAccountID, lot.SecurityID, lot.Quantity, lot.AcquisitionDate, lot.CostBasisPer, lot.Provenance, lot.Status, lot.BuyTradeID, lot.CreatedAt, lot.UpdatedAt, userID)
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() == 0 {
+		return apperrors.ErrInvestmentForbidden
+	}
+	return nil
+}
+
+func (r *InvestmentRepo) UpdateShareLotQuantity(ctx context.Context, userID string, lotID string, quantity string) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	cmd, err := pool.Exec(ctx, `
+		WITH ok AS (
+			SELECT 1
+			FROM share_lots l
+			JOIN investment_accounts ia ON ia.id = l.broker_account_id
+			JOIN accounts a ON a.id = ia.account_id
+			JOIN user_accounts ua ON ua.account_id = a.id
+			WHERE l.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
+			  AND ua.permission IN ('owner','editor')
+		)
+		UPDATE share_lots
+		SET quantity = $3::numeric,
+		    updated_at = NOW()
+		WHERE id = $1 AND EXISTS (SELECT 1 FROM ok)
+	`, lotID, userID, quantity)
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() == 0 {
+		return apperrors.ErrInvestmentForbidden
+	}
+	return nil
+}
+
+func (r *InvestmentRepo) CreateRealizedTradeLog(ctx context.Context, userID string, log domain.RealizedTradeLog) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	cmd, err := pool.Exec(ctx, `
+		INSERT INTO realized_trade_logs (
+			id, broker_account_id, security_id, sell_trade_id, source_share_lot_id, quantity,
+			acquisition_date, cost_basis_total, sell_price, proceeds, realized_pnl, provenance, created_at
+		)
+		SELECT $1,$2,$3,$4,$5,$6::numeric,$7::date,$8::numeric,$9::numeric,$10::numeric,$11::numeric,$12::lot_provenance,$13
+		WHERE EXISTS (
+			SELECT 1
+			FROM investment_accounts ia
+			JOIN accounts a ON a.id = ia.account_id
+			JOIN user_accounts ua ON ua.account_id = a.id
+			WHERE ia.id = $2 AND ua.user_id = $14 AND ua.status = 'active' AND a.deleted_at IS NULL
+			  AND ua.permission IN ('owner','editor')
+		)
+	`, log.ID, log.BrokerAccountID, log.SecurityID, log.SellTradeID, log.SourceShareLot, log.Quantity, log.AcquisitionDate, log.CostBasisTotal, log.SellPrice, log.Proceeds, log.RealizedPnL, log.Provenance, log.CreatedAt, userID)
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() == 0 {
+		return apperrors.ErrInvestmentForbidden
+	}
+	return nil
 }
 
 func nullStringPtr(ns sql.NullString) *string {

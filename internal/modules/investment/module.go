@@ -23,6 +23,7 @@ import (
 
 	"github.com/sonbn-225/goen-api/internal/config"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/modules/transaction"
 	"github.com/sonbn-225/goen-api/internal/storage"
 )
 
@@ -48,7 +49,7 @@ type AccountServiceDep interface {
 
 // TransactionServiceDep defines the transaction service methods needed by this module.
 type TransactionServiceDep interface {
-	// Add methods as needed for fee/tax transactions
+	Create(ctx context.Context, userID string, req transaction.CreateRequest) (*domain.Transaction, error)
 }
 
 // NewModule creates a new investment module with all dependencies wired.

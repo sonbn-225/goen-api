@@ -108,11 +108,42 @@ type Holding struct {
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
+type ShareLot struct {
+	ID              string    `json:"id"`
+	BrokerAccountID string    `json:"broker_account_id"`
+	SecurityID      string    `json:"security_id"`
+	Quantity        string    `json:"quantity"`
+	AcquisitionDate string    `json:"acquisition_date"`
+	CostBasisPer    string    `json:"cost_basis_per_share"`
+	Provenance      string    `json:"provenance"`
+	Status          string    `json:"status"`
+	BuyTradeID      *string   `json:"buy_trade_id,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type RealizedTradeLog struct {
+	ID              string    `json:"id"`
+	BrokerAccountID string    `json:"broker_account_id"`
+	SecurityID      string    `json:"security_id"`
+	SellTradeID     string    `json:"sell_trade_id"`
+	SourceShareLot  string    `json:"source_share_lot_id"`
+	Quantity        string    `json:"quantity"`
+	AcquisitionDate string    `json:"acquisition_date"`
+	CostBasisTotal  string    `json:"cost_basis_total"`
+	SellPrice       string    `json:"sell_price"`
+	Proceeds        string    `json:"proceeds"`
+	RealizedPnL     string    `json:"realized_pnl"`
+	Provenance      string    `json:"provenance"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
 type InvestmentRepository interface {
 	// Investment accounts
 	CreateInvestmentAccount(ctx context.Context, userID string, ia InvestmentAccount) error
 	GetInvestmentAccount(ctx context.Context, userID string, investmentAccountID string) (*InvestmentAccount, error)
 	ListInvestmentAccounts(ctx context.Context, userID string) ([]InvestmentAccount, error)
+	UpdateInvestmentAccountSettings(ctx context.Context, userID string, investmentAccountID string, feeSettings any, taxSettings any) (*InvestmentAccount, error)
 
 	// Securities
 	GetSecurity(ctx context.Context, securityID string) (*Security, error)
@@ -134,4 +165,11 @@ type InvestmentRepository interface {
 	// Holdings
 	ListHoldings(ctx context.Context, userID string, brokerAccountID string) ([]Holding, error)
 	GetHolding(ctx context.Context, userID string, brokerAccountID string, securityID string) (*Holding, error)
+	UpsertHolding(ctx context.Context, userID string, h Holding) (*Holding, error)
+
+	// Share lots (FIFO)
+	ListShareLots(ctx context.Context, userID string, brokerAccountID string, securityID string) ([]ShareLot, error)
+	CreateShareLot(ctx context.Context, userID string, lot ShareLot) error
+	UpdateShareLotQuantity(ctx context.Context, userID string, lotID string, quantity string) error
+	CreateRealizedTradeLog(ctx context.Context, userID string, log RealizedTradeLog) error
 }

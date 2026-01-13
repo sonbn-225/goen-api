@@ -90,6 +90,29 @@ Response ← Middleware ← Handler ← Service ← Storage
 - `docker-compose.dev.yml` (Traefik HTTP only)
 - `docker-compose.prod.yml` (Traefik HTTPS via `le` resolver)
 
+## Investment fees & taxes (V2-only)
+
+Investment accounts support JSONB configuration for auto-calculating fees and taxes.
+
+- Endpoint: `PATCH /api/v1/investment-accounts/{investmentAccountId}`
+- Fields: `fee_settings`, `tax_settings`
+- Schema (V2 only): `{ "version": 2, "fees": [ ... ] }`
+
+Each config item supports:
+
+- `name` (string), `enabled` (bool)
+- `trigger_event`: `BUY_SECURITY` | `SELL_SECURITY` | `STOCK_DIVIDEND` | `CASH_DIVIDEND` | `CASH_WITHDRAWAL` | `MONTHLY_CUSTODY`
+- `calculation_method`: `PERCENTAGE` | `FIXED_AMOUNT` | `PER_SHARE`
+- `value` (decimal string)
+- optional: `min_fee`, `max_fee`, `base_price_per_share` (used for `STOCK_DIVIDEND` base)
+
+Trade behavior:
+
+- `POST /api/v1/investment-accounts/{investmentAccountId}/trades`
+  - If `fees`/`taxes` are omitted, server computes them from settings (if configured).
+  - If `fees`/`taxes` are provided, server uses the provided values.
+  - When `fees > 0` or `taxes > 0`, server creates linked expense transactions.
+
 ## Run (dev)
 
 Prereqs:
