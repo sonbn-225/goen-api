@@ -213,6 +213,23 @@ This repo uses **feature-based modules**. Each feature is a self-contained modul
 
 This project uses [goose](https://github.com/pressly/goose) for database migrations. Goose is installed in the Docker container.
 
+### Baseline (squashed) migration for DB resets
+
+For fresh installs / local database resets, this repo keeps a single baseline migration:
+
+- `migrations/20260114000000_baseline_schema.sql`
+
+This baseline also initializes TimescaleDB (creates the extension if available) and converts selected time-series tables into hypertables.
+
+All older step-by-step migrations are archived in:
+
+- `migrations/legacy/`
+
+Notes:
+
+- The baseline is intended for an empty database.
+- If you already have a database with `goose_db_version` populated, do not apply the baseline on top. Drop/recreate the database (or clear the goose version table) first.
+
 ### Create a new migration
 
 ```bash
