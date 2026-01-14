@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
+	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
 // CreateLineItemRequest contains line item create parameters.
@@ -35,7 +35,6 @@ type CreateRequest struct {
 	FromAccountID *string                 `json:"from_account_id,omitempty"`
 	ToAccountID   *string                 `json:"to_account_id,omitempty"`
 	ExchangeRate  *string                 `json:"exchange_rate,omitempty"`
-	Counterparty  *string                 `json:"counterparty,omitempty"`
 	Notes         *string                 `json:"notes,omitempty"`
 	TagIDs        []string                `json:"tag_ids,omitempty"`
 	LineItems     []CreateLineItemRequest `json:"line_items,omitempty"`
@@ -52,9 +51,8 @@ type ListRequest struct {
 
 // PatchRequest contains transaction patch parameters.
 type PatchRequest struct {
-	Description  *string `json:"description,omitempty"`
-	Notes        *string `json:"notes,omitempty"`
-	Counterparty *string `json:"counterparty,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Notes       *string `json:"notes,omitempty"`
 }
 
 // Service handles transaction business logic.
@@ -166,7 +164,6 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 		FromAccountID: normalizeOptionalString(req.FromAccountID),
 		ToAccountID:   normalizeOptionalString(req.ToAccountID),
 		ExchangeRate:  normalizeOptionalString(req.ExchangeRate),
-		Counterparty:  normalizeOptionalString(req.Counterparty),
 		Notes:         normalizeOptionalString(req.Notes),
 		Status:        "posted",
 		CreatedAt:     now,
@@ -250,9 +247,8 @@ func (s *Service) List(ctx context.Context, userID string, req ListRequest) ([]d
 // Patch updates transaction fields.
 func (s *Service) Patch(ctx context.Context, userID, transactionID string, req PatchRequest) (*domain.Transaction, error) {
 	patch := domain.TransactionPatch{
-		Description:  normalizeOptionalString(req.Description),
-		Notes:        normalizeOptionalString(req.Notes),
-		Counterparty: normalizeOptionalString(req.Counterparty),
+		Description: normalizeOptionalString(req.Description),
+		Notes:       normalizeOptionalString(req.Notes),
 	}
 	tx, err := s.repo.PatchTransaction(ctx, userID, transactionID, patch)
 	if err != nil {

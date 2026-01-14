@@ -238,7 +238,6 @@ CREATE TABLE IF NOT EXISTS transactions (
   to_account_id text,
   exchange_rate numeric(18,8),
 
-  counterparty text,
   notes text,
   status transaction_status NOT NULL DEFAULT 'posted',
 

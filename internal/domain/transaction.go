@@ -33,7 +33,6 @@ type Transaction struct {
 	FromAccountID   *string               `json:"from_account_id,omitempty"`
 	ToAccountID     *string               `json:"to_account_id,omitempty"`
 	ExchangeRate    *string               `json:"exchange_rate,omitempty"`
-	Counterparty    *string               `json:"counterparty,omitempty"`
 	Notes           *string               `json:"notes,omitempty"`
 	Status          string                `json:"status"`
 	CreatedAt       time.Time             `json:"created_at"`
@@ -63,7 +62,6 @@ type TransactionRepository interface {
 }
 
 type TransactionPatch struct {
-	Description  *string
-	Notes        *string
-	Counterparty *string
+	Description *string
+	Notes       *string
 }

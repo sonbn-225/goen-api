@@ -442,8 +442,6 @@ definitions:
         type: array
       client_id:
         type: string
-      counterparty:
-        type: string
       created_at:
         type: string
       created_by:
@@ -730,10 +728,6 @@ definitions:
         type: string
       client_id:
         type: string
-      counterparty:
-        type: string
-      currency:
-        type: string
       description:
         type: string
       exchange_rate:
@@ -787,8 +781,6 @@ definitions:
     type: object
   transaction.PatchRequest:
     properties:
-      counterparty:
-        type: string
       description:
         type: string
       notes:
@@ -1542,8 +1534,8 @@ paths:
       - investments
   /market-data/vnstock/sync-all:
     post:
-      description: Enqueue a vnstock job to sync securities catalog then fan-out daily
-        prices and events jobs.
+      description: Enqueue a vnstock job to sync securities catalog then (optionally)
+        fan-out daily prices and events jobs.
       parameters:
       - description: Bypass caching (1/true)
         in: query

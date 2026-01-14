@@ -1136,7 +1136,7 @@ const docTemplate = `{
         },
         "/market-data/vnstock/sync-all": {
             "post": {
-                "description": "Enqueue a vnstock job to sync securities catalog then fan-out daily prices and events jobs.",
+                "description": "Enqueue a vnstock job to sync securities catalog then (optionally) fan-out daily prices and events jobs.",
                 "produces": [
                     "application/json"
                 ],
@@ -3186,9 +3186,6 @@ const docTemplate = `{
                 "client_id": {
                     "type": "string"
                 },
-                "counterparty": {
-                    "type": "string"
-                },
                 "created_at": {
                     "type": "string"
                 },
@@ -3625,12 +3622,6 @@ const docTemplate = `{
                 "client_id": {
                     "type": "string"
                 },
-                "counterparty": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string"
                 },
@@ -3712,9 +3703,6 @@ const docTemplate = `{
         "transaction.PatchRequest": {
             "type": "object",
             "properties": {
-                "counterparty": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string"
                 },
