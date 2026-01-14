@@ -116,8 +116,8 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 				id, client_id, external_ref, type, occurred_at, amount, description,
 				from_amount, to_amount,
 				account_id, from_account_id, to_account_id, exchange_rate,
-				counterparty, notes, status, created_at, updated_at, created_by, updated_by, deleted_at
-			) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7,$8::numeric,$9::numeric,$10,$11,$12,$13::numeric,$14,$15,$16,$17,$18,$19,$20,$21)
+				notes, status, created_at, updated_at, created_by, updated_by, deleted_at
+			) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7,$8::numeric,$9::numeric,$10,$11,$12,$13::numeric,$14,$15,$16,$17,$18,$19,$20)
 		`,
 			tx.ID,
 			tx.ClientID,
@@ -132,7 +132,6 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 			tx.FromAccountID,
 			tx.ToAccountID,
 			tx.ExchangeRate,
-			tx.Counterparty,
 			tx.Notes,
 			tx.Status,
 			tx.CreatedAt,
@@ -242,7 +241,6 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 			a.currency AS account_currency,
 			fa.currency AS from_currency,
 			ta.currency AS to_currency,
-			t.counterparty,
 			t.notes,
 			t.status,
 			t.created_at,
@@ -291,7 +289,6 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 		&t.AccountCurrency,
 		&t.FromCurrency,
 		&t.ToCurrency,
-		&t.Counterparty,
 		&t.Notes,
 		&t.Status,
 		&t.CreatedAt,
@@ -399,7 +396,6 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 			a.currency AS account_currency,
 			fa.currency AS from_currency,
 			ta.currency AS to_currency,
-			t.counterparty,
 			t.notes,
 			t.status,
 			t.created_at,
@@ -462,7 +458,6 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 			&t.AccountCurrency,
 			&t.FromCurrency,
 			&t.ToCurrency,
-			&t.Counterparty,
 			&t.Notes,
 			&t.Status,
 			&t.CreatedAt,
@@ -535,26 +530,21 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 
 		desc := cur.Description
 		notes := cur.Notes
-		cp := cur.Counterparty
 		if patch.Description != nil {
 			desc = patch.Description
 		}
 		if patch.Notes != nil {
 			notes = patch.Notes
 		}
-		if patch.Counterparty != nil {
-			cp = patch.Counterparty
-		}
 
 		_, err = dbtx.Exec(ctx, `
 			UPDATE transactions
 			SET description = $1,
 			    notes = $2,
-			    counterparty = $3,
-			    updated_at = $4,
-			    updated_by = $5
-			WHERE id = $6 AND deleted_at IS NULL
-		`, desc, notes, cp, now, userID, transactionID)
+			    updated_at = $3,
+			    updated_by = $4
+			WHERE id = $5 AND deleted_at IS NULL
+		`, desc, notes, now, userID, transactionID)
 		if err != nil {
 			return err
 		}
@@ -566,9 +556,8 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 
 		// Audit (UC-007)
 		auditDiff := map[string]any{
-			"description":  patch.Description,
-			"notes":        patch.Notes,
-			"counterparty": patch.Counterparty,
+			"description": patch.Description,
+			"notes":       patch.Notes,
 		}
 		switch cur.Type {
 		case "expense", "income":

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/httpapi"
 	"github.com/sonbn-225/goen-api/internal/response"
-	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 // Handler handles HTTP requests for market data.
@@ -169,7 +169,7 @@ func (h *Handler) GetSecurityStatus(w http.ResponseWriter, r *http.Request) {
 
 // RefreshMarketDataAll handles POST /market-data/vnstock/sync-all
 // @Summary Enqueue market-wide sync (vnstock)
-// @Description Enqueue a vnstock job to sync securities catalog then fan-out daily prices and events jobs.
+// @Description Enqueue a vnstock job to sync securities catalog then (optionally) fan-out daily prices and events jobs.
 // @Tags investments
 // @Produce json
 // @Param force query string false "Bypass caching (1/true)"
@@ -192,10 +192,6 @@ func (h *Handler) RefreshMarketDataAll(w http.ResponseWriter, r *http.Request) {
 	full := parseBoolDefault(r.URL.Query().Get("full"), false)
 	includePrices := parseBoolDefault(r.URL.Query().Get("include_prices"), true)
 	includeEvents := parseBoolDefault(r.URL.Query().Get("include_events"), true)
-	if !includePrices && !includeEvents {
-		response.WriteError(w, http.StatusBadRequest, "validation_error", "include_prices or include_events must be true", nil)
-		return
-	}
 
 	resp, err := h.svc.EnqueueMarketSync(r.Context(), userID, includePrices, includeEvents, force, full)
 	if err != nil {

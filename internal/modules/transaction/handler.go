@@ -3,15 +3,16 @@ package transaction
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sonbn-225/goen-api/internal/httpapi"
-	"github.com/sonbn-225/goen-api/internal/domain"
-	"github.com/sonbn-225/goen-api/internal/response"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
+	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/response"
 )
 
 // Handler handles HTTP requests for transactions.
@@ -50,7 +51,6 @@ type CreateBody struct {
 	OccurredDate  *string                 `json:"occurred_date,omitempty"`
 	OccurredTime  *string                 `json:"occurred_time,omitempty"`
 	Amount        string                  `json:"amount"`
-	Currency      *string                 `json:"currency,omitempty"`
 	FromAmount    *string                 `json:"from_amount,omitempty"`
 	ToAmount      *string                 `json:"to_amount,omitempty"`
 	Description   *string                 `json:"description,omitempty"`
@@ -58,7 +58,6 @@ type CreateBody struct {
 	FromAccountID *string                 `json:"from_account_id,omitempty"`
 	ToAccountID   *string                 `json:"to_account_id,omitempty"`
 	ExchangeRate  *string                 `json:"exchange_rate,omitempty"`
-	Counterparty  *string                 `json:"counterparty,omitempty"`
 	Notes         *string                 `json:"notes,omitempty"`
 	TagIDs        []string                `json:"tag_ids,omitempty"`
 	LineItems     []CreateLineItemRequest `json:"line_items,omitempty"`
@@ -149,13 +148,35 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body CreateBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid request body", nil)
+		return
+	}
+
+	// Currency is derived from account(s) and must not be provided by clients.
+	// We intentionally do NOT include this field in CreateBody (Swagger schema),
+	// but we still validate and reject if a client sends it.
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json body", nil)
 		return
 	}
-	if body.Currency != nil && strings.TrimSpace(*body.Currency) != "" {
-		response.WriteError(w, http.StatusBadRequest, "validation_error", "currency is not supported for transactions (omit currency)", map[string]any{"field": "currency"})
+	if v, ok := raw["currency"]; ok && len(v) > 0 && string(v) != "null" {
+		var cur string
+		if err := json.Unmarshal(v, &cur); err != nil {
+			response.WriteError(w, http.StatusBadRequest, "validation_error", "currency must be a string", map[string]any{"field": "currency"})
+			return
+		}
+		if strings.TrimSpace(cur) != "" {
+			response.WriteError(w, http.StatusBadRequest, "validation_error", "currency is not supported for transactions (omit currency)", map[string]any{"field": "currency"})
+			return
+		}
+	}
+
+	var body CreateBody
+	if err := json.Unmarshal(bodyBytes, &body); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json body", nil)
 		return
 	}
 
@@ -174,7 +195,6 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		FromAccountID: body.FromAccountID,
 		ToAccountID:   body.ToAccountID,
 		ExchangeRate:  body.ExchangeRate,
-		Counterparty:  body.Counterparty,
 		Notes:         body.Notes,
 		TagIDs:        body.TagIDs,
 		LineItems:     body.LineItems,
