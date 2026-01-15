@@ -3,12 +3,14 @@ package investment
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/config"
 	"github.com/sonbn-225/goen-api/internal/domain"
@@ -283,6 +285,47 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 	feeTxID := normalizeOptionalString(req.FeeTransactionID)
 	taxTxID := normalizeOptionalString(req.TaxTransactionID)
 
+	// Auto-create principal cashflow transaction (buy/sell notional) so account balances reflect trades,
+	// not only fee/tax transactions.
+	// - BUY: creates an expense (cash outflow)
+	// - SELL: creates an income (cash inflow)
+	// For stock dividends, the user should record price=0 if there is no cashflow; additionally, we skip
+	// principal cashflow for new trades explicitly marked as stock_dividend provenance.
+	if !(side == "buy" && provenance == "stock_dividend") {
+		qRat, qOK := new(big.Rat).SetString(strings.TrimSpace(quantity))
+		pRat, pOK := new(big.Rat).SetString(strings.TrimSpace(price))
+		if qOK && pOK {
+			notional := new(big.Rat).Mul(qRat, pRat)
+			if notional.Cmp(big.NewRat(0, 1)) > 0 {
+				principalAmount := formatRatDecimalScale(notional, 2)
+				externalRef := deriveTradeExternalRef(req.ClientID, tradeID, "principal")
+				kind := "expense"
+				if side == "sell" {
+					kind = "income"
+				}
+				desc := "Trade " + side
+				if sec, err := s.repo.GetSecurity(ctx, securityID); err == nil && sec != nil {
+					desc = "Trade " + side + ": " + sec.Symbol
+				}
+				_, err := s.txSvc.Create(ctx, userID, transaction.CreateRequest{
+					ClientID:     req.ClientID,
+					Type:         kind,
+					OccurredDate: &occurredDate,
+					Amount:       principalAmount,
+					Description:  &desc,
+					AccountID:    &ia.AccountID,
+					ExternalRef:  externalRef,
+				})
+				if err != nil {
+					// Allow idempotent retries/backfills.
+					if !isUniqueViolation(err) {
+						return nil, err
+					}
+				}
+			}
+		}
+	}
+
 	// Auto-create fee/tax transactions if requested amounts > 0 and no explicit transaction ids provided.
 	if feeTxID == nil {
 		if amt, ok := new(big.Rat).SetString(fees); ok && amt.Cmp(new(big.Rat)) > 0 {
@@ -416,6 +459,133 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 	}
 
 	return &trade, nil
+}
+
+type BackfillTradePrincipalResult struct {
+	TradesTotal          int `json:"trades_total"`
+	TransactionsCreated  int `json:"transactions_created"`
+	TransactionsExisting int `json:"transactions_existing"`
+	SkippedZeroNotional  int `json:"skipped_zero_notional"`
+	SkippedStockDividend int `json:"skipped_stock_dividend"`
+}
+
+// BackfillTradePrincipalTransactions creates missing principal cashflow transactions for historical trades.
+// It is safe to call multiple times; duplicates are ignored via unique (account_id, external_ref).
+func (s *Service) BackfillTradePrincipalTransactions(ctx context.Context, userID, brokerAccountID string) (*BackfillTradePrincipalResult, error) {
+	bid := strings.TrimSpace(brokerAccountID)
+	if bid == "" {
+		return nil, apperrors.Validation("investmentAccountId is required", nil)
+	}
+
+	ia, err := s.repo.GetInvestmentAccount(ctx, userID, bid)
+	if err != nil {
+		return nil, err
+	}
+	if ia == nil {
+		return nil, apperrors.NotFound("investment account not found", nil)
+	}
+
+	trades, err := s.repo.ListTrades(ctx, userID, bid)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache lots by security to detect stock-dividend buys (no cashflow).
+	lotsBySecurity := map[string][]domain.ShareLot{}
+	securitySymbol := map[string]string{}
+
+	result := &BackfillTradePrincipalResult{TradesTotal: len(trades)}
+
+	for _, tr := range trades {
+		securityID := strings.TrimSpace(tr.SecurityID)
+		if securityID == "" {
+			continue
+		}
+
+		// Heuristic: if there is a share lot created by this buy trade and its provenance is stock_dividend,
+		// skip principal cashflow.
+		if strings.TrimSpace(tr.Side) == "buy" {
+			lots, ok := lotsBySecurity[securityID]
+			if !ok {
+				ll, err := s.repo.ListShareLots(ctx, userID, bid, securityID)
+				if err != nil {
+					return nil, err
+				}
+				lots = ll
+				lotsBySecurity[securityID] = ll
+			}
+			isStockDiv := false
+			for _, l := range lots {
+				if l.BuyTradeID != nil && strings.TrimSpace(*l.BuyTradeID) == strings.TrimSpace(tr.ID) {
+					if strings.TrimSpace(l.Provenance) == "stock_dividend" {
+						isStockDiv = true
+						break
+					}
+				}
+			}
+			if isStockDiv {
+				result.SkippedStockDividend++
+				continue
+			}
+		}
+
+		qRat, qOK := new(big.Rat).SetString(strings.TrimSpace(tr.Quantity))
+		pRat, pOK := new(big.Rat).SetString(strings.TrimSpace(tr.Price))
+		if !qOK || !pOK {
+			continue
+		}
+		notional := new(big.Rat).Mul(qRat, pRat)
+		if notional.Cmp(big.NewRat(0, 1)) <= 0 {
+			result.SkippedZeroNotional++
+			continue
+		}
+
+		principalAmount := formatRatDecimalScale(notional, 2)
+		externalRef := deriveTradeExternalRef(tr.ClientID, tr.ID, "principal")
+		kind := "expense"
+		if strings.TrimSpace(tr.Side) == "sell" {
+			kind = "income"
+		}
+
+		// Resolve symbol for nicer description (cached).
+		sym := securitySymbol[securityID]
+		if sym == "" {
+			if sec, err := s.repo.GetSecurity(ctx, securityID); err == nil && sec != nil {
+				sym = sec.Symbol
+				securitySymbol[securityID] = sym
+			}
+		}
+		desc := "Trade " + strings.TrimSpace(tr.Side)
+		if sym != "" {
+			desc = desc + ": " + sym
+		}
+
+		occurredAt := tr.OccurredAt.UTC().Format(time.RFC3339Nano)
+		_, err := s.txSvc.Create(ctx, userID, transaction.CreateRequest{
+			ClientID:    tr.ClientID,
+			Type:        kind,
+			OccurredAt:  &occurredAt,
+			Amount:      principalAmount,
+			Description: &desc,
+			AccountID:   &ia.AccountID,
+			ExternalRef: externalRef,
+		})
+		if err != nil {
+			if isUniqueViolation(err) {
+				result.TransactionsExisting++
+				continue
+			}
+			return nil, err
+		}
+		result.TransactionsCreated++
+	}
+
+	return result, nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return err != nil && errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 type lotConsumptionPlan struct {
