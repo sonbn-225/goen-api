@@ -25,6 +25,7 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 	r.With(authMiddleware).Get("/investment-accounts", h.ListInvestmentAccounts)
 	r.With(authMiddleware).Get("/investment-accounts/{investmentAccountId}", h.GetInvestmentAccount)
 	r.With(authMiddleware).Patch("/investment-accounts/{investmentAccountId}", h.PatchInvestmentAccount)
+	r.With(authMiddleware).Post("/investment-accounts/{investmentAccountId}/backfill-cash", h.BackfillCash)
 	r.With(authMiddleware).Post("/investment-accounts/{investmentAccountId}/trades", h.CreateTrade)
 	r.With(authMiddleware).Get("/investment-accounts/{investmentAccountId}/trades", h.ListTrades)
 	r.With(authMiddleware).Get("/investment-accounts/{investmentAccountId}/holdings", h.ListHoldings)
@@ -32,6 +33,31 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 	r.With(authMiddleware).Get("/securities/{securityId}", h.GetSecurity)
 	r.With(authMiddleware).Get("/securities/{securityId}/prices-daily", h.ListSecurityPrices)
 	r.With(authMiddleware).Get("/securities/{securityId}/events", h.ListSecurityEvents)
+}
+
+// BackfillCash handles POST /investment-accounts/{investmentAccountId}/backfill-cash
+// It creates missing cashflow transactions for trade principal (buy/sell notional)
+// so broker account balances reflect trades, not only fees/taxes.
+func (h *Handler) BackfillCash(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	id := chi.URLParam(r, "investmentAccountId")
+	if id == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "investmentAccountId is required", nil)
+		return
+	}
+
+	res, err := h.svc.BackfillTradePrincipalTransactions(r.Context(), userID, id)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, res)
 }
 
 // PatchInvestmentAccount handles PATCH /investment-accounts/{investmentAccountId}
