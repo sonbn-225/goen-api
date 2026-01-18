@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
+	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
 // Service handles category business logic.

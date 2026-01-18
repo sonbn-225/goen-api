@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
+	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
 type AccountRepo struct {

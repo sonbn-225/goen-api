@@ -15,6 +15,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/modules/category"
 	"github.com/sonbn-225/goen-api/internal/modules/debt"
 	"github.com/sonbn-225/goen-api/internal/modules/diagnostics"
+	groupExpense "github.com/sonbn-225/goen-api/internal/modules/group_expense"
 	"github.com/sonbn-225/goen-api/internal/modules/investment"
 	"github.com/sonbn-225/goen-api/internal/modules/marketdata"
 	rotatingsavings "github.com/sonbn-225/goen-api/internal/modules/rotating_savings"
@@ -56,6 +57,7 @@ func New(cfg *config.Config) *App {
 	rotatingSavingsRepo := storage.NewRotatingSavingsRepo(db)
 	debtRepo := storage.NewDebtRepo(db)
 	investmentRepo := storage.NewInvestmentRepo(db)
+	groupExpenseRepo := storage.NewGroupExpenseRepo(db)
 
 	// Independent modules (no cross-module dependencies)
 	diagMod := diagnostics.NewModule(diagnostics.ModuleDeps{
@@ -109,6 +111,12 @@ func New(cfg *config.Config) *App {
 		TxSvc: txMod.Service,
 	})
 
+	// Group expense module (depends on transaction service)
+	groupExpenseMod := groupExpense.NewModule(groupExpense.ModuleDeps{
+		Repo:  groupExpenseRepo,
+		TxSvc: txMod.Service,
+	})
+
 	// Rotating Savings module (depends on account repo and transaction service)
 	rotTxAdapter := &rotTxServiceAdapter{svc: txMod.Service}
 	rotMod := rotatingsavings.NewModule(rotatingsavings.ModuleDeps{
@@ -147,6 +155,7 @@ func New(cfg *config.Config) *App {
 		savings:         savingsMod,
 		rotatingSavings: rotMod,
 		debt:            debtMod,
+		groupExpense:    groupExpenseMod,
 		investment:      investMod,
 		marketData:      marketDataMod,
 	})
@@ -176,6 +185,7 @@ type modules struct {
 	savings         *savings.Module
 	rotatingSavings *rotatingsavings.Module
 	debt            *debt.Module
+	groupExpense    *groupExpense.Module
 	investment      *investment.Module
 	marketData      *marketdata.Module
 }
@@ -212,6 +222,9 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 
 		// Transaction
 		mods.transaction.Handler.RegisterRoutes(r, authMiddleware)
+
+		// Group Expense
+		mods.groupExpense.Handler.RegisterRoutes(r, authMiddleware)
 
 		// Category
 		mods.category.Handler.RegisterRoutes(r, authMiddleware)

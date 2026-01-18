@@ -253,7 +253,9 @@ func (r *InvestmentRepo) ListSecurityPrices(ctx context.Context, securityID stri
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT id, security_id, price_date, open, high, low, close, volume, created_at, updated_at
+		SELECT id, security_id, price_date,
+		       open * 1000, high * 1000, low * 1000, close * 1000,
+		       volume, created_at, updated_at
 		FROM security_price_dailies
 		WHERE security_id = $1
 		  AND ($2::date IS NULL OR price_date >= $2::date)
@@ -639,9 +641,29 @@ func (r *InvestmentRepo) ListHoldings(ctx context.Context, userID string, broker
 
 	rows, err := pool.Query(ctx, `
 		SELECT h.id, h.broker_account_id, h.security_id, h.quantity::text,
-		       h.cost_basis_total::text, h.avg_cost::text, h.market_price::text, h.market_value::text, h.unrealized_pnl::text,
+		       h.cost_basis_total::text, h.avg_cost::text,
+		       mv.market_price::text, mv.market_value::text, mv.unrealized_pnl::text,
 		       h.as_of, h.source_of_truth, h.created_at, h.updated_at
 		FROM holdings h
+		LEFT JOIN LATERAL (
+			SELECT spd.close * 1000 AS latest_close
+			FROM security_price_dailies spd
+			WHERE spd.security_id = h.security_id
+			ORDER BY spd.price_date DESC
+			LIMIT 1
+		) lp ON TRUE
+		LEFT JOIN LATERAL (
+			SELECT
+				COALESCE(lp.latest_close, h.market_price) AS market_price,
+				CASE
+					WHEN COALESCE(lp.latest_close, h.market_price) IS NULL THEN NULL
+					ELSE ROUND(h.quantity * COALESCE(lp.latest_close, h.market_price), 2)
+				END AS market_value,
+				CASE
+					WHEN h.cost_basis_total IS NULL OR COALESCE(lp.latest_close, h.market_price) IS NULL THEN NULL
+					ELSE ROUND(h.quantity * COALESCE(lp.latest_close, h.market_price), 2) - h.cost_basis_total
+				END AS unrealized_pnl
+		) mv ON TRUE
 		JOIN investment_accounts ia ON ia.id = h.broker_account_id
 		JOIN accounts a ON a.id = ia.account_id
 		JOIN user_accounts ua ON ua.account_id = a.id
@@ -695,9 +717,29 @@ func (r *InvestmentRepo) GetHolding(ctx context.Context, userID string, brokerAc
 
 	row := pool.QueryRow(ctx, `
 		SELECT h.id, h.broker_account_id, h.security_id, h.quantity::text,
-		       h.cost_basis_total::text, h.avg_cost::text, h.market_price::text, h.market_value::text, h.unrealized_pnl::text,
+		       h.cost_basis_total::text, h.avg_cost::text,
+		       mv.market_price::text, mv.market_value::text, mv.unrealized_pnl::text,
 		       h.as_of, h.source_of_truth, h.created_at, h.updated_at
 		FROM holdings h
+		LEFT JOIN LATERAL (
+			SELECT spd.close * 1000 AS latest_close
+			FROM security_price_dailies spd
+			WHERE spd.security_id = h.security_id
+			ORDER BY spd.price_date DESC
+			LIMIT 1
+		) lp ON TRUE
+		LEFT JOIN LATERAL (
+			SELECT
+				COALESCE(lp.latest_close, h.market_price) AS market_price,
+				CASE
+					WHEN COALESCE(lp.latest_close, h.market_price) IS NULL THEN NULL
+					ELSE ROUND(h.quantity * COALESCE(lp.latest_close, h.market_price), 2)
+				END AS market_value,
+				CASE
+					WHEN h.cost_basis_total IS NULL OR COALESCE(lp.latest_close, h.market_price) IS NULL THEN NULL
+					ELSE ROUND(h.quantity * COALESCE(lp.latest_close, h.market_price), 2) - h.cost_basis_total
+				END AS unrealized_pnl
+		) mv ON TRUE
 		JOIN investment_accounts ia ON ia.id = h.broker_account_id
 		JOIN accounts a ON a.id = ia.account_id
 		JOIN user_accounts ua ON ua.account_id = a.id
