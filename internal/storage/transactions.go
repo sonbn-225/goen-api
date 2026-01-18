@@ -17,6 +17,190 @@ type TransactionRepo struct {
 	db *Postgres
 }
 
+// createTransactionTx inserts a transaction and its children using an existing dbtx.
+// It mirrors CreateTransaction but does not begin/commit.
+func createTransactionTx(ctx context.Context, dbtx pgx.Tx, userID string, tx domain.Transaction, lineItems []domain.TransactionLineItem, tagIDs []string) error {
+	auditAt := time.Now().UTC()
+	auditDiff := map[string]any{
+		"type":        tx.Type,
+		"amount":      tx.Amount,
+		"from_amount": tx.FromAmount,
+		"to_amount":   tx.ToAmount,
+		"occurred_at": tx.OccurredAt.UTC().Format(time.RFC3339Nano),
+	}
+	// Permission checks
+	switch tx.Type {
+	case "expense", "income":
+		if tx.AccountID == nil || strings.TrimSpace(*tx.AccountID) == "" {
+			return apperrors.ErrAccountIDRequired
+		}
+		if err := requireAccountPermission(ctx, dbtx, userID, *tx.AccountID, true); err != nil {
+			return err
+		}
+		if err := requireAccountActive(ctx, dbtx, *tx.AccountID); err != nil {
+			return err
+		}
+	case "transfer":
+		if tx.FromAccountID == nil || strings.TrimSpace(*tx.FromAccountID) == "" {
+			return apperrors.ErrFromAccountIDRequired
+		}
+		if tx.ToAccountID == nil || strings.TrimSpace(*tx.ToAccountID) == "" {
+			return apperrors.ErrToAccountIDRequired
+		}
+		if err := requireAccountPermission(ctx, dbtx, userID, *tx.FromAccountID, true); err != nil {
+			return err
+		}
+		if err := requireAccountPermission(ctx, dbtx, userID, *tx.ToAccountID, true); err != nil {
+			return err
+		}
+		if err := requireAccountActive(ctx, dbtx, *tx.FromAccountID); err != nil {
+			return err
+		}
+		if err := requireAccountActive(ctx, dbtx, *tx.ToAccountID); err != nil {
+			return err
+		}
+
+		fromCur, err := getAccountCurrency(ctx, dbtx, *tx.FromAccountID)
+		if err != nil {
+			return err
+		}
+		toCur, err := getAccountCurrency(ctx, dbtx, *tx.ToAccountID)
+		if err != nil {
+			return err
+		}
+		fx := !strings.EqualFold(strings.TrimSpace(fromCur), strings.TrimSpace(toCur))
+
+		// Default amounts for same-currency transfers.
+		if tx.FromAmount == nil {
+			tx.FromAmount = &tx.Amount
+		}
+		if tx.ToAmount == nil {
+			if fx {
+				return apperrors.ErrFXAmountsRequired
+			}
+			tx.ToAmount = &tx.Amount
+		}
+		if fx {
+			if tx.FromAmount == nil || tx.ToAmount == nil {
+				return apperrors.ErrFXAmountsRequired
+			}
+		}
+
+		// Auto-compute exchange_rate if omitted and amounts are provided.
+		if tx.ExchangeRate == nil && tx.FromAmount != nil && tx.ToAmount != nil {
+			rate, err := computeExchangeRate(*tx.FromAmount, *tx.ToAmount)
+			if err != nil {
+				return err
+			}
+			if rate != nil {
+				tx.ExchangeRate = rate
+			}
+		}
+	default:
+		return apperrors.ErrTransactionInvalidType
+	}
+
+	_, err := dbtx.Exec(ctx, `
+		INSERT INTO transactions (
+			id, client_id, external_ref, type, occurred_at, amount, description,
+			from_amount, to_amount,
+			account_id, from_account_id, to_account_id, exchange_rate,
+			notes, status, created_at, updated_at, created_by, updated_by, deleted_at
+		) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7,$8::numeric,$9::numeric,$10,$11,$12,$13::numeric,$14,$15,$16,$17,$18,$19,$20)
+	`,
+		tx.ID,
+		tx.ClientID,
+		tx.ExternalRef,
+		tx.Type,
+		tx.OccurredAt,
+		tx.Amount,
+		tx.Description,
+		tx.FromAmount,
+		tx.ToAmount,
+		tx.AccountID,
+		tx.FromAccountID,
+		tx.ToAccountID,
+		tx.ExchangeRate,
+		tx.Notes,
+		tx.Status,
+		tx.CreatedAt,
+		tx.UpdatedAt,
+		tx.CreatedBy,
+		tx.UpdatedBy,
+		tx.DeletedAt,
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, li := range lineItems {
+		if li.ID == "" {
+			li.ID = uuid.NewString()
+		}
+		if li.CategoryID != nil && strings.TrimSpace(*li.CategoryID) != "" {
+			var ok bool
+			err := dbtx.QueryRow(ctx, `
+				SELECT EXISTS (
+					SELECT 1
+					FROM categories
+					WHERE id = $1
+					  AND deleted_at IS NULL
+					  AND is_active = true
+					  AND is_system = false
+				)
+			`, strings.TrimSpace(*li.CategoryID)).Scan(&ok)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return apperrors.ErrCategoryIDInvalid
+			}
+		}
+		_, err := dbtx.Exec(ctx, `
+			INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note)
+			VALUES ($1,$2,$3,$4::numeric,$5)
+		`, li.ID, tx.ID, li.CategoryID, li.Amount, li.Note)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(tagIDs) > 0 {
+		var okCount int
+		err := dbtx.QueryRow(ctx, `
+			SELECT COUNT(*)
+			FROM tags
+			WHERE user_id = $1 AND id = ANY($2::text[])
+		`, userID, tagIDs).Scan(&okCount)
+		if err != nil {
+			return err
+		}
+		if okCount != len(tagIDs) {
+			return apperrors.ErrTagIDsInvalid
+		}
+
+		_, err = dbtx.Exec(ctx, `
+			INSERT INTO transaction_tags (transaction_id, tag_id, created_at)
+			SELECT $1, unnest($2::text[]), $3
+			ON CONFLICT DO NOTHING
+		`, tx.ID, tagIDs, tx.CreatedAt)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Audit (UC-007)
+	switch tx.Type {
+	case "expense", "income":
+		_ = insertAuditEvent(ctx, dbtx, *tx.AccountID, userID, "transaction.create", "transaction", tx.ID, auditAt, auditDiff)
+	case "transfer":
+		_ = insertAuditEvent(ctx, dbtx, *tx.FromAccountID, userID, "transaction.create", "transaction", tx.ID, auditAt, auditDiff)
+		_ = insertAuditEvent(ctx, dbtx, *tx.ToAccountID, userID, "transaction.create", "transaction", tx.ID, auditAt, auditDiff)
+	}
+
+	return nil
+}
+
 func NewTransactionRepo(db *Postgres) *TransactionRepo {
 	return &TransactionRepo{db: db}
 }
@@ -31,185 +215,7 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 	}
 
 	return withTx(ctx, pool, func(dbtx pgx.Tx) error {
-		auditAt := time.Now().UTC()
-		auditDiff := map[string]any{
-			"type":        tx.Type,
-			"amount":      tx.Amount,
-			"from_amount": tx.FromAmount,
-			"to_amount":   tx.ToAmount,
-			"occurred_at": tx.OccurredAt.UTC().Format(time.RFC3339Nano),
-		}
-		// Permission checks
-		switch tx.Type {
-		case "expense", "income":
-			if tx.AccountID == nil || strings.TrimSpace(*tx.AccountID) == "" {
-				return apperrors.ErrAccountIDRequired
-			}
-			if err := requireAccountPermission(ctx, dbtx, userID, *tx.AccountID, true); err != nil {
-				return err
-			}
-			if err := requireAccountActive(ctx, dbtx, *tx.AccountID); err != nil {
-				return err
-			}
-		case "transfer":
-			if tx.FromAccountID == nil || strings.TrimSpace(*tx.FromAccountID) == "" {
-				return apperrors.ErrFromAccountIDRequired
-			}
-			if tx.ToAccountID == nil || strings.TrimSpace(*tx.ToAccountID) == "" {
-				return apperrors.ErrToAccountIDRequired
-			}
-			if err := requireAccountPermission(ctx, dbtx, userID, *tx.FromAccountID, true); err != nil {
-				return err
-			}
-			if err := requireAccountPermission(ctx, dbtx, userID, *tx.ToAccountID, true); err != nil {
-				return err
-			}
-			if err := requireAccountActive(ctx, dbtx, *tx.FromAccountID); err != nil {
-				return err
-			}
-			if err := requireAccountActive(ctx, dbtx, *tx.ToAccountID); err != nil {
-				return err
-			}
-
-			fromCur, err := getAccountCurrency(ctx, dbtx, *tx.FromAccountID)
-			if err != nil {
-				return err
-			}
-			toCur, err := getAccountCurrency(ctx, dbtx, *tx.ToAccountID)
-			if err != nil {
-				return err
-			}
-			fx := !strings.EqualFold(strings.TrimSpace(fromCur), strings.TrimSpace(toCur))
-
-			// Default amounts for same-currency transfers.
-			if tx.FromAmount == nil {
-				tx.FromAmount = &tx.Amount
-			}
-			if tx.ToAmount == nil {
-				if fx {
-					return apperrors.ErrFXAmountsRequired
-				}
-				tx.ToAmount = &tx.Amount
-			}
-			if fx {
-				if tx.FromAmount == nil || tx.ToAmount == nil {
-					return apperrors.ErrFXAmountsRequired
-				}
-			}
-
-			// Auto-compute exchange_rate if omitted and amounts are provided.
-			if tx.ExchangeRate == nil && tx.FromAmount != nil && tx.ToAmount != nil {
-				rate, err := computeExchangeRate(*tx.FromAmount, *tx.ToAmount)
-				if err != nil {
-					return err
-				}
-				if rate != nil {
-					tx.ExchangeRate = rate
-				}
-			}
-		default:
-			return apperrors.ErrTransactionInvalidType
-		}
-
-		_, err := dbtx.Exec(ctx, `
-			INSERT INTO transactions (
-				id, client_id, external_ref, type, occurred_at, amount, description,
-				from_amount, to_amount,
-				account_id, from_account_id, to_account_id, exchange_rate,
-				notes, status, created_at, updated_at, created_by, updated_by, deleted_at
-			) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7,$8::numeric,$9::numeric,$10,$11,$12,$13::numeric,$14,$15,$16,$17,$18,$19,$20)
-		`,
-			tx.ID,
-			tx.ClientID,
-			tx.ExternalRef,
-			tx.Type,
-			tx.OccurredAt,
-			tx.Amount,
-			tx.Description,
-			tx.FromAmount,
-			tx.ToAmount,
-			tx.AccountID,
-			tx.FromAccountID,
-			tx.ToAccountID,
-			tx.ExchangeRate,
-			tx.Notes,
-			tx.Status,
-			tx.CreatedAt,
-			tx.UpdatedAt,
-			tx.CreatedBy,
-			tx.UpdatedBy,
-			tx.DeletedAt,
-		)
-		if err != nil {
-			return err
-		}
-
-		for _, li := range lineItems {
-			if li.ID == "" {
-				li.ID = uuid.NewString()
-			}
-			if li.CategoryID != nil && strings.TrimSpace(*li.CategoryID) != "" {
-				var ok bool
-				err := dbtx.QueryRow(ctx, `
-					SELECT EXISTS (
-						SELECT 1
-						FROM categories
-						WHERE id = $1
-						  AND deleted_at IS NULL
-						  AND is_active = true
-						  AND is_system = false
-					)
-				`, strings.TrimSpace(*li.CategoryID)).Scan(&ok)
-				if err != nil {
-					return err
-				}
-				if !ok {
-					return apperrors.ErrCategoryIDInvalid
-				}
-			}
-			_, err := dbtx.Exec(ctx, `
-				INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note)
-				VALUES ($1,$2,$3,$4::numeric,$5)
-			`, li.ID, tx.ID, li.CategoryID, li.Amount, li.Note)
-			if err != nil {
-				return err
-			}
-		}
-
-		if len(tagIDs) > 0 {
-			var okCount int
-			err := dbtx.QueryRow(ctx, `
-				SELECT COUNT(*)
-				FROM tags
-				WHERE user_id = $1 AND id = ANY($2::text[])
-			`, userID, tagIDs).Scan(&okCount)
-			if err != nil {
-				return err
-			}
-			if okCount != len(tagIDs) {
-				return apperrors.ErrTagIDsInvalid
-			}
-
-			_, err = dbtx.Exec(ctx, `
-				INSERT INTO transaction_tags (transaction_id, tag_id, created_at)
-				SELECT $1, unnest($2::text[]), $3
-				ON CONFLICT DO NOTHING
-			`, tx.ID, tagIDs, tx.CreatedAt)
-			if err != nil {
-				return err
-			}
-		}
-
-		// Audit (UC-007)
-		switch tx.Type {
-		case "expense", "income":
-			_ = insertAuditEvent(ctx, dbtx, *tx.AccountID, userID, "transaction.create", "transaction", tx.ID, auditAt, auditDiff)
-		case "transfer":
-			_ = insertAuditEvent(ctx, dbtx, *tx.FromAccountID, userID, "transaction.create", "transaction", tx.ID, auditAt, auditDiff)
-			_ = insertAuditEvent(ctx, dbtx, *tx.ToAccountID, userID, "transaction.create", "transaction", tx.ID, auditAt, auditDiff)
-		}
-
-		return nil
+		return createTransactionTx(ctx, dbtx, userID, tx, lineItems, tagIDs)
 	})
 }
 

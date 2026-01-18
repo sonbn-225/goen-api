@@ -173,6 +173,13 @@ var ErrRotatingSavingsGroupNotFound = errors.New("rotating savings group not fou
 // Debt
 var ErrDebtNotFound = errors.New("debt not found")
 
+// Group Expense
+var (
+	ErrGroupExpenseParticipantNotFound       = errors.New("group expense participant not found")
+	ErrGroupExpenseParticipantAlreadySettled = errors.New("group expense participant already settled")
+	ErrNotImplemented                        = errors.New("not implemented")
+)
+
 // Investment
 var (
 	ErrInvestmentAccountNotFound     = errors.New("investment account not found")

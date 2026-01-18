@@ -7,10 +7,10 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/config"
 	"github.com/sonbn-225/goen-api/internal/httpapi"
 	"github.com/sonbn-225/goen-api/internal/response"
-	"github.com/sonbn-225/goen-api/internal/apperrors"
 )
 
 // Handler handles HTTP requests for authentication.
