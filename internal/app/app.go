@@ -20,6 +20,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/modules/marketdata"
 	rotatingsavings "github.com/sonbn-225/goen-api/internal/modules/rotating_savings"
 	"github.com/sonbn-225/goen-api/internal/modules/savings"
+	"github.com/sonbn-225/goen-api/internal/modules/report"
 	"github.com/sonbn-225/goen-api/internal/modules/tag"
 	"github.com/sonbn-225/goen-api/internal/modules/transaction"
 	"github.com/sonbn-225/goen-api/internal/storage"
@@ -58,6 +59,7 @@ func New(cfg *config.Config) *App {
 	debtRepo := storage.NewDebtRepo(db)
 	investmentRepo := storage.NewInvestmentRepo(db)
 	groupExpenseRepo := storage.NewGroupExpenseRepo(db)
+	reportRepo := storage.NewReportRepo(db)
 
 	// Independent modules (no cross-module dependencies)
 	diagMod := diagnostics.NewModule(diagnostics.ModuleDeps{
@@ -143,6 +145,12 @@ func New(cfg *config.Config) *App {
 		InvestSvc: investMod.Service,
 	})
 
+	// Report module
+	reportMod := report.NewModule(report.ModuleDeps{
+		ReportRepo:  reportRepo,
+		AccountRepo: accountRepo,
+	})
+
 	// Create router
 	h := newModularRouter(cfg, &modules{
 		diagnostics:     diagMod,
@@ -158,6 +166,7 @@ func New(cfg *config.Config) *App {
 		groupExpense:    groupExpenseMod,
 		investment:      investMod,
 		marketData:      marketDataMod,
+		report:          reportMod,
 	})
 
 	return &App{
@@ -188,6 +197,7 @@ type modules struct {
 	groupExpense    *groupExpense.Module
 	investment      *investment.Module
 	marketData      *marketdata.Module
+	report          *report.Module
 }
 
 func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
@@ -249,6 +259,9 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 
 		// Market Data
 		mods.marketData.Handler.RegisterRoutes(r, authMiddleware)
+
+		// Report
+		mods.report.Handler.RegisterRoutes(r, authMiddleware)
 	})
 
 	return r
