@@ -42,17 +42,40 @@ type CreateRequest struct {
 
 // ListRequest contains transaction list filters.
 type ListRequest struct {
-	AccountID *string
-	From      *string
-	To        *string
-	Cursor    *string
-	Limit     int
+	AccountID  *string
+	CategoryID *string
+	Type       *string
+	Search     *string
+	From       *string
+	To         *string
+	Cursor     *string
+	Limit      int
 }
 
 // PatchRequest contains transaction patch parameters.
 type PatchRequest struct {
-	Description *string `json:"description,omitempty"`
-	Notes       *string `json:"notes,omitempty"`
+	Description       *string                   `json:"description,omitempty"`
+	Notes             *string                   `json:"notes,omitempty"`
+	CategoryIDs       []string                  `json:"category_ids,omitempty"`
+	TagIDs            []string                  `json:"tag_ids,omitempty"`
+	Amount            *string                   `json:"amount,omitempty"`
+	OccurredAt        *string                   `json:"occurred_at,omitempty"`
+	LineItems         *[]LineItemInput          `json:"line_items,omitempty"`
+	GroupParticipants *[]GroupParticipantInput   `json:"group_participants,omitempty"`
+}
+
+// LineItemInput is the line item payload for patch.
+type LineItemInput struct {
+	CategoryID *string `json:"category_id,omitempty"`
+	Amount     string  `json:"amount"`
+	Note       *string `json:"note,omitempty"`
+}
+
+// GroupParticipantInput is the group participant payload for patch.
+type GroupParticipantInput struct {
+	ParticipantName string `json:"participant_name"`
+	OriginalAmount  string `json:"original_amount"`
+	ShareAmount     string `json:"share_amount"`
 }
 
 // Service handles transaction business logic.
@@ -215,9 +238,12 @@ func (s *Service) Get(ctx context.Context, userID, transactionID string) (*domai
 // List returns transactions matching the filter.
 func (s *Service) List(ctx context.Context, userID string, req ListRequest) ([]domain.Transaction, *string, error) {
 	filter := domain.TransactionListFilter{
-		AccountID: normalizeOptionalString(req.AccountID),
-		Cursor:    normalizeOptionalString(req.Cursor),
-		Limit:     req.Limit,
+		AccountID:  normalizeOptionalString(req.AccountID),
+		CategoryID: normalizeOptionalString(req.CategoryID),
+		Type:       normalizeOptionalString(req.Type),
+		Search:     normalizeOptionalString(req.Search),
+		Cursor:     normalizeOptionalString(req.Cursor),
+		Limit:      req.Limit,
 	}
 
 	if req.From != nil {
@@ -249,7 +275,56 @@ func (s *Service) Patch(ctx context.Context, userID, transactionID string, req P
 	patch := domain.TransactionPatch{
 		Description: normalizeOptionalString(req.Description),
 		Notes:       normalizeOptionalString(req.Notes),
+		CategoryIDs: req.CategoryIDs,
+		TagIDs:      req.TagIDs,
+		Amount:      normalizeOptionalString(req.Amount),
 	}
+
+	// Convert LineItemInput → domain.TransactionLineItem
+	if req.LineItems != nil {
+		items := make([]domain.TransactionLineItem, len(*req.LineItems))
+		for i, li := range *req.LineItems {
+			items[i] = domain.TransactionLineItem{
+				ID:         uuid.NewString(),
+				CategoryID: li.CategoryID,
+				Amount:     li.Amount,
+				Note:       li.Note,
+			}
+		}
+		patch.LineItems = &items
+	}
+
+	// Convert GroupParticipantInput → domain.GroupExpenseParticipant
+	if req.GroupParticipants != nil {
+		now := time.Now().UTC()
+		parts := make([]domain.GroupExpenseParticipant, len(*req.GroupParticipants))
+		for i, g := range *req.GroupParticipants {
+			parts[i] = domain.GroupExpenseParticipant{
+				ID:              uuid.NewString(),
+				UserID:          userID,
+				TransactionID:   transactionID,
+				ParticipantName: g.ParticipantName,
+				OriginalAmount:  g.OriginalAmount,
+				ShareAmount:     g.ShareAmount,
+				IsSettled:       false,
+				CreatedAt:       now,
+				UpdatedAt:       now,
+			}
+		}
+		patch.GroupParticipants = &parts
+	}
+
+	if req.OccurredAt != nil {
+		v := strings.TrimSpace(*req.OccurredAt)
+		if v != "" {
+			t, err := parseTimeOrDate(v)
+			if err != nil {
+				return nil, apperrors.Validation("occurred_at is invalid", nil)
+			}
+			patch.OccurredAt = &t
+		}
+	}
+
 	tx, err := s.repo.PatchTransaction(ctx, userID, transactionID, patch)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrTransactionNotFound) {

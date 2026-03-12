@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/i18n"
 )
 
 // TxCreateRequest is a local representation of transaction create request.
@@ -230,7 +232,8 @@ func (s *Service) CreateContribution(ctx context.Context, userID, groupID string
 		txType = "income"
 	}
 
-	desc := fmt.Sprintf("RotatingSavings: %s", group.Name)
+	lang := httpapi.LangFromContext(ctx)
+	desc := fmt.Sprintf("%s: %s", i18n.T(lang, "rotating_savings_prefix"), group.Name)
 	txReq := TxCreateRequest{
 		Type:         txType,
 		OccurredDate: &occurredDate,

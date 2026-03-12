@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/i18n"
 	"github.com/sonbn-225/goen-api/internal/modules/account"
 	"github.com/sonbn-225/goen-api/internal/modules/transaction"
 )
@@ -113,6 +115,7 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 
 	var acc *domain.Account
 	autoCreatedAccount := false
+	lang := httpapi.LangFromContext(ctx)
 	if savingsAccountID == "" {
 		parent, err := s.accounts.Get(ctx, userID, *parentAccountID)
 		if err != nil {
@@ -122,7 +125,7 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 			return nil, apperrors.Validation("parent account must be bank or wallet", map[string]any{"field": "parent_account_id"})
 		}
 
-		accName := "Savings"
+		accName := i18n.T(lang, "savings_name")
 		if name != nil {
 			accName = *name
 		}
@@ -190,11 +193,11 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 				occurredDate = strings.TrimSpace(*startDate)
 			}
 
-			desc := "Savings deposit"
+			desc := i18n.T(lang, "savings_deposit")
 			if acc != nil {
 				name := strings.TrimSpace(acc.Name)
 				if name != "" {
-					desc = "Savings deposit: " + name
+					desc = i18n.T(lang, "savings_deposit") + ": " + name
 				}
 			}
 

@@ -46,11 +46,14 @@ type Transaction struct {
 }
 
 type TransactionListFilter struct {
-	AccountID *string
-	From      *time.Time
-	To        *time.Time
-	Cursor    *string
-	Limit     int
+	AccountID  *string
+	CategoryID *string
+	Type       *string
+	Search     *string
+	From       *time.Time
+	To         *time.Time
+	Cursor     *string
+	Limit      int
 }
 
 type TransactionRepository interface {
@@ -62,6 +65,12 @@ type TransactionRepository interface {
 }
 
 type TransactionPatch struct {
-	Description *string
-	Notes       *string
+	Description       *string
+	Notes             *string
+	CategoryIDs       []string
+	TagIDs            []string
+	Amount            *string
+	OccurredAt        *time.Time
+	LineItems         *[]TransactionLineItem   // nil = no change, non-nil = replace all
+	GroupParticipants *[]GroupExpenseParticipant // nil = no change, non-nil = replace all (only unsettled)
 }

@@ -20,13 +20,25 @@ import (
 
 type ctxKey int
 
-const ctxKeyUserID ctxKey = iota
+const (
+	ctxKeyUserID ctxKey = iota
+	ctxKeyLang
+)
 
 // UserIDFromContext extracts user ID from context.
 func UserIDFromContext(ctx context.Context) (string, bool) {
 	v := ctx.Value(ctxKeyUserID)
 	id, ok := v.(string)
 	return id, ok && id != ""
+}
+
+// LangFromContext extracts language from context.
+func LangFromContext(ctx context.Context) string {
+	v := ctx.Value(ctxKeyLang)
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return "en"
 }
 
 // =====================
@@ -145,7 +157,7 @@ func CORSMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 					w.Header().Add("Vary", "Origin")
 				}
 				w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Authorization,If-Match,If-None-Match,X-Client-Id,Idempotency-Key")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Authorization,If-Match,If-None-Match,X-Client-Id,Idempotency-Key,X-Goen-Language")
 			}
 
 			if r.Method == http.MethodOptions {
@@ -173,9 +185,20 @@ func isOriginAllowed(origin string, allowed []string) bool {
 
 // RequestLogger logs a single line per request to stdout/stderr (container logs).
 // It includes request id, method, path, status, bytes, duration, and user id (if authenticated).
+// It also extracts language from headers and puts it in context.
 func RequestLogger() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			lang := r.Header.Get("Accept-Language")
+			if lang == "" {
+				lang = r.Header.Get("X-Goen-Language")
+			}
+			if lang == "" {
+				lang = "en"
+			}
+			ctx := context.WithValue(r.Context(), ctxKeyLang, lang)
+			r = r.WithContext(ctx)
+
 			// Skip very noisy probes.
 			if r.URL.Path == "/healthz" {
 				next.ServeHTTP(w, r)

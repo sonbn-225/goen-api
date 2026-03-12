@@ -823,7 +823,56 @@ VALUES
   ('cat_def_food_snacks', 'Snacks', 'cat_def_food', 'expense', 15, true, 'cookie', 'orange', now(), now()),
   ('cat_def_food_alcohol', 'Alcohol', 'cat_def_food', 'expense', 16, true, 'glass', 'orange', now(), now()),
 
+  -- Beauty & Grooming
+  ('cat_def_beauty', 'Beauty & Grooming', NULL, 'expense', 18, true, 'sparkles', 'pink', now(), now()),
+  ('cat_def_beauty_haircut', 'Haircut', 'cat_def_beauty', 'expense', 19, true, 'cut', 'pink', now(), now()),
+  ('cat_def_beauty_spa', 'Spa & Massage', 'cat_def_beauty', 'expense', 20, true, 'leaf', 'pink', now(), now()),
+  ('cat_def_beauty_cosmetics', 'Cosmetics', 'cat_def_beauty', 'expense', 21, true, 'sparkles', 'pink', now(), now()),
+
+  -- Social & Gifts
+  ('cat_def_social', 'Social & Gifts', NULL, 'expense', 23, true, 'users', 'grape', now(), now()),
+  ('cat_def_social_wedding', 'Wedding', 'cat_def_social', 'expense', 24, true, 'heart', 'grape', now(), now()),
+  ('cat_def_social_funeral', 'Funeral', 'cat_def_social', 'expense', 25, true, 'shredder', 'grape', now(), now()),
+  ('cat_def_social_gift', 'Gifts given', 'cat_def_social', 'expense', 26, true, 'gift', 'grape', now(), now()),
+
   -- Transport children
+  ('cat_def_transport_gas', 'Gas', 'cat_def_transport', 'expense', 31, true, 'car', 'blue', now(), now()),
+  ('cat_def_transport_taxi', 'Taxi / Grab', 'cat_def_transport', 'expense', 32, true, 'car', 'blue', now(), now()),
+  ('cat_def_transport_public', 'Public transit', 'cat_def_transport', 'expense', 33, true, 'car', 'blue', now(), now()),
+  ('cat_def_transport_parking', 'Parking', 'cat_def_transport', 'expense', 34, true, 'car', 'blue', now(), now()),
+  ('cat_def_transport_tolls', 'Tolls', 'cat_def_transport', 'expense', 35, true, 'road', 'blue', now(), now()),
+  ('cat_def_transport_maintenance', 'Vehicle maintenance', 'cat_def_transport', 'expense', 36, true, 'tools', 'blue', now(), now()),
+  ('cat_def_transport_insurance', 'Vehicle insurance', 'cat_def_transport', 'expense', 37, true, 'shield', 'blue', now(), now()),
+  ('cat_def_transport_car_payment', 'Car payment', 'cat_def_transport', 'expense', 38, true, 'credit-card', 'blue', now(), now()),
+
+  -- Shopping children
+  ('cat_def_shopping_household', 'Household', 'cat_def_shopping', 'expense', 41, true, 'shopping-bag', 'violet', now(), now()),
+  ('cat_def_shopping_clothes', 'Clothes', 'cat_def_shopping', 'expense', 42, true, 'shopping-bag', 'violet', now(), now()),
+  ('cat_def_shopping_electronics', 'Electronics', 'cat_def_shopping', 'expense', 43, true, 'shopping-bag', 'violet', now(), now()),
+  ('cat_def_shopping_personal_care', 'Personal care', 'cat_def_shopping', 'expense', 44, true, 'sparkles', 'violet', now(), now()),
+  ('cat_def_shopping_gifts', 'Gifts', 'cat_def_shopping', 'expense', 45, true, 'gift', 'violet', now(), now()),
+  ('cat_def_shopping_online', 'Online shopping', 'cat_def_shopping', 'expense', 46, true, 'shopping-cart', 'violet', now(), now()),
+  ('cat_def_shopping_cosmetics', 'Cosmetics (Shopping)', 'cat_def_shopping', 'expense', 47, true, 'sparkles', 'violet', now(), now()),
+
+  -- Home & Life
+  ('cat_def_house', 'Home & Life', NULL, 'expense', 48, true, 'home', 'teal', now(), now()),
+  ('cat_def_home_furniture', 'Furniture', 'cat_def_house', 'expense', 49, true, 'armchair', 'teal', now(), now()),
+  ('cat_def_home_decor', 'Home Decor', 'cat_def_house', 'expense', 50, true, 'lamp', 'teal', now(), now()),
+  ('cat_def_home_cleaning', 'Cleaning', 'cat_def_house', 'expense', 51, true, 'trash', 'teal', now(), now()),
+
+  -- Work & Career
+  ('cat_def_work', 'Work & Career', NULL, 'expense', 52, true, 'briefcase', 'indigo', now(), now()),
+  ('cat_def_work_supplies', 'Office Supplies', 'cat_def_work', 'expense', 53, true, 'pencil', 'indigo', now(), now()),
+  ('cat_def_work_travel', 'Work Travel', 'cat_def_work', 'expense', 54, true, 'plane', 'indigo', now(), now()),
+  ('cat_def_work_lunch', 'Business Lunch', 'cat_def_work', 'expense', 55, true, 'tools', 'indigo', now(), now()),
+
+  -- Technology
+  ('cat_def_tech', 'Technology', NULL, 'expense', 56, true, 'cpu', 'cyan', now(), now()),
+  ('cat_def_tech_gadgets', 'Gadgets', 'cat_def_tech', 'expense', 57, true, 'device-mobile', 'cyan', now(), now()),
+  ('cat_def_tech_software', 'Software / Subscriptions', 'cat_def_tech', 'expense', 58, true, 'code', 'cyan', now(), now()),
+  ('cat_def_tech_cloud', 'Cloud Storage', 'cat_def_tech', 'expense', 59, true, 'cloud', 'cyan', now(), now()),
+
+  -- Bills children
   ('cat_def_transport_gas', 'Gas', 'cat_def_transport', 'expense', 21, true, 'car', 'blue', now(), now()),
   ('cat_def_transport_taxi', 'Taxi / Grab', 'cat_def_transport', 'expense', 22, true, 'car', 'blue', now(), now()),
   ('cat_def_transport_public', 'Public transit', 'cat_def_transport', 'expense', 23, true, 'car', 'blue', now(), now()),
