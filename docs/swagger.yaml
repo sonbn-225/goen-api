@@ -770,6 +770,24 @@ definitions:
       note:
         type: string
     type: object
+  transaction.GroupParticipantInput:
+    properties:
+      original_amount:
+        type: string
+      participant_name:
+        type: string
+      share_amount:
+        type: string
+    type: object
+  transaction.LineItemInput:
+    properties:
+      amount:
+        type: string
+      category_id:
+        type: string
+      note:
+        type: string
+    type: object
   transaction.ListResponse:
     properties:
       data:
@@ -781,10 +799,30 @@ definitions:
     type: object
   transaction.PatchRequest:
     properties:
+      amount:
+        type: string
+      category_ids:
+        items:
+          type: string
+        type: array
       description:
         type: string
+      group_participants:
+        items:
+          $ref: '#/definitions/transaction.GroupParticipantInput'
+        type: array
+      line_items:
+        items:
+          $ref: '#/definitions/transaction.LineItemInput'
+        type: array
       notes:
         type: string
+      occurred_at:
+        type: string
+      tag_ids:
+        items:
+          type: string
+        type: array
     type: object
 info:
   contact: {}

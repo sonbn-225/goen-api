@@ -374,6 +374,18 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 		idx := len(args)
 		whereExtra += fmt.Sprintf(" AND (t.account_id = $%d OR t.from_account_id = $%d OR t.to_account_id = $%d)", idx, idx, idx)
 	}
+	if filter.CategoryID != nil && strings.TrimSpace(*filter.CategoryID) != "" {
+		args = append(args, *filter.CategoryID)
+		whereExtra += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM transaction_line_items tli WHERE tli.transaction_id = t.id AND tli.category_id = $%d)", len(args))
+	}
+	if filter.Type != nil && strings.TrimSpace(*filter.Type) != "" {
+		args = append(args, *filter.Type)
+		whereExtra += fmt.Sprintf(" AND t.type = $%d", len(args))
+	}
+	if filter.Search != nil && strings.TrimSpace(*filter.Search) != "" {
+		args = append(args, "%"+*filter.Search+"%")
+		whereExtra += fmt.Sprintf(" AND (t.description ILIKE $%d OR t.notes ILIKE $%d)", len(args), len(args))
+	}
 	if cursorTime != nil && cursorID != nil {
 		args = append(args, *cursorTime)
 		args = append(args, *cursorID)
@@ -543,16 +555,125 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 			notes = patch.Notes
 		}
 
+		amount := cur.Amount
+		if patch.Amount != nil {
+			amount = *patch.Amount
+		}
+
+		occurredAt := cur.OccurredAt
+		if patch.OccurredAt != nil {
+			occurredAt = *patch.OccurredAt
+		}
+
 		_, err = dbtx.Exec(ctx, `
 			UPDATE transactions
 			SET description = $1,
 			    notes = $2,
-			    updated_at = $3,
-			    updated_by = $4
-			WHERE id = $5 AND deleted_at IS NULL
-		`, desc, notes, now, userID, transactionID)
+			    amount = $3::numeric,
+			    occurred_at = $4,
+			    updated_at = $5,
+			    updated_by = $6
+			WHERE id = $7 AND deleted_at IS NULL
+		`, desc, notes, amount, occurredAt, now, userID, transactionID)
 		if err != nil {
 			return err
+		}
+
+		// Update FIRST line item if amount or single category changes
+		if patch.Amount != nil || len(patch.CategoryIDs) == 1 {
+			var liID string
+			err := dbtx.QueryRow(ctx, `SELECT id FROM transaction_line_items WHERE transaction_id = $1 ORDER BY created_at LIMIT 1`, transactionID).Scan(&liID)
+			if err == nil {
+				setClause := ""
+				args := []any{liID}
+				if patch.Amount != nil {
+					setClause += "amount = $2"
+					args = append(args, *patch.Amount)
+				}
+				if len(patch.CategoryIDs) == 1 {
+					if setClause != "" {
+						setClause += ", "
+					}
+					setClause += fmt.Sprintf("category_id = $%d", len(args)+1)
+					args = append(args, patch.CategoryIDs[0])
+				}
+
+				if setClause != "" {
+					_, err = dbtx.Exec(ctx, "UPDATE transaction_line_items SET "+setClause+" WHERE id = $1", args...)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		// Handle Tags
+		if patch.TagIDs != nil {
+			_, err = dbtx.Exec(ctx, `DELETE FROM transaction_tags WHERE transaction_id = $1`, transactionID)
+			if err != nil {
+				return err
+			}
+			if len(patch.TagIDs) > 0 {
+				_, err = dbtx.Exec(ctx, `
+					INSERT INTO transaction_tags (transaction_id, tag_id, created_at)
+					SELECT $1, unnest($2::text[]), $3
+				`, transactionID, patch.TagIDs, now)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// Handle LineItems: replace all
+		if patch.LineItems != nil {
+			_, err = dbtx.Exec(ctx, `DELETE FROM transaction_line_items WHERE transaction_id = $1`, transactionID)
+			if err != nil {
+				return err
+			}
+			for _, li := range *patch.LineItems {
+				if li.ID == "" {
+					li.ID = uuid.NewString()
+				}
+				_, err = dbtx.Exec(ctx, `
+					INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note)
+					VALUES ($1, $2, $3, $4::numeric, $5)
+				`, li.ID, transactionID, li.CategoryID, li.Amount, li.Note)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// Handle GroupParticipants: delete unsettled + insert new
+		if patch.GroupParticipants != nil {
+			_, err = dbtx.Exec(ctx, `
+				DELETE FROM group_expense_participants
+				WHERE transaction_id = $1 AND user_id = $2 AND is_settled = false
+			`, transactionID, userID)
+			if err != nil {
+				return err
+			}
+			for _, p := range *patch.GroupParticipants {
+				if p.ID == "" {
+					p.ID = uuid.NewString()
+				}
+				_, err = dbtx.Exec(ctx, `
+					INSERT INTO group_expense_participants (
+						id, user_id, transaction_id, participant_name,
+						original_amount, share_amount,
+						is_settled, settlement_transaction_id,
+						created_at, updated_at
+					) VALUES ($1,$2,$3,$4,$5::numeric,$6::numeric,$7,$8,$9,$10)
+				`,
+					p.ID, p.UserID, transactionID, p.ParticipantName,
+					p.OriginalAmount, p.ShareAmount,
+					p.IsSettled, p.SettlementTransactionID,
+					p.CreatedAt, p.UpdatedAt,
+				)
+				if err != nil {
+					return err
+				}
+			}
 		}
 
 		fetched, err := r.GetTransaction(ctx, userID, transactionID)

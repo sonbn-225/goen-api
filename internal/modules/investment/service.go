@@ -14,6 +14,8 @@ import (
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/config"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/i18n"
 	"github.com/sonbn-225/goen-api/internal/modules/transaction"
 	"github.com/sonbn-225/goen-api/internal/storage"
 )
@@ -137,6 +139,7 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 		return nil, err
 	}
 
+	lang := httpapi.LangFromContext(ctx)
 	securityID := strings.TrimSpace(req.SecurityID)
 	if securityID == "" {
 		return nil, apperrors.Validation("security_id is required", nil)
@@ -303,9 +306,9 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 				if side == "sell" {
 					kind = "income"
 				}
-				desc := "Trade " + side
+				desc := i18n.T(lang, "trade_"+side)
 				if sec, err := s.repo.GetSecurity(ctx, securityID); err == nil && sec != nil {
-					desc = "Trade " + side + ": " + sec.Symbol
+					desc = i18n.T(lang, "trade_"+side) + ": " + sec.Symbol
 				}
 				_, err := s.txSvc.Create(ctx, userID, transaction.CreateRequest{
 					ClientID:     req.ClientID,
@@ -329,9 +332,9 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 	// Auto-create fee/tax transactions if requested amounts > 0 and no explicit transaction ids provided.
 	if feeTxID == nil {
 		if amt, ok := new(big.Rat).SetString(fees); ok && amt.Cmp(new(big.Rat)) > 0 {
-			desc := "Trade fee"
+			desc := i18n.T(lang, "trade_fee")
 			if sec, err := s.repo.GetSecurity(ctx, securityID); err == nil {
-				desc = "Trade fee: " + sec.Symbol
+				desc = i18n.T(lang, "trade_fee") + ": " + sec.Symbol
 			}
 			externalRef := deriveTradeExternalRef(req.ClientID, tradeID, "fee")
 			tx, err := s.txSvc.Create(ctx, userID, transaction.CreateRequest{
@@ -351,9 +354,9 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 
 	if taxTxID == nil {
 		if amt, ok := new(big.Rat).SetString(taxes); ok && amt.Cmp(new(big.Rat)) > 0 {
-			desc := "Trade tax"
+			desc := i18n.T(lang, "trade_tax")
 			if sec, err := s.repo.GetSecurity(ctx, securityID); err == nil {
-				desc = "Trade tax: " + sec.Symbol
+				desc = i18n.T(lang, "trade_tax") + ": " + sec.Symbol
 			}
 			externalRef := deriveTradeExternalRef(req.ClientID, tradeID, "tax")
 			tx, err := s.txSvc.Create(ctx, userID, transaction.CreateRequest{
@@ -555,7 +558,8 @@ func (s *Service) BackfillTradePrincipalTransactions(ctx context.Context, userID
 				securitySymbol[securityID] = sym
 			}
 		}
-		desc := "Trade " + strings.TrimSpace(tr.Side)
+		lang := httpapi.LangFromContext(ctx)
+		desc := i18n.T(lang, "trade_"+strings.TrimSpace(tr.Side))
 		if sym != "" {
 			desc = desc + ": " + sym
 		}

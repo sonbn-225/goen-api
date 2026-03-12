@@ -86,6 +86,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	q := r.URL.Query()
 	accountID := q.Get("account_id")
+	categoryID := q.Get("category_id")
+	txType := q.Get("type")
+	search := q.Get("search")
 	from := q.Get("from")
 	to := q.Get("to")
 	cursor := q.Get("cursor")
@@ -101,6 +104,18 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	if accountID != "" {
 		accountPtr = &accountID
 	}
+	var catPtr *string
+	if categoryID != "" {
+		catPtr = &categoryID
+	}
+	var typePtr *string
+	if txType != "" {
+		typePtr = &txType
+	}
+	var searchPtr *string
+	if search != "" {
+		searchPtr = &search
+	}
 	var fromPtr *string
 	if from != "" {
 		fromPtr = &from
@@ -115,11 +130,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	items, next, err := h.svc.List(r.Context(), userID, ListRequest{
-		AccountID: accountPtr,
-		From:      fromPtr,
-		To:        toPtr,
-		Cursor:    cursorPtr,
-		Limit:     limit,
+		AccountID:  accountPtr,
+		CategoryID: catPtr,
+		Type:       typePtr,
+		Search:     searchPtr,
+		From:       fromPtr,
+		To:         toPtr,
+		Cursor:     cursorPtr,
+		Limit:      limit,
 	})
 	if err != nil {
 		h.writeServiceError(w, err)

@@ -3686,6 +3686,34 @@ const docTemplate = `{
                 }
             }
         },
+        "transaction.GroupParticipantInput": {
+            "type": "object",
+            "properties": {
+                "original_amount": {
+                    "type": "string"
+                },
+                "participant_name": {
+                    "type": "string"
+                },
+                "share_amount": {
+                    "type": "string"
+                }
+            }
+        },
+        "transaction.LineItemInput": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                }
+            }
+        },
         "transaction.ListResponse": {
             "type": "object",
             "properties": {
@@ -3703,11 +3731,41 @@ const docTemplate = `{
         "transaction.PatchRequest": {
             "type": "object",
             "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "category_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "description": {
                     "type": "string"
                 },
+                "group_participants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/transaction.GroupParticipantInput"
+                    }
+                },
+                "line_items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/transaction.LineItemInput"
+                    }
+                },
                 "notes": {
                     "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "tag_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         }

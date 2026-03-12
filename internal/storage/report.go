@@ -49,7 +49,8 @@ func (r *ReportRepo) GetCashflow(ctx context.Context, userID string, months int)
 	}
 	defer rows.Close()
 
-	// Aggregate into mapping by month
+	// Aggregate into mapping by month while preserving order
+	var order []string
 	dataMap := make(map[string]*domain.CashflowStat)
 	for rows.Next() {
 		var month string
@@ -63,6 +64,7 @@ func (r *ReportRepo) GetCashflow(ctx context.Context, userID string, months int)
 		if !ok {
 			stat = &domain.CashflowStat{Month: month, Income: "0", Expense: "0"}
 			dataMap[month] = stat
+			order = append(order, month)
 		}
 		if tType == "income" {
 			stat.Income = total
@@ -74,11 +76,9 @@ func (r *ReportRepo) GetCashflow(ctx context.Context, userID string, months int)
 		return nil, err
 	}
 
-	// We might have missing months, but let's just return the found data for MVP.
-	// Frontend or service can zero-fill.
 	var result []domain.CashflowStat
-	for _, v := range dataMap {
-		result = append(result, *v)
+	for _, m := range order {
+		result = append(result, *dataMap[m])
 	}
 	
 	return result, nil
