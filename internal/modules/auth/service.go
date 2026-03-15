@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"mime/multipart"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/config"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/storage"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -40,13 +42,15 @@ type AuthResponse struct {
 type Service struct {
 	userRepo domain.UserRepository
 	cfg      *config.Config
+	s3       *storage.S3Client
 }
 
 // NewService creates a new auth service.
-func NewService(userRepo domain.UserRepository, cfg *config.Config) *Service {
+func NewService(userRepo domain.UserRepository, cfg *config.Config, s3 *storage.S3Client) *Service {
 	return &Service{
 		userRepo: userRepo,
 		cfg:      cfg,
+		s3:       s3,
 	}
 }
 
@@ -170,6 +174,29 @@ func (s *Service) Signin(ctx context.Context, req SigninRequest) (*AuthResponse,
 	}, nil
 }
 
+// Refresh issues a new access token for the current user.
+func (s *Service) Refresh(ctx context.Context, userID string) (*AuthResponse, error) {
+	user, err := s.userRepo.FindUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return nil, apperrors.Wrap(apperrors.KindUnauthorized, "user not found", err)
+		}
+		return nil, err
+	}
+
+	token, expiresIn, err := s.generateToken(*user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AuthResponse{
+		AccessToken: token,
+		TokenType:   "Bearer",
+		ExpiresIn:   expiresIn,
+		User:        *user,
+	}, nil
+}
+
 // GetMe returns the current user.
 func (s *Service) GetMe(ctx context.Context, userID string) (*domain.User, error) {
 	user, err := s.userRepo.FindUserByID(ctx, userID)
@@ -201,6 +228,42 @@ func (s *Service) UpdateMySettings(ctx context.Context, userID string, patch map
 
 	if updated.Settings == nil {
 		updated.Settings = defaultUserSettings()
+	}
+	return updated, nil
+}
+
+// UploadAvatar uploads a profile image to SeaweedFS and updates the user's avatar_url.
+func (s *Service) UploadAvatar(ctx context.Context, userID string, file *multipart.FileHeader) (*domain.User, error) {
+	if s.s3 == nil {
+		return nil, apperrors.Wrap(apperrors.KindNotFound, "storage not configured", nil)
+	}
+
+	objectKey, err := s.s3.UploadAvatar(ctx, userID, file)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build proxied URL pointing to our /media/... endpoint.
+	avatarURL := s.s3.AvatarURL(s.cfg.S3PublicBaseURL, objectKey)
+
+	updated, err := s.userRepo.UpdateUserProfile(ctx, userID, nil, &avatarURL)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return nil, apperrors.Wrap(apperrors.KindUnauthorized, "user not found", err)
+		}
+		return nil, err
+	}
+	return updated, nil
+}
+
+// UpdateMyProfile patches display_name (avatar_url is handled by UploadAvatar).
+func (s *Service) UpdateMyProfile(ctx context.Context, userID string, displayName *string) (*domain.User, error) {
+	updated, err := s.userRepo.UpdateUserProfile(ctx, userID, displayName, nil)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return nil, apperrors.Wrap(apperrors.KindUnauthorized, "user not found", err)
+		}
+		return nil, err
 	}
 	return updated, nil
 }

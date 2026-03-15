@@ -58,7 +58,6 @@ type CreateBody struct {
 	FromAccountID *string                 `json:"from_account_id,omitempty"`
 	ToAccountID   *string                 `json:"to_account_id,omitempty"`
 	ExchangeRate  *string                 `json:"exchange_rate,omitempty"`
-	Notes         *string                 `json:"notes,omitempty"`
 	CategoryID    *string                 `json:"category_id,omitempty"`
 	TagIDs        []string                `json:"tag_ids,omitempty"`
 	LineItems     []CreateLineItemRequest `json:"line_items,omitempty"`
@@ -90,6 +89,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	categoryID := q.Get("category_id")
 	txType := q.Get("type")
 	search := q.Get("search")
+	externalRefFamily := q.Get("external_ref_family")
 	from := q.Get("from")
 	to := q.Get("to")
 	cursor := q.Get("cursor")
@@ -117,6 +117,10 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	if search != "" {
 		searchPtr = &search
 	}
+	var externalRefFamilyPtr *string
+	if externalRefFamily != "" {
+		externalRefFamilyPtr = &externalRefFamily
+	}
 	var fromPtr *string
 	if from != "" {
 		fromPtr = &from
@@ -131,14 +135,15 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	items, next, err := h.svc.List(r.Context(), userID, ListRequest{
-		AccountID:  accountPtr,
-		CategoryID: catPtr,
-		Type:       typePtr,
-		Search:     searchPtr,
-		From:       fromPtr,
-		To:         toPtr,
-		Cursor:     cursorPtr,
-		Limit:      limit,
+		AccountID:         accountPtr,
+		CategoryID:        catPtr,
+		Type:              typePtr,
+		Search:            searchPtr,
+		ExternalRefFamily: externalRefFamilyPtr,
+		From:              fromPtr,
+		To:                toPtr,
+		Cursor:            cursorPtr,
+		Limit:             limit,
 	})
 	if err != nil {
 		h.writeServiceError(w, err)
@@ -214,7 +219,6 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		FromAccountID: body.FromAccountID,
 		ToAccountID:   body.ToAccountID,
 		ExchangeRate:  body.ExchangeRate,
-		Notes:         body.Notes,
 		CategoryID:    body.CategoryID,
 		TagIDs:        body.TagIDs,
 		LineItems:     body.LineItems,

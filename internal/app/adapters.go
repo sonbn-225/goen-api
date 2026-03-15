@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strings"
 
 	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/modules/account"
@@ -22,14 +23,22 @@ type rotTxServiceAdapter struct {
 }
 
 func (t *rotTxServiceAdapter) Create(ctx context.Context, userID string, req rotatingsavings.TxCreateRequest) (*domain.Transaction, error) {
+	var mergedDescription *string
+	if req.Description != nil && strings.TrimSpace(*req.Description) != "" {
+		v := strings.TrimSpace(*req.Description)
+		mergedDescription = &v
+	} else if req.Notes != nil && strings.TrimSpace(*req.Notes) != "" {
+		v := strings.TrimSpace(*req.Notes)
+		mergedDescription = &v
+	}
+
 	mapped := transaction.CreateRequest{
 		Type:         req.Type,
 		OccurredDate: req.OccurredDate,
 		OccurredTime: req.OccurredTime,
 		Amount:       req.Amount,
-		Description:  req.Description,
+		Description:  mergedDescription,
 		AccountID:    req.AccountID,
-		Notes:        req.Notes,
 	}
 	return t.svc.Create(ctx, userID, mapped)
 }

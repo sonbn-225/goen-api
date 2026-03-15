@@ -169,9 +169,9 @@ func (r *GroupExpenseRepo) SettleParticipant(ctx context.Context, userID, partic
 			d := fmt.Sprintf("Reimbursement from %s", strings.TrimSpace(name))
 			settlementTx.Description = &d
 		}
-		if settlementTx.Notes == nil {
-			n := fmt.Sprintf("Settlement for group expense transaction %s", txID)
-			settlementTx.Notes = &n
+		if settlementTx.Description != nil {
+			d := fmt.Sprintf("%s | Settlement for group expense transaction %s", strings.TrimSpace(*settlementTx.Description), txID)
+			settlementTx.Description = &d
 		}
 
 		catID := "cat_def_income_reimbursement"

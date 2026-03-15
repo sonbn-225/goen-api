@@ -295,6 +295,27 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 	feeTxID := normalizeOptionalString(req.FeeTransactionID)
 	taxTxID := normalizeOptionalString(req.TaxTransactionID)
 
+	principalCategoryID := req.PrincipalCategoryID
+	if principalCategoryID == nil || strings.TrimSpace(*principalCategoryID) == "" {
+		defaultPrincipalCategory := "cat_def_financial_invest_buy"
+		if side == "sell" {
+			defaultPrincipalCategory = "cat_def_financial_invest_sell"
+		}
+		principalCategoryID = &defaultPrincipalCategory
+	}
+
+	feeCategoryID := req.FeeCategoryID
+	if feeCategoryID == nil || strings.TrimSpace(*feeCategoryID) == "" {
+		defaultFeeCategory := "cat_def_financial_invest_fees"
+		feeCategoryID = &defaultFeeCategory
+	}
+
+	taxCategoryID := req.TaxCategoryID
+	if taxCategoryID == nil || strings.TrimSpace(*taxCategoryID) == "" {
+		defaultTaxCategory := "cat_def_other_taxes"
+		taxCategoryID = &defaultTaxCategory
+	}
+
 	// Auto-create principal cashflow transaction (buy/sell notional) so account balances reflect trades,
 	// not only fee/tax transactions.
 	// - BUY: creates an expense (cash outflow)
@@ -333,7 +354,7 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 					Description:  &desc,
 					AccountID:    &ia.AccountID,
 					ExternalRef:  externalRef,
-					CategoryID:   req.PrincipalCategoryID,
+					CategoryID:   principalCategoryID,
 				})
 				if err != nil {
 					// Allow idempotent retries/backfills.
@@ -367,7 +388,7 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 				Description:  &desc,
 				AccountID:    &ia.AccountID,
 				ExternalRef:  externalRef,
-				CategoryID:   req.FeeCategoryID,
+				CategoryID:   feeCategoryID,
 			})
 			if err != nil {
 				return nil, err
@@ -397,7 +418,7 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 				Description:  &desc,
 				AccountID:    &ia.AccountID,
 				ExternalRef:  externalRef,
-				CategoryID:   req.TaxCategoryID,
+				CategoryID:   taxCategoryID,
 			})
 			if err != nil {
 				return nil, err

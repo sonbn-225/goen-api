@@ -105,8 +105,8 @@ func createTransactionTx(ctx context.Context, dbtx pgx.Tx, userID string, tx dom
 			id, client_id, external_ref, type, occurred_at, amount, description,
 			from_amount, to_amount,
 			account_id, from_account_id, to_account_id, exchange_rate,
-			notes, status, created_at, updated_at, created_by, updated_by, deleted_at
-		) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7,$8::numeric,$9::numeric,$10,$11,$12,$13::numeric,$14,$15,$16,$17,$18,$19,$20)
+			status, created_at, updated_at, created_by, updated_by, deleted_at
+		) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7,$8::numeric,$9::numeric,$10,$11,$12,$13::numeric,$14,$15,$16,$17,$18,$19)
 	`,
 		tx.ID,
 		tx.ClientID,
@@ -121,7 +121,6 @@ func createTransactionTx(ctx context.Context, dbtx pgx.Tx, userID string, tx dom
 		tx.FromAccountID,
 		tx.ToAccountID,
 		tx.ExchangeRate,
-		tx.Notes,
 		tx.Status,
 		tx.CreatedAt,
 		tx.UpdatedAt,
@@ -246,7 +245,6 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 			a.currency AS account_currency,
 			fa.currency AS from_currency,
 			ta.currency AS to_currency,
-			t.notes,
 			t.status,
 			t.created_at,
 			t.updated_at,
@@ -294,7 +292,6 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 		&t.AccountCurrency,
 		&t.FromCurrency,
 		&t.ToCurrency,
-		&t.Notes,
 		&t.Status,
 		&t.CreatedAt,
 		&t.UpdatedAt,
@@ -383,7 +380,11 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 	}
 	if filter.Search != nil && strings.TrimSpace(*filter.Search) != "" {
 		args = append(args, "%"+*filter.Search+"%")
-		whereExtra += fmt.Sprintf(" AND (t.description ILIKE $%d OR t.notes ILIKE $%d)", len(args), len(args))
+		whereExtra += fmt.Sprintf(" AND t.description ILIKE $%d", len(args))
+	}
+	if filter.ExternalRefFamily != nil && strings.TrimSpace(*filter.ExternalRefFamily) != "" {
+		args = append(args, strings.TrimSpace(*filter.ExternalRefFamily))
+		whereExtra += fmt.Sprintf(" AND t.external_ref LIKE ($%d || ':%%')", len(args))
 	}
 	if cursorTime != nil && cursorID != nil {
 		args = append(args, *cursorTime)
@@ -413,7 +414,6 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 			a.currency AS account_currency,
 			fa.currency AS from_currency,
 			ta.currency AS to_currency,
-			t.notes,
 			t.status,
 			t.created_at,
 			t.updated_at,
@@ -475,7 +475,6 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 			&t.AccountCurrency,
 			&t.FromCurrency,
 			&t.ToCurrency,
-			&t.Notes,
 			&t.Status,
 			&t.CreatedAt,
 			&t.UpdatedAt,
@@ -546,12 +545,8 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 		}
 
 		desc := cur.Description
-		notes := cur.Notes
 		if patch.Description != nil {
 			desc = patch.Description
-		}
-		if patch.Notes != nil {
-			notes = patch.Notes
 		}
 
 		amount := cur.Amount
@@ -567,13 +562,12 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 		_, err = dbtx.Exec(ctx, `
 			UPDATE transactions
 			SET description = $1,
-			    notes = $2,
-			    amount = $3::numeric,
-			    occurred_at = $4,
-			    updated_at = $5,
-			    updated_by = $6
-			WHERE id = $7 AND deleted_at IS NULL
-		`, desc, notes, amount, occurredAt, now, userID, transactionID)
+			    amount = $2::numeric,
+			    occurred_at = $3,
+			    updated_at = $4,
+			    updated_by = $5
+			WHERE id = $6 AND deleted_at IS NULL
+		`, desc, amount, occurredAt, now, userID, transactionID)
 		if err != nil {
 			return err
 		}
@@ -581,7 +575,7 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 		// Update FIRST line item if amount or single category changes
 		if patch.Amount != nil || len(patch.CategoryIDs) == 1 {
 			var liID string
-			err := dbtx.QueryRow(ctx, `SELECT id FROM transaction_line_items WHERE transaction_id = $1 ORDER BY created_at LIMIT 1`, transactionID).Scan(&liID)
+			err := dbtx.QueryRow(ctx, `SELECT id FROM transaction_line_items WHERE transaction_id = $1 ORDER BY id LIMIT 1`, transactionID).Scan(&liID)
 			if err == nil {
 				setClause := ""
 				args := []any{liID}
@@ -683,7 +677,6 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 		// Audit (UC-007)
 		auditDiff := map[string]any{
 			"description": patch.Description,
-			"notes":       patch.Notes,
 		}
 		switch cur.Type {
 		case "expense", "income":

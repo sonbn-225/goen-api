@@ -33,7 +33,6 @@ type Transaction struct {
 	FromAccountID   *string               `json:"from_account_id,omitempty"`
 	ToAccountID     *string               `json:"to_account_id,omitempty"`
 	ExchangeRate    *string               `json:"exchange_rate,omitempty"`
-	Notes           *string               `json:"notes,omitempty"`
 	Status          string                `json:"status"`
 	CreatedAt       time.Time             `json:"created_at"`
 	UpdatedAt       time.Time             `json:"updated_at"`
@@ -46,14 +45,15 @@ type Transaction struct {
 }
 
 type TransactionListFilter struct {
-	AccountID  *string
-	CategoryID *string
-	Type       *string
-	Search     *string
-	From       *time.Time
-	To         *time.Time
-	Cursor     *string
-	Limit      int
+	AccountID         *string
+	CategoryID        *string
+	Type              *string
+	Search            *string
+	ExternalRefFamily *string
+	From              *time.Time
+	To                *time.Time
+	Cursor            *string
+	Limit             int
 }
 
 type TransactionRepository interface {
@@ -66,11 +66,10 @@ type TransactionRepository interface {
 
 type TransactionPatch struct {
 	Description       *string
-	Notes             *string
 	CategoryIDs       []string
 	TagIDs            []string
 	Amount            *string
 	OccurredAt        *time.Time
-	LineItems         *[]TransactionLineItem   // nil = no change, non-nil = replace all
+	LineItems         *[]TransactionLineItem     // nil = no change, non-nil = replace all
 	GroupParticipants *[]GroupExpenseParticipant // nil = no change, non-nil = replace all (only unsettled)
 }

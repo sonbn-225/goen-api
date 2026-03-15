@@ -160,6 +160,10 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 	// Build transaction (expense) and participant rows (exclude owner row).
 	now := time.Now().UTC()
 	txID := uuid.NewString()
+	mergedDescription := normalizeOptionalString(req.Description)
+	if mergedDescription == nil {
+		mergedDescription = normalizeOptionalString(req.Notes)
+	}
 	tx := domain.Transaction{
 		ID:           txID,
 		ClientID:     normalizeOptionalString(req.ClientID),
@@ -168,9 +172,8 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 		OccurredAt:   occurredAt,
 		OccurredDate: occurredDate,
 		Amount:       formatRatDecimalScale(totalPaid, 2),
-		Description:  normalizeOptionalString(req.Description),
+		Description:  mergedDescription,
 		AccountID:    &accountID,
-		Notes:        normalizeOptionalString(req.Notes),
 		Status:       "posted",
 		CreatedAt:    now,
 		UpdatedAt:    now,
