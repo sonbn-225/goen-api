@@ -296,6 +296,29 @@ CREATE TABLE IF NOT EXISTS transaction_line_items (
 
 CREATE INDEX IF NOT EXISTS idx_tli_transaction_id ON transaction_line_items(transaction_id);
 
+CREATE TABLE IF NOT EXISTS group_expense_participants (
+  id text PRIMARY KEY,
+  user_id text NOT NULL,
+  transaction_id text NOT NULL,
+  participant_name text NOT NULL,
+  original_amount numeric(18,2) NOT NULL,
+  share_amount numeric(18,2) NOT NULL,
+  is_settled boolean NOT NULL DEFAULT false,
+  settlement_transaction_id text,
+  created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+
+  CONSTRAINT fk_gep_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_gep_transaction_id FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_gep_settlement_transaction_id FOREIGN KEY (settlement_transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
+  CONSTRAINT ck_gep_amounts_positive CHECK (original_amount > 0 AND share_amount > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gep_user_id ON group_expense_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_gep_transaction_id ON group_expense_participants(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_gep_user_settled ON group_expense_participants(user_id, is_settled);
+CREATE INDEX IF NOT EXISTS idx_gep_user_participant_name ON group_expense_participants(user_id, lower(participant_name));
+
 CREATE TABLE IF NOT EXISTS categories (
   id text PRIMARY KEY,
   name text NOT NULL,
@@ -956,6 +979,10 @@ VALUES
   ('cat_def_other_donations', 'Donations', 'cat_def_other_expense', 'expense', 93, true, 'heart-handshake', 'gray', now(), now()),
   ('cat_def_other_taxes', 'Taxes', 'cat_def_other_expense', 'expense', 94, true, 'building-bank', 'gray', now(), now()),
 
+  -- Financial Investment (System)
+  ('cat_def_financial_invest_buy', 'Invest: Buy', 'cat_def_financial', 'expense', 92, true, 'chart-line', 'yellow', now(), now()),
+  ('cat_def_financial_invest_sell', 'Invest: Sell', 'cat_def_financial', 'income', 93, true, 'chart-line', 'yellow', now(), now()),
+
   -- System-only categories
   ('cat_sys_internal', 'System', NULL, 'both', 10000, true, 'settings', 'gray', now(), now()),
   ('cat_sys_internal_adjustment', 'System adjustment', 'cat_sys_internal', 'both', 10001, true, 'settings', 'gray', now(), now()),
@@ -964,7 +991,7 @@ ON CONFLICT (id) DO NOTHING;
 
 UPDATE categories
 SET is_system = true
-WHERE id IN ('cat_sys_internal','cat_sys_internal_adjustment','cat_sys_internal_sync');
+WHERE id IN ('cat_sys_internal','cat_sys_internal_adjustment','cat_sys_internal_sync','cat_def_financial_invest_buy','cat_def_financial_invest_sell');
 
 
 -- +goose Down

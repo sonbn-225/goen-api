@@ -59,6 +59,7 @@ type CreateBody struct {
 	ToAccountID   *string                 `json:"to_account_id,omitempty"`
 	ExchangeRate  *string                 `json:"exchange_rate,omitempty"`
 	Notes         *string                 `json:"notes,omitempty"`
+	CategoryID    *string                 `json:"category_id,omitempty"`
 	TagIDs        []string                `json:"tag_ids,omitempty"`
 	LineItems     []CreateLineItemRequest `json:"line_items,omitempty"`
 }
@@ -214,6 +215,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		ToAccountID:   body.ToAccountID,
 		ExchangeRate:  body.ExchangeRate,
 		Notes:         body.Notes,
+		CategoryID:    body.CategoryID,
 		TagIDs:        body.TagIDs,
 		LineItems:     body.LineItems,
 	}
