@@ -35,7 +35,6 @@ type CreateRequest struct {
 	FromAccountID *string                 `json:"from_account_id,omitempty"`
 	ToAccountID   *string                 `json:"to_account_id,omitempty"`
 	ExchangeRate  *string                 `json:"exchange_rate,omitempty"`
-	Notes         *string                 `json:"notes,omitempty"`
 	CategoryID    *string                 `json:"category_id,omitempty"`
 	TagIDs        []string                `json:"tag_ids,omitempty"`
 	LineItems     []CreateLineItemRequest `json:"line_items,omitempty"`
@@ -43,26 +42,26 @@ type CreateRequest struct {
 
 // ListRequest contains transaction list filters.
 type ListRequest struct {
-	AccountID  *string
-	CategoryID *string
-	Type       *string
-	Search     *string
-	From       *string
-	To         *string
-	Cursor     *string
-	Limit      int
+	AccountID         *string
+	CategoryID        *string
+	Type              *string
+	Search            *string
+	ExternalRefFamily *string
+	From              *string
+	To                *string
+	Cursor            *string
+	Limit             int
 }
 
 // PatchRequest contains transaction patch parameters.
 type PatchRequest struct {
-	Description       *string                   `json:"description,omitempty"`
-	Notes             *string                   `json:"notes,omitempty"`
-	CategoryIDs       []string                  `json:"category_ids,omitempty"`
-	TagIDs            []string                  `json:"tag_ids,omitempty"`
-	Amount            *string                   `json:"amount,omitempty"`
-	OccurredAt        *string                   `json:"occurred_at,omitempty"`
-	LineItems         *[]LineItemInput          `json:"line_items,omitempty"`
-	GroupParticipants *[]GroupParticipantInput   `json:"group_participants,omitempty"`
+	Description       *string                  `json:"description,omitempty"`
+	CategoryIDs       []string                 `json:"category_ids,omitempty"`
+	TagIDs            []string                 `json:"tag_ids,omitempty"`
+	Amount            *string                  `json:"amount,omitempty"`
+	OccurredAt        *string                  `json:"occurred_at,omitempty"`
+	LineItems         *[]LineItemInput         `json:"line_items,omitempty"`
+	GroupParticipants *[]GroupParticipantInput `json:"group_participants,omitempty"`
 }
 
 // LineItemInput is the line item payload for patch.
@@ -138,7 +137,20 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 	}
 
 	lineItems := make([]domain.TransactionLineItem, 0, len(req.LineItems))
-	
+
+	if kind == "transfer" {
+		if len(req.LineItems) > 0 {
+			return nil, apperrors.Validation("line_items must be empty for transfer", nil)
+		}
+		if req.CategoryID != nil && strings.TrimSpace(*req.CategoryID) != "" {
+			return nil, apperrors.Validation("category_id must be empty for transfer", nil)
+		}
+	}
+
+	if kind != "transfer" && len(req.LineItems) == 0 && (req.CategoryID == nil || strings.TrimSpace(*req.CategoryID) == "") {
+		return nil, apperrors.Validation("line_items is required and must include at least one category", nil)
+	}
+
 	// If CategoryID is provided at top-level and no lineItems, create a default lineItem.
 	if len(req.LineItems) == 0 && req.CategoryID != nil && strings.TrimSpace(*req.CategoryID) != "" {
 		lineItems = append(lineItems, domain.TransactionLineItem{
@@ -151,6 +163,12 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 	if len(req.LineItems) > 0 {
 		sum := big.NewRat(0, 1)
 		for _, li := range req.LineItems {
+			if kind != "transfer" {
+				if li.CategoryID == nil || strings.TrimSpace(*li.CategoryID) == "" {
+					return nil, apperrors.Validation("line_items.category_id is required", nil)
+				}
+			}
+
 			liAmt := strings.TrimSpace(li.Amount)
 			if liAmt == "" {
 				return nil, apperrors.Validation("line_items.amount is required", nil)
@@ -171,13 +189,14 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 				Note:       normalizeOptionalString(li.Note),
 			})
 		}
-		total, ok := new(big.Rat).SetString(amount)
-		if !ok {
-			return nil, apperrors.Validation("amount must be a decimal string", nil)
+
+		if kind != "transfer" {
+			amount = sum.FloatString(2)
 		}
-		if sum.Cmp(total) != 0 {
-			return nil, apperrors.Validation("line_items total must equal amount", nil)
-		}
+	}
+
+	if kind != "transfer" && len(lineItems) == 0 {
+		return nil, apperrors.Validation("line_items is required and must include at least one category", nil)
 	}
 
 	now := time.Now().UTC()
@@ -198,7 +217,6 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 		FromAccountID: normalizeOptionalString(req.FromAccountID),
 		ToAccountID:   normalizeOptionalString(req.ToAccountID),
 		ExchangeRate:  normalizeOptionalString(req.ExchangeRate),
-		Notes:         normalizeOptionalString(req.Notes),
 		Status:        "posted",
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -249,12 +267,13 @@ func (s *Service) Get(ctx context.Context, userID, transactionID string) (*domai
 // List returns transactions matching the filter.
 func (s *Service) List(ctx context.Context, userID string, req ListRequest) ([]domain.Transaction, *string, error) {
 	filter := domain.TransactionListFilter{
-		AccountID:  normalizeOptionalString(req.AccountID),
-		CategoryID: normalizeOptionalString(req.CategoryID),
-		Type:       normalizeOptionalString(req.Type),
-		Search:     normalizeOptionalString(req.Search),
-		Cursor:     normalizeOptionalString(req.Cursor),
-		Limit:      req.Limit,
+		AccountID:         normalizeOptionalString(req.AccountID),
+		CategoryID:        normalizeOptionalString(req.CategoryID),
+		Type:              normalizeOptionalString(req.Type),
+		Search:            normalizeOptionalString(req.Search),
+		ExternalRefFamily: normalizeOptionalString(req.ExternalRefFamily),
+		Cursor:            normalizeOptionalString(req.Cursor),
+		Limit:             req.Limit,
 	}
 
 	if req.From != nil {
@@ -283,26 +302,86 @@ func (s *Service) List(ctx context.Context, userID string, req ListRequest) ([]d
 
 // Patch updates transaction fields.
 func (s *Service) Patch(ctx context.Context, userID, transactionID string, req PatchRequest) (*domain.Transaction, error) {
+	cur, err := s.repo.GetTransaction(ctx, userID, transactionID)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrTransactionNotFound) {
+			return nil, apperrors.Wrap(apperrors.KindNotFound, "transaction not found", err)
+		}
+		if errors.Is(err, apperrors.ErrTransactionForbidden) {
+			return nil, apperrors.Wrap(apperrors.KindForbidden, "forbidden", err)
+		}
+		return nil, err
+	}
+
 	patch := domain.TransactionPatch{
 		Description: normalizeOptionalString(req.Description),
-		Notes:       normalizeOptionalString(req.Notes),
 		CategoryIDs: req.CategoryIDs,
 		TagIDs:      req.TagIDs,
 		Amount:      normalizeOptionalString(req.Amount),
 	}
 
+	if req.Amount != nil {
+		a := strings.TrimSpace(*req.Amount)
+		if a == "" {
+			return nil, apperrors.Validation("amount is required", nil)
+		}
+		if !isValidDecimal(a) {
+			return nil, apperrors.Validation("amount must be a decimal string", nil)
+		}
+	}
+
+	if cur.Type == "transfer" {
+		if req.LineItems != nil {
+			return nil, apperrors.Validation("line_items must be empty for transfer", nil)
+		}
+		if len(req.CategoryIDs) > 0 {
+			return nil, apperrors.Validation("category_ids must be empty for transfer", nil)
+		}
+	}
+
 	// Convert LineItemInput → domain.TransactionLineItem
 	if req.LineItems != nil {
+		if cur.Type != "transfer" && len(*req.LineItems) == 0 {
+			return nil, apperrors.Validation("line_items is required and must include at least one category", nil)
+		}
+
+		sum := big.NewRat(0, 1)
 		items := make([]domain.TransactionLineItem, len(*req.LineItems))
 		for i, li := range *req.LineItems {
+			if cur.Type != "transfer" {
+				if li.CategoryID == nil || strings.TrimSpace(*li.CategoryID) == "" {
+					return nil, apperrors.Validation("line_items.category_id is required", nil)
+				}
+			}
+
+			liAmt := strings.TrimSpace(li.Amount)
+			if liAmt == "" {
+				return nil, apperrors.Validation("line_items.amount is required", nil)
+			}
+			if !isValidDecimal(liAmt) {
+				return nil, apperrors.Validation("line_items.amount must be a decimal string", nil)
+			}
+			r, ok := new(big.Rat).SetString(liAmt)
+			if !ok {
+				return nil, apperrors.Validation("line_items.amount must be a decimal string", nil)
+			}
+			sum.Add(sum, r)
+
 			items[i] = domain.TransactionLineItem{
 				ID:         uuid.NewString(),
 				CategoryID: li.CategoryID,
-				Amount:     li.Amount,
+				Amount:     liAmt,
 				Note:       li.Note,
 			}
 		}
+
+		if cur.Type != "transfer" {
+			summed := sum.FloatString(2)
+			patch.Amount = &summed
+		}
 		patch.LineItems = &items
+	} else if req.Amount != nil && cur.Type != "transfer" {
+		return nil, apperrors.Validation("line_items is required when updating amount", nil)
 	}
 
 	// Convert GroupParticipantInput → domain.GroupExpenseParticipant

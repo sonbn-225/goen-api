@@ -61,6 +61,16 @@ func New(cfg *config.Config) *App {
 	groupExpenseRepo := storage.NewGroupExpenseRepo(db)
 	reportRepo := storage.NewReportRepo(db)
 
+	// Object storage (optional — gracefully degraded if not configured)
+	s3Client := storage.NewS3Client(storage.S3Config{
+		Endpoint:      cfg.S3Endpoint,
+		AccessKey:     cfg.S3AccessKey,
+		SecretKey:     cfg.S3SecretKey,
+		Bucket:        cfg.S3Bucket,
+		UseSSL:        cfg.S3UseSSL,
+		PublicBaseURL: cfg.S3PublicBaseURL,
+	})
+
 	// Independent modules (no cross-module dependencies)
 	diagMod := diagnostics.NewModule(diagnostics.ModuleDeps{
 		Cfg:   cfg,
@@ -71,6 +81,7 @@ func New(cfg *config.Config) *App {
 	authModule := authMod.NewModule(authMod.ModuleDeps{
 		UserRepo: userRepo,
 		Config:   cfg,
+		S3Client: s3Client,
 	})
 
 	categoryMod := category.NewModule(category.ModuleDeps{

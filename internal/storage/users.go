@@ -70,7 +70,7 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*domain.User, e
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, email, phone, display_name, settings, status, created_at, updated_at
+		SELECT id, email, phone, display_name, avatar_url, settings, status, created_at, updated_at
 		FROM users
 		WHERE id = $1`, id)
 
@@ -81,6 +81,7 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*domain.User, e
 		&u.Email,
 		&u.Phone,
 		&u.DisplayName,
+		&u.AvatarURL,
 		&settingsJSON,
 		&u.Status,
 		&u.CreatedAt,
@@ -111,7 +112,7 @@ func (r *UserRepo) findOneUser(ctx context.Context, whereClause string, args ...
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, email, phone, display_name, settings, status, password_hash, created_at, updated_at
+		SELECT id, email, phone, display_name, avatar_url, settings, status, password_hash, created_at, updated_at
 		FROM users
 		WHERE `+whereClause, args...)
 
@@ -122,6 +123,7 @@ func (r *UserRepo) findOneUser(ctx context.Context, whereClause string, args ...
 		&u.Email,
 		&u.Phone,
 		&u.DisplayName,
+		&u.AvatarURL,
 		&settingsJSON,
 		&u.Status,
 		&u.PasswordHash,
@@ -162,12 +164,49 @@ func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID string, patch 
 		SET settings = COALESCE(settings, '{}'::jsonb) || $1::jsonb,
 		    updated_at = NOW()
 		WHERE id = $2
-		RETURNING id, email, phone, display_name, settings, status, created_at, updated_at
+		RETURNING id, email, phone, display_name, avatar_url, settings, status, created_at, updated_at
 	`, patchJSON, userID)
 
 	var u domain.User
 	var settingsJSON []byte
-	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &u.AvatarURL, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.ErrUserNotFound
+		}
+		return nil, err
+	}
+	if len(settingsJSON) > 0 {
+		var v any
+		if err := json.Unmarshal(settingsJSON, &v); err == nil {
+			u.Settings = v
+		}
+	}
+	return &u, nil
+}
+
+// UpdateUserProfile updates display_name and/or avatar_url for a user.
+// Only non-nil pointers are applied.
+func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID string, displayName *string, avatarURL *string) (*domain.User, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	row := pool.QueryRow(ctx, `
+		UPDATE users
+		SET display_name = COALESCE($1, display_name),
+		    avatar_url   = COALESCE($2, avatar_url),
+		    updated_at   = NOW()
+		WHERE id = $3
+		RETURNING id, email, phone, display_name, avatar_url, settings, status, created_at, updated_at
+	`, displayName, avatarURL, userID)
+
+	var u domain.User
+	var settingsJSON []byte
+	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &u.AvatarURL, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.ErrUserNotFound
 		}

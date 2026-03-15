@@ -467,8 +467,6 @@ definitions:
         items:
           $ref: '#/definitions/domain.TransactionLineItem'
         type: array
-      notes:
-        type: string
       occurred_at:
         type: string
       occurred_date:
@@ -505,6 +503,8 @@ definitions:
     type: object
   domain.User:
     properties:
+      avatar_url:
+        type: string
       created_at:
         type: string
       display_name:
@@ -744,8 +744,6 @@ definitions:
         items:
           $ref: '#/definitions/transaction.CreateLineItemRequest'
         type: array
-      notes:
-        type: string
       occurred_at:
         type: string
       occurred_date:
@@ -817,8 +815,6 @@ definitions:
         items:
           $ref: '#/definitions/transaction.LineItemInput'
         type: array
-      notes:
-        type: string
       occurred_at:
         type: string
       tag_ids:
@@ -1040,6 +1036,60 @@ paths:
       summary: Get current user
       tags:
       - auth
+  /auth/me/avatar:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a profile image (multipart/form-data, field "avatar").
+      parameters:
+      - description: Image file
+        in: formData
+        name: avatar
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: Upload profile avatar
+      tags:
+      - auth
+  /auth/me/profile:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Profile patch
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.User'
+      summary: Update profile display name
+      tags:
+      - auth
   /auth/me/settings:
     patch:
       consumes:
@@ -1072,6 +1122,29 @@ paths:
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
       summary: Update current user settings
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Issue a new access token for the current authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AuthResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: Refresh access token
       tags:
       - auth
   /auth/signin:
@@ -1708,6 +1781,33 @@ paths:
       summary: Enqueue vnstock refresh for a list of symbols
       tags:
       - investments
+  /media/{bucket}/{key}:
+    get:
+      parameters:
+      - description: Bucket name
+        in: path
+        name: bucket
+        required: true
+        type: string
+      - description: Object key
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: Get media file
+      tags:
+      - media
   /ping:
     get:
       description: Lightweight endpoint for browser/app connectivity test.

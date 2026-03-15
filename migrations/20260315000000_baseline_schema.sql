@@ -157,6 +157,7 @@ CREATE TABLE IF NOT EXISTS users (
   email text NULL,
   phone text NULL,
   display_name text NULL,
+  avatar_url text NULL,
   status text NOT NULL DEFAULT 'active',
   password_hash text NOT NULL,
   settings jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -237,8 +238,6 @@ CREATE TABLE IF NOT EXISTS transactions (
   from_account_id text,
   to_account_id text,
   exchange_rate numeric(18,8),
-
-  notes text,
   status transaction_status NOT NULL DEFAULT 'posted',
 
   created_at timestamptz NOT NULL,
@@ -251,7 +250,30 @@ CREATE TABLE IF NOT EXISTS transactions (
   CONSTRAINT fk_transactions_from_account_id FOREIGN KEY (from_account_id) REFERENCES accounts(id),
   CONSTRAINT fk_transactions_to_account_id FOREIGN KEY (to_account_id) REFERENCES accounts(id),
   CONSTRAINT fk_transactions_created_by FOREIGN KEY (created_by) REFERENCES users(id),
-  CONSTRAINT fk_transactions_updated_by FOREIGN KEY (updated_by) REFERENCES users(id)
+  CONSTRAINT fk_transactions_updated_by FOREIGN KEY (updated_by) REFERENCES users(id),
+  CONSTRAINT ck_transactions_amount_positive CHECK (amount > 0),
+  CONSTRAINT ck_transactions_from_amount_positive CHECK (from_amount IS NULL OR from_amount > 0),
+  CONSTRAINT ck_transactions_to_amount_positive CHECK (to_amount IS NULL OR to_amount > 0),
+  CONSTRAINT ck_transactions_type_linkage CHECK (
+    (
+      type IN ('expense', 'income')
+      AND account_id IS NOT NULL
+      AND from_account_id IS NULL
+      AND to_account_id IS NULL
+      AND from_amount IS NULL
+      AND to_amount IS NULL
+      AND exchange_rate IS NULL
+    )
+    OR
+    (
+      type = 'transfer'
+      AND account_id IS NULL
+      AND from_account_id IS NOT NULL
+      AND to_account_id IS NOT NULL
+      AND from_account_id <> to_account_id
+      AND ((from_amount IS NULL AND to_amount IS NULL) OR (from_amount IS NOT NULL AND to_amount IS NOT NULL))
+    )
+  )
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_transactions_account_external_ref
@@ -291,10 +313,38 @@ CREATE TABLE IF NOT EXISTS transaction_line_items (
   amount numeric(18,2) NOT NULL,
   note text,
 
-  CONSTRAINT fk_tli_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
+  CONSTRAINT fk_tli_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
+  CONSTRAINT ck_tli_amount_positive CHECK (amount > 0)
 );
 
 CREATE INDEX IF NOT EXISTS idx_tli_transaction_id ON transaction_line_items(transaction_id);
+
+-- Prevent attaching line items to transfer transactions.
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION enforce_tli_non_transfer()
+RETURNS trigger AS $$
+DECLARE
+  tx_type transaction_type;
+BEGIN
+  SELECT type INTO tx_type
+  FROM transactions
+  WHERE id = NEW.transaction_id;
+
+  IF tx_type = 'transfer' THEN
+    RAISE EXCEPTION 'line items are not allowed for transfer transactions';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+-- +goose StatementEnd
+
+DROP TRIGGER IF EXISTS trg_enforce_tli_non_transfer ON transaction_line_items;
+CREATE TRIGGER trg_enforce_tli_non_transfer
+BEFORE INSERT OR UPDATE OF transaction_id
+ON transaction_line_items
+FOR EACH ROW
+EXECUTE FUNCTION enforce_tli_non_transfer();
 
 CREATE TABLE IF NOT EXISTS group_expense_participants (
   id text PRIMARY KEY,

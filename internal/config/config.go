@@ -21,6 +21,13 @@ type Config struct {
 	JWTSecret           string
 	JWTAccessTTLMinutes int
 	MarketDataStatusURL string
+	// SeaweedFS / S3-compatible object storage
+	S3Endpoint      string
+	S3AccessKey     string
+	S3SecretKey     string
+	S3Bucket        string
+	S3UseSSL        bool
+	S3PublicBaseURL string
 }
 
 func Load() (*Config, error) {
@@ -50,6 +57,14 @@ func Load() (*Config, error) {
 	// Optional: goen-python status endpoint for rate limit visibility.
 	// In docker-compose, goen-python service is typically reachable by name on the shared network.
 	cfg.MarketDataStatusURL = getenvDefault("MARKET_DATA_STATUS_URL", "http://goen-market-data:8090/status")
+
+	// SeaweedFS / S3-compatible storage (optional)
+	cfg.S3Endpoint = os.Getenv("SEAWEEDFS_ENDPOINT")
+	cfg.S3AccessKey = os.Getenv("SEAWEEDFS_ACCESS_KEY_ID")
+	cfg.S3SecretKey = os.Getenv("SEAWEEDFS_SECRET_ACCESS_KEY")
+	cfg.S3Bucket = getenvDefault("SEAWEEDFS_BUCKET", "goen")
+	cfg.S3UseSSL = os.Getenv("SEAWEEDFS_USE_SSL") == "true"
+	cfg.S3PublicBaseURL = os.Getenv("SEAWEEDFS_PUBLIC_BASE_URL")
 
 	cfg.JWTSecret = os.Getenv("JWT_SECRET")
 	if cfg.JWTSecret == "" {

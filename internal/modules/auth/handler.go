@@ -5,30 +5,38 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/config"
 	"github.com/sonbn-225/goen-api/internal/httpapi"
 	"github.com/sonbn-225/goen-api/internal/response"
+	"github.com/sonbn-225/goen-api/internal/storage"
 )
 
 // Handler handles HTTP requests for authentication.
 type Handler struct {
 	svc *Service
+	s3  *storage.S3Client
 }
 
 // NewHandler creates a new auth handler.
 func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+	return &Handler{svc: svc, s3: svc.s3}
 }
 
 // RegisterRoutes registers all auth routes on the given router.
 func (h *Handler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Post("/auth/signup", h.Signup)
 	r.Post("/auth/signin", h.Signin)
+	r.With(httpapi.AuthMiddleware(cfg)).Post("/auth/refresh", h.Refresh)
 	r.With(httpapi.AuthMiddleware(cfg)).Get("/auth/me", h.Me)
 	r.With(httpapi.AuthMiddleware(cfg)).Patch("/auth/me/settings", h.PatchMySettings)
+	r.With(httpapi.AuthMiddleware(cfg)).Post("/auth/me/avatar", h.UploadAvatar)
+	r.With(httpapi.AuthMiddleware(cfg)).Patch("/auth/me/profile", h.PatchMyProfile)
+	// Public media proxy (no auth — object keys are UUIDs)
+	r.Get("/media/{bucket}/*", h.GetMedia)
 }
 
 // Signup handles POST /auth/signup
@@ -79,6 +87,32 @@ func (h *Handler) Signin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.svc.Signin(r.Context(), req)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, resp)
+}
+
+// Refresh handles POST /auth/refresh
+// @Summary Refresh access token
+// @Description Issue a new access token for the current authenticated user.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Success 200 {object} AuthResponse
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /auth/refresh [post]
+func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	resp, err := h.svc.Refresh(r.Context(), userID)
 	if err != nil {
 		h.writeServiceError(w, err)
 		return
@@ -155,4 +189,111 @@ func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
 		return
 	}
 	response.WriteInternalError(w, err)
+}
+
+// UploadAvatar handles POST /auth/me/avatar
+// @Summary Upload profile avatar
+// @Description Upload a profile image (multipart/form-data, field "avatar").
+// @Tags auth
+// @Accept multipart/form-data
+// @Produce json
+// @Param avatar formData file true "Image file"
+// @Success 200 {object} domain.User
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 503 {object} response.ErrorEnvelope
+// @Router /auth/me/avatar [post]
+func (h *Handler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "failed to parse multipart form", nil)
+		return
+	}
+
+	file, fh, err := r.FormFile("avatar")
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "field 'avatar' not found", nil)
+		return
+	}
+	defer file.Close()
+
+	user, err := h.svc.UploadAvatar(r.Context(), userID, fh)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, user)
+}
+
+// PatchMyProfile handles PATCH /auth/me/profile
+// @Summary Update profile display name
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body object true "Profile patch"
+// @Success 200 {object} domain.User
+// @Router /auth/me/profile [patch]
+func (h *Handler) PatchMyProfile(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	var body struct {
+		DisplayName *string `json:"display_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		return
+	}
+
+	user, err := h.svc.UpdateMyProfile(r.Context(), userID, body.DisplayName)
+	if err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	response.WriteJSON(w, http.StatusOK, user)
+}
+
+// GetMedia handles GET /media/{bucket}/*
+// Streams a file from SeaweedFS without requiring authentication.
+// Object keys are unguessable UUIDs so this is safe to keep public.
+// @Summary Get media file
+// @Tags media
+// @Produce application/octet-stream
+// @Param bucket path string true "Bucket name"
+// @Param key path string true "Object key"
+// @Success 200 {file} binary
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /media/{bucket}/{key} [get]
+func (h *Handler) GetMedia(w http.ResponseWriter, r *http.Request) {
+	if h.s3 == nil {
+		response.WriteError(w, http.StatusServiceUnavailable, "unavailable", "storage not configured", nil)
+		return
+	}
+
+	bucket := chi.URLParam(r, "bucket")
+	key := strings.TrimPrefix(chi.URLParam(r, "*"), "/")
+	if strings.TrimSpace(bucket) == "" || strings.TrimSpace(key) == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid path", nil)
+		return
+	}
+
+	obj, info, err := h.s3.GetObject(r.Context(), bucket, key)
+	if err != nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "media not found", nil)
+		return
+	}
+	defer obj.Close()
+
+	w.Header().Set("Content-Type", info.ContentType)
+	w.Header().Set("Cache-Control", "public, max-age=31536000")
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, obj)
 }

@@ -17,6 +17,12 @@ services:
       - MARKET_DATA_STATUS_URL=${MARKET_DATA_STATUS_URL:-http://goen-market-data:8090/status}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - SEAWEEDFS_ENDPOINT=${SEAWEEDFS_ENDPOINT:-sunflower-seaweedfs:8333}
+      - SEAWEEDFS_ACCESS_KEY_ID=${SEAWEEDFS_ACCESS_KEY_ID:-your-s3-access-key}
+      - SEAWEEDFS_SECRET_ACCESS_KEY=${SEAWEEDFS_SECRET_ACCESS_KEY:-your-s3-secret-key}
+      - SEAWEEDFS_BUCKET=${SEAWEEDFS_BUCKET:-goen}
+      - SEAWEEDFS_USE_SSL=${SEAWEEDFS_USE_SSL:-false}
+      - SEAWEEDFS_PUBLIC_BASE_URL=${SEAWEEDFS_PUBLIC_BASE_URL:-}
     volumes:
       - .:/app
     networks:
