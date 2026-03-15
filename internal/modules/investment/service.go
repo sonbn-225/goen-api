@@ -40,6 +40,13 @@ type CreateTradeRequest struct {
 	OccurredDate     *string `json:"occurred_date,omitempty"`
 	OccurredTime     *string `json:"occurred_time,omitempty"`
 	Note             *string `json:"note,omitempty"`
+
+	PrincipalCategoryID  *string `json:"principal_category_id,omitempty"`
+	PrincipalDescription *string `json:"principal_description,omitempty"`
+	FeeCategoryID        *string `json:"fee_category_id,omitempty"`
+	FeeDescription       *string `json:"fee_description,omitempty"`
+	TaxCategoryID        *string `json:"tax_category_id,omitempty"`
+	TaxDescription       *string `json:"tax_description,omitempty"`
 }
 
 // Service handles investment business logic.
@@ -306,10 +313,18 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 				if side == "sell" {
 					kind = "income"
 				}
-				desc := i18n.T(lang, "trade_"+side)
-				if sec, err := s.repo.GetSecurity(ctx, securityID); err == nil && sec != nil {
-					desc = i18n.T(lang, "trade_"+side) + ": " + sec.Symbol
+				desc := ""
+				if req.PrincipalDescription != nil {
+					desc = *req.PrincipalDescription
 				}
+				if desc == "" {
+					// Fallback if frontend didn't provide it
+					desc = i18n.T(lang, "trade_"+side)
+					if sec, err := s.repo.GetSecurity(ctx, securityID); err == nil && sec != nil {
+						desc += ": " + sec.Symbol
+					}
+				}
+
 				_, err := s.txSvc.Create(ctx, userID, transaction.CreateRequest{
 					ClientID:     req.ClientID,
 					Type:         kind,
@@ -318,6 +333,7 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 					Description:  &desc,
 					AccountID:    &ia.AccountID,
 					ExternalRef:  externalRef,
+					CategoryID:   req.PrincipalCategoryID,
 				})
 				if err != nil {
 					// Allow idempotent retries/backfills.
@@ -332,10 +348,17 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 	// Auto-create fee/tax transactions if requested amounts > 0 and no explicit transaction ids provided.
 	if feeTxID == nil {
 		if amt, ok := new(big.Rat).SetString(fees); ok && amt.Cmp(new(big.Rat)) > 0 {
-			desc := i18n.T(lang, "trade_fee")
-			if sec, err := s.repo.GetSecurity(ctx, securityID); err == nil {
-				desc = i18n.T(lang, "trade_fee") + ": " + sec.Symbol
+			desc := ""
+			if req.FeeDescription != nil {
+				desc = *req.FeeDescription
 			}
+			if desc == "" {
+				desc = i18n.T(lang, "trade_fee")
+				if sec, err := s.repo.GetSecurity(ctx, securityID); err == nil {
+					desc += ": " + sec.Symbol
+				}
+			}
+
 			externalRef := deriveTradeExternalRef(req.ClientID, tradeID, "fee")
 			tx, err := s.txSvc.Create(ctx, userID, transaction.CreateRequest{
 				Type:         "expense",
@@ -344,6 +367,7 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 				Description:  &desc,
 				AccountID:    &ia.AccountID,
 				ExternalRef:  externalRef,
+				CategoryID:   req.FeeCategoryID,
 			})
 			if err != nil {
 				return nil, err
@@ -354,10 +378,17 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 
 	if taxTxID == nil {
 		if amt, ok := new(big.Rat).SetString(taxes); ok && amt.Cmp(new(big.Rat)) > 0 {
-			desc := i18n.T(lang, "trade_tax")
-			if sec, err := s.repo.GetSecurity(ctx, securityID); err == nil {
-				desc = i18n.T(lang, "trade_tax") + ": " + sec.Symbol
+			desc := ""
+			if req.TaxDescription != nil {
+				desc = *req.TaxDescription
 			}
+			if desc == "" {
+				desc = i18n.T(lang, "trade_tax")
+				if sec, err := s.repo.GetSecurity(ctx, securityID); err == nil {
+					desc += ": " + sec.Symbol
+				}
+			}
+
 			externalRef := deriveTradeExternalRef(req.ClientID, tradeID, "tax")
 			tx, err := s.txSvc.Create(ctx, userID, transaction.CreateRequest{
 				Type:         "expense",
@@ -366,6 +397,7 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 				Description:  &desc,
 				AccountID:    &ia.AccountID,
 				ExternalRef:  externalRef,
+				CategoryID:   req.TaxCategoryID,
 			})
 			if err != nil {
 				return nil, err
@@ -573,6 +605,13 @@ func (s *Service) BackfillTradePrincipalTransactions(ctx context.Context, userID
 			Description: &desc,
 			AccountID:   &ia.AccountID,
 			ExternalRef: externalRef,
+			CategoryID: func() *string {
+				cid := "cat_def_financial_invest_buy"
+				if strings.TrimSpace(tr.Side) == "sell" {
+					cid = "cat_def_financial_invest_sell"
+				}
+				return &cid
+			}(),
 		})
 		if err != nil {
 			if isUniqueViolation(err) {

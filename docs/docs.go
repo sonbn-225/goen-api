@@ -3619,6 +3619,9 @@ const docTemplate = `{
                 "amount": {
                     "type": "string"
                 },
+                "category_id": {
+                    "type": "string"
+                },
                 "client_id": {
                     "type": "string"
                 },

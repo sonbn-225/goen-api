@@ -36,6 +36,7 @@ type CreateRequest struct {
 	ToAccountID   *string                 `json:"to_account_id,omitempty"`
 	ExchangeRate  *string                 `json:"exchange_rate,omitempty"`
 	Notes         *string                 `json:"notes,omitempty"`
+	CategoryID    *string                 `json:"category_id,omitempty"`
 	TagIDs        []string                `json:"tag_ids,omitempty"`
 	LineItems     []CreateLineItemRequest `json:"line_items,omitempty"`
 }
@@ -137,6 +138,16 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 	}
 
 	lineItems := make([]domain.TransactionLineItem, 0, len(req.LineItems))
+	
+	// If CategoryID is provided at top-level and no lineItems, create a default lineItem.
+	if len(req.LineItems) == 0 && req.CategoryID != nil && strings.TrimSpace(*req.CategoryID) != "" {
+		lineItems = append(lineItems, domain.TransactionLineItem{
+			ID:         uuid.NewString(),
+			CategoryID: normalizeOptionalString(req.CategoryID),
+			Amount:     amount,
+		})
+	}
+
 	if len(req.LineItems) > 0 {
 		sum := big.NewRat(0, 1)
 		for _, li := range req.LineItems {

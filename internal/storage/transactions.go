@@ -146,7 +146,6 @@ func createTransactionTx(ctx context.Context, dbtx pgx.Tx, userID string, tx dom
 					WHERE id = $1
 					  AND deleted_at IS NULL
 					  AND is_active = true
-					  AND is_system = false
 				)
 			`, strings.TrimSpace(*li.CategoryID)).Scan(&ok)
 			if err != nil {
