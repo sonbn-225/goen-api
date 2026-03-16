@@ -26,3 +26,4 @@ type BudgetRepository interface {
 	ListBudgets(ctx context.Context, userID string) ([]Budget, error)
 	ComputeSpent(ctx context.Context, userID string, categoryID string, startDate string, endDate string) (string, error)
 }
+

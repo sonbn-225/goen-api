@@ -27,3 +27,4 @@ type AccountShareRepository interface {
 	UpsertAccountShare(ctx context.Context, actorUserID string, accountID string, targetUserID string, permission string) (*AccountShare, error)
 	RevokeAccountShare(ctx context.Context, actorUserID string, accountID string, targetUserID string) error
 }
+

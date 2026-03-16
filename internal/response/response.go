@@ -42,3 +42,4 @@ func WriteInternalError(w http.ResponseWriter, err error) {
 	}
 	WriteError(w, http.StatusInternalServerError, "internal_error", "internal error", nil)
 }
+

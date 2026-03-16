@@ -3,14 +3,12 @@ package marketdata
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sonbn-225/goen-api/internal/apperrors"
-	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/response"
 )
 
@@ -55,9 +53,9 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /securities/{securityId}/prices-daily/refresh [post]
 func (h *Handler) RefreshSecurityPricesDaily(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -87,7 +85,7 @@ func (h *Handler) RefreshSecurityPricesDaily(w http.ResponseWriter, r *http.Requ
 
 	resp, err := h.svc.EnqueueSecurityPricesDaily(r.Context(), userID, securityID, force, full, from, to)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -108,9 +106,9 @@ func (h *Handler) RefreshSecurityPricesDaily(w http.ResponseWriter, r *http.Requ
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /securities/{securityId}/events/refresh [post]
 func (h *Handler) RefreshSecurityEvents(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -123,7 +121,7 @@ func (h *Handler) RefreshSecurityEvents(w http.ResponseWriter, r *http.Request) 
 	force := r.URL.Query().Get("force")
 	resp, err := h.svc.EnqueueSecurityEvents(r.Context(), userID, securityID, force)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -143,9 +141,9 @@ func (h *Handler) RefreshSecurityEvents(w http.ResponseWriter, r *http.Request) 
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /securities/{securityId}/market-data/status [get]
 func (h *Handler) GetSecurityStatus(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -160,7 +158,7 @@ func (h *Handler) GetSecurityStatus(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.svc.GetSecurityStatus(ctx, userID, securityID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -182,9 +180,9 @@ func (h *Handler) GetSecurityStatus(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /market-data/vnstock/sync-all [post]
 func (h *Handler) RefreshMarketDataAll(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -195,7 +193,7 @@ func (h *Handler) RefreshMarketDataAll(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.svc.EnqueueMarketSync(r.Context(), userID, includePrices, includeEvents, force, full)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -227,9 +225,9 @@ type SyncSymbolsRequest struct {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /market-data/vnstock/sync-symbol/{symbol} [post]
 func (h *Handler) RefreshMarketDataBySymbol(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -249,7 +247,7 @@ func (h *Handler) RefreshMarketDataBySymbol(w http.ResponseWriter, r *http.Reque
 	force := r.URL.Query().Get("force")
 	resp, err := h.svc.EnqueueBySymbol(r.Context(), userID, symbol, includePrices, includeEvents, force)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -271,9 +269,9 @@ func (h *Handler) RefreshMarketDataBySymbol(w http.ResponseWriter, r *http.Reque
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /market-data/vnstock/sync-symbols [post]
 func (h *Handler) RefreshMarketDataBySymbols(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -312,7 +310,7 @@ func (h *Handler) RefreshMarketDataBySymbols(w http.ResponseWriter, r *http.Requ
 
 	resp, err := h.svc.EnqueueBySymbols(r.Context(), userID, req.Symbols, includePrices, includeEvents, force)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -329,9 +327,9 @@ func (h *Handler) RefreshMarketDataBySymbols(w http.ResponseWriter, r *http.Requ
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /market-data/vnstock/status [get]
 func (h *Handler) GetGlobalStatus(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -340,20 +338,11 @@ func (h *Handler) GetGlobalStatus(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.svc.GetGlobalStatus(ctx, userID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
 	response.WriteJSON(w, http.StatusOK, resp)
-}
-
-func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
-	var se *apperrors.Error
-	if errors.As(err, &se) {
-		response.WriteError(w, se.HTTPStatus(), string(se.Kind), se.Message, se.Details)
-		return
-	}
-	response.WriteInternalError(w, err)
 }
 
 func parseBoolDefault(raw string, def bool) bool {
@@ -370,3 +359,4 @@ func parseBoolDefault(raw string, def bool) bool {
 		return def
 	}
 }
+

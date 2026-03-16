@@ -345,3 +345,4 @@ func (s *Service) generateToken(user domain.User) (string, int, error) {
 
 	return signedToken, expiresIn, nil
 }
+

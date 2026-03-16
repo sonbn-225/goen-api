@@ -78,3 +78,4 @@ func (s *Service) Connectivity(ctx context.Context) ConnectivityResponse {
 
 	return resp
 }
+

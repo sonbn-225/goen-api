@@ -86,3 +86,4 @@ func (p *Postgres) Close() {
 		p.pool = nil
 	}
 }
+

@@ -3,14 +3,12 @@ package account
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/domain"
-	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/response"
 )
 
@@ -51,15 +49,15 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /accounts [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
 	items, err := h.svc.List(r.Context(), userID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -79,9 +77,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /accounts [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -93,7 +91,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	account, err := h.svc.Create(r.Context(), userID, req)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -112,9 +110,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId} [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -126,7 +124,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := h.svc.Get(r.Context(), userID, accountID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -149,9 +147,9 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId} [patch]
 func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -169,7 +167,7 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := h.svc.Patch(r.Context(), userID, accountID, patch)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -188,9 +186,9 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId} [delete]
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -201,7 +199,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), userID, accountID); err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -218,15 +216,15 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /accounts/balances [get]
 func (h *Handler) ListBalances(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
 	items, err := h.svc.ListBalances(r.Context(), userID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -240,16 +238,16 @@ type upsertShareRequest struct {
 
 // ListShares handles GET /accounts/{accountId}/shares
 func (h *Handler) ListShares(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
 	accountID := chi.URLParam(r, "accountId")
 	items, err := h.svc.ListShares(r.Context(), userID, accountID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -258,9 +256,9 @@ func (h *Handler) ListShares(w http.ResponseWriter, r *http.Request) {
 
 // UpsertShare handles PUT /accounts/{accountId}/shares
 func (h *Handler) UpsertShare(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -274,7 +272,7 @@ func (h *Handler) UpsertShare(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.UpsertShare(r.Context(), userID, accountID, req.Login, req.Permission)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -283,9 +281,9 @@ func (h *Handler) UpsertShare(w http.ResponseWriter, r *http.Request) {
 
 // RevokeShare handles DELETE /accounts/{accountId}/shares/{userId}
 func (h *Handler) RevokeShare(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -297,7 +295,7 @@ func (h *Handler) RevokeShare(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.RevokeShare(r.Context(), userID, accountID, targetUserID); err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -306,9 +304,9 @@ func (h *Handler) RevokeShare(w http.ResponseWriter, r *http.Request) {
 
 // ListAuditEvents handles GET /accounts/{accountId}/audit-events
 func (h *Handler) ListAuditEvents(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -322,23 +320,10 @@ func (h *Handler) ListAuditEvents(w http.ResponseWriter, r *http.Request) {
 
 	items, err := h.auditSvc.ListAuditEvents(context.Background(), userID, accountID, limit)
 	if err != nil {
-		var se *apperrors.Error
-		if errors.As(err, &se) {
-			response.WriteError(w, se.HTTPStatus(), string(se.Kind), se.Message, se.Details)
-			return
-		}
-		response.WriteInternalError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
 	response.WriteJSON(w, http.StatusOK, items)
 }
 
-func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
-	var se *apperrors.Error
-	if errors.As(err, &se) {
-		response.WriteError(w, se.HTTPStatus(), string(se.Kind), se.Message, se.Details)
-		return
-	}
-	response.WriteInternalError(w, err)
-}

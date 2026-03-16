@@ -40,3 +40,4 @@ func (s *Service) Get(ctx context.Context, userID, categoryID string) (*domain.C
 func (s *Service) List(ctx context.Context, userID string) ([]domain.Category, error) {
 	return s.repo.ListCategories(ctx, userID)
 }
+

@@ -46,3 +46,4 @@ type AccountRepository interface {
 	// UC-007 Shared Account
 	AccountShareRepository
 }
+

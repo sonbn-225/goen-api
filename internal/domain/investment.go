@@ -199,3 +199,4 @@ type InvestmentRepository interface {
 	ListRealizedLogs(ctx context.Context, userID string, brokerAccountID string) ([]RealizedTradeLog, error)
 	ListDividends(ctx context.Context, userID string, brokerAccountID string) ([]Transaction, error)
 }
+

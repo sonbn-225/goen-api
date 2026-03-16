@@ -34,3 +34,4 @@ type ServiceInterface interface {
 	Get(ctx context.Context, userID, categoryID string) (*domain.Category, error)
 	List(ctx context.Context, userID string) ([]domain.Category, error)
 }
+

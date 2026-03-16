@@ -23,3 +23,4 @@ type ReportRepository interface {
 	GetCashflow(ctx context.Context, userID string, months int) ([]CashflowStat, error)
 	GetTopExpenses(ctx context.Context, userID string, year int, month int, limit int) ([]CategoryExpenseStat, error)
 }
+

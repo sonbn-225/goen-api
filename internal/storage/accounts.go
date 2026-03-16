@@ -600,3 +600,4 @@ func requireAccountOwner(ctx context.Context, tx pgx.Tx, actorUserID string, acc
 	}
 	return nil
 }
+

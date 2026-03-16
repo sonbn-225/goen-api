@@ -132,3 +132,4 @@ func (s *S3Client) AvatarURL(baseURL, objectKey string) string {
 	base := strings.TrimRight(baseURL, "/")
 	return fmt.Sprintf("%s/api/v1/media/%s/%s", base, s.bucket, objectKey)
 }
+

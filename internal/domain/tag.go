@@ -19,3 +19,4 @@ type TagRepository interface {
 	GetTag(ctx context.Context, userID string, tagID string) (*Tag, error)
 	ListTags(ctx context.Context, userID string) ([]Tag, error)
 }
+

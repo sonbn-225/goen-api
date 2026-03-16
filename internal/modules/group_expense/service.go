@@ -391,3 +391,4 @@ func formatRatDecimalScale(r *big.Rat, scale int) string {
 	rr := roundRat(r, scale)
 	return rr.FloatString(scale)
 }
+

@@ -280,3 +280,4 @@ func (r *RotatingSavingsRepo) ListContributions(ctx context.Context, userID stri
 	}
 	return out, nil
 }
+

@@ -85,3 +85,4 @@ func normalizeOptionalString(s *string) *string {
 	}
 	return &v
 }
+

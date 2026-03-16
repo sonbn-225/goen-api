@@ -199,3 +199,4 @@ var (
 	ErrInvalidCursor        = errors.New("invalid cursor")
 	ErrStreamRequired       = errors.New("stream is required")
 )
+

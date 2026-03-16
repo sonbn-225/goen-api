@@ -118,3 +118,4 @@ func (h *Handler) Connectivity(w http.ResponseWriter, r *http.Request) {
 
 	response.WriteJSON(w, status, svcResp)
 }
+

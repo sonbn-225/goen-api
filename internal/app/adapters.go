@@ -50,3 +50,4 @@ type investmentAccountServiceAdapter struct {
 func (a *investmentAccountServiceAdapter) GetAccountByID(ctx context.Context, userID, accountID string) (*domain.Account, error) {
 	return a.svc.Get(ctx, userID, accountID)
 }
+

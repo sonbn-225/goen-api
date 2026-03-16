@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sonbn-225/goen-api/internal/config"
-	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/modules/account"
 	authMod "github.com/sonbn-225/goen-api/internal/modules/auth"
 	"github.com/sonbn-225/goen-api/internal/modules/budget"
@@ -216,9 +216,9 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(httpapi.OptionalAuthMiddleware(cfg))
-	r.Use(httpapi.RequestLogger())
-	r.Use(httpapi.CORSMiddleware(cfg))
+	r.Use(httpx.OptionalAuthMiddleware(cfg))
+	r.Use(httpx.RequestLogger())
+	r.Use(httpx.CORSMiddleware(cfg))
 	r.Use(middleware.Heartbeat("/healthz"))
 
 	r.Get("/swagger", func(w http.ResponseWriter, req *http.Request) {
@@ -236,7 +236,7 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 		mods.auth.Handler.RegisterRoutes(r, cfg)
 
 		// Others use auth middleware
-		authMiddleware := httpapi.AuthMiddleware(cfg)
+		authMiddleware := httpx.AuthMiddleware(cfg)
 
 		// Account
 		mods.account.Handler.RegisterRoutes(r, authMiddleware)
@@ -277,3 +277,4 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 
 	return r
 }
+

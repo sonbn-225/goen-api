@@ -29,3 +29,4 @@ type SavingsRepository interface {
 	UpdateSavingsInstrument(ctx context.Context, userID string, s SavingsInstrument) error
 	DeleteSavingsInstrument(ctx context.Context, userID string, savingsInstrumentID string) error
 }
+

@@ -144,3 +144,4 @@ func (r *CategoryRepo) ListCategories(ctx context.Context, userID string) ([]dom
 
 	return out, nil
 }
+

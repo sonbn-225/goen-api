@@ -204,3 +204,4 @@ func insertAuditEvent(ctx context.Context, dbtx pgx.Tx, accountID string, actorU
 	`, id, accountID, actorUserID, action, entityType, entityID, occurredAt, diffJSON)
 	return err
 }
+

@@ -14,7 +14,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/config"
 	"github.com/sonbn-225/goen-api/internal/domain"
-	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/i18n"
 	"github.com/sonbn-225/goen-api/internal/modules/transaction"
 	"github.com/sonbn-225/goen-api/internal/storage"
@@ -263,7 +263,7 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 		return nil, err
 	}
 
-	lang := httpapi.LangFromContext(ctx)
+	lang := httpx.LangFromContext(ctx)
 	securityID := strings.TrimSpace(req.SecurityID)
 	if securityID == "" {
 		return nil, apperrors.Validation("security_id is required", nil)
@@ -728,7 +728,7 @@ func (s *Service) BackfillTradePrincipalTransactions(ctx context.Context, userID
 				securitySymbol[securityID] = sym
 			}
 		}
-		lang := httpapi.LangFromContext(ctx)
+		lang := httpx.LangFromContext(ctx)
 		desc := i18n.T(lang, "trade_"+strings.TrimSpace(tr.Side))
 		if sym != "" {
 			desc = desc + ": " + sym
@@ -1800,3 +1800,4 @@ func isValidDecimal(s string) bool {
 	_, ok := new(big.Rat).SetString(strings.TrimSpace(s))
 	return ok
 }
+

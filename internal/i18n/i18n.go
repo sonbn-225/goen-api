@@ -38,3 +38,4 @@ func T(lang, key string) string {
 	}
 	return key
 }
+
