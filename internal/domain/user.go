@@ -30,3 +30,4 @@ type UserRepository interface {
 	UpdateUserSettings(ctx context.Context, userID string, patch map[string]any) (*User, error)
 	UpdateUserProfile(ctx context.Context, userID string, displayName *string, avatarURL *string) (*User, error)
 }
+

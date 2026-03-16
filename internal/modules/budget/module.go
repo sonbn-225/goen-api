@@ -27,3 +27,4 @@ func NewModule(deps ModuleDeps) *Module {
 		Handler: h,
 	}
 }
+

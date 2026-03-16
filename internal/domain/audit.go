@@ -19,3 +19,4 @@ type AuditEvent struct {
 type AuditRepository interface {
 	ListAuditEventsForAccount(ctx context.Context, userID string, accountID string, limit int) ([]AuditEvent, error)
 }
+

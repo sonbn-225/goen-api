@@ -363,3 +363,4 @@ func normalizeAccountColor(in *string) (*string, error) {
 	}
 	return &v, nil
 }
+

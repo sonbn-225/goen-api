@@ -2,12 +2,10 @@ package debt
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sonbn-225/goen-api/internal/apperrors"
-	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/response"
 )
 
@@ -45,15 +43,15 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /debts [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
 	items, err := h.svc.List(r.Context(), userID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -73,9 +71,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /debts [post]
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -87,7 +85,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.Create(r.Context(), userID, req)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -106,9 +104,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /debts/{debtId} [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -120,7 +118,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.Get(r.Context(), userID, id)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -139,9 +137,9 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /debts/{debtId}/payments [get]
 func (h *Handler) ListPayments(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -153,7 +151,7 @@ func (h *Handler) ListPayments(w http.ResponseWriter, r *http.Request) {
 
 	items, err := h.svc.ListPayments(r.Context(), userID, debtID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -175,9 +173,9 @@ func (h *Handler) ListPayments(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /debts/{debtId}/payments [post]
 func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -195,7 +193,7 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.CreatePayment(r.Context(), userID, debtID, req)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -214,9 +212,9 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /debts/{debtId}/installments [get]
 func (h *Handler) ListInstallments(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -228,7 +226,7 @@ func (h *Handler) ListInstallments(w http.ResponseWriter, r *http.Request) {
 
 	items, err := h.svc.ListInstallments(r.Context(), userID, debtID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -250,9 +248,9 @@ func (h *Handler) ListInstallments(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /debts/{debtId}/installments [post]
 func (h *Handler) CreateInstallment(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -270,7 +268,7 @@ func (h *Handler) CreateInstallment(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.CreateInstallment(r.Context(), userID, debtID, req)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -290,9 +288,9 @@ func (h *Handler) CreateInstallment(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /transactions/{transactionId}/debt-links [get]
 func (h *Handler) ListDebtLinksForTransaction(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -304,18 +302,10 @@ func (h *Handler) ListDebtLinksForTransaction(w http.ResponseWriter, r *http.Req
 
 	items, err := h.svc.ListPaymentsByTransaction(r.Context(), userID, txID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
 	response.WriteJSON(w, http.StatusOK, items)
 }
 
-func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
-	var se *apperrors.Error
-	if errors.As(err, &se) {
-		response.WriteError(w, se.HTTPStatus(), string(se.Kind), se.Message, se.Details)
-		return
-	}
-	response.WriteInternalError(w, err)
-}

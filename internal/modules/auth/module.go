@@ -41,3 +41,4 @@ type ServiceInterface interface {
 	GetMe(ctx context.Context, userID string) (*domain.User, error)
 	UpdateMySettings(ctx context.Context, userID string, patch map[string]any) (*domain.User, error)
 }
+

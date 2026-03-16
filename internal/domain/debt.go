@@ -57,3 +57,4 @@ type DebtRepository interface {
 	CreateInstallment(ctx context.Context, userID string, inst DebtInstallment) error
 	ListInstallments(ctx context.Context, userID string, debtID string) ([]DebtInstallment, error)
 }
+

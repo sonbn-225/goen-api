@@ -2,14 +2,12 @@ package group_expense
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sonbn-225/goen-api/internal/apperrors"
-	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/response"
 )
 
@@ -36,9 +34,9 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -56,7 +54,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.svc.Create(r.Context(), userID, body)
 	if err != nil {
-		writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -64,9 +62,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListByTransaction(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -78,16 +76,16 @@ func (h *Handler) ListByTransaction(w http.ResponseWriter, r *http.Request) {
 
 	items, err := h.svc.ListByTransaction(r.Context(), userID, txID)
 	if err != nil {
-		writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, items)
 }
 
 func (h *Handler) ListParticipantNames(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 	limit := 50
@@ -99,16 +97,16 @@ func (h *Handler) ListParticipantNames(w http.ResponseWriter, r *http.Request) {
 
 	names, err := h.svc.ListUniqueParticipantNames(r.Context(), userID, limit)
 	if err != nil {
-		writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, names)
 }
 
 func (h *Handler) Settle(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -132,18 +130,10 @@ func (h *Handler) Settle(w http.ResponseWriter, r *http.Request) {
 
 	tx, err := h.svc.Settle(r.Context(), userID, pid, body)
 	if err != nil {
-		writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
 	response.WriteJSON(w, http.StatusOK, tx)
 }
 
-func writeServiceError(w http.ResponseWriter, err error) {
-	var se *apperrors.Error
-	if errors.As(err, &se) {
-		response.WriteError(w, se.HTTPStatus(), string(se.Kind), se.Message, se.Details)
-		return
-	}
-	response.WriteInternalError(w, err)
-}

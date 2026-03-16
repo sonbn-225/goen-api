@@ -227,3 +227,4 @@ func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID string, display
 func EnsureUsersSchema(ctx context.Context, db *Postgres) error {
 	return nil
 }
+

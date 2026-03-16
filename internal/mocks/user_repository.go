@@ -48,3 +48,4 @@ func (m *MockUserRepository) UpdateUserSettings(ctx context.Context, userID stri
 	}
 	return args.Get(0).(*domain.User), args.Error(1)
 }
+

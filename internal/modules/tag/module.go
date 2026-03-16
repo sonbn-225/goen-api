@@ -35,3 +35,4 @@ type ServiceInterface interface {
 	Get(ctx context.Context, userID, tagID string) (*domain.Tag, error)
 	List(ctx context.Context, userID string) ([]domain.Tag, error)
 }
+

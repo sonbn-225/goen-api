@@ -451,3 +451,4 @@ func minRat(a *big.Rat, b *big.Rat) *big.Rat {
 func ratToDecimalString(r *big.Rat) string {
 	return r.FloatString(2)
 }
+

@@ -279,3 +279,4 @@ func isValidDecimal(s string) bool {
 	_, ok := new(big.Rat).SetString(s)
 	return ok
 }
+

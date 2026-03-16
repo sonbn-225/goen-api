@@ -2,12 +2,10 @@ package rotatingsavings
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sonbn-225/goen-api/internal/apperrors"
-	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/response"
 )
 
@@ -42,15 +40,15 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/groups [get]
 func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
 	items, err := h.svc.ListGroups(r.Context(), userID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -70,9 +68,9 @@ func (h *Handler) ListGroups(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/groups [post]
 func (h *Handler) CreateGroup(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -84,7 +82,7 @@ func (h *Handler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.CreateGroup(r.Context(), userID, req)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -103,9 +101,9 @@ func (h *Handler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/groups/{groupId} [get]
 func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -117,7 +115,7 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.GetGroup(r.Context(), userID, id)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -136,9 +134,9 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/groups/{groupId}/contributions [get]
 func (h *Handler) ListContributions(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -150,7 +148,7 @@ func (h *Handler) ListContributions(w http.ResponseWriter, r *http.Request) {
 
 	items, err := h.svc.ListContributions(r.Context(), userID, groupID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -172,9 +170,9 @@ func (h *Handler) ListContributions(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/groups/{groupId}/contributions [post]
 func (h *Handler) CreateContribution(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -192,18 +190,10 @@ func (h *Handler) CreateContribution(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.CreateContribution(r.Context(), userID, groupID, req)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
 	response.WriteJSON(w, http.StatusOK, item)
 }
 
-func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
-	var se *apperrors.Error
-	if errors.As(err, &se) {
-		response.WriteError(w, se.HTTPStatus(), string(se.Kind), se.Message, se.Details)
-		return
-	}
-	response.WriteInternalError(w, err)
-}

@@ -24,3 +24,4 @@ type CategoryRepository interface {
 	GetCategory(ctx context.Context, userID string, categoryID string) (*Category, error)
 	ListCategories(ctx context.Context, userID string) ([]Category, error)
 }
+

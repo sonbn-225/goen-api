@@ -110,3 +110,4 @@ func (r *PostgresRepo) LoadSyncState(ctx context.Context, syncKey string) (*Sync
 
 	return st, nil
 }
+

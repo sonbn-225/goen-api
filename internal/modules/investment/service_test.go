@@ -333,3 +333,4 @@ func TestClaimCorporateAction_Split_Residuals(t *testing.T) {
 	txSvc.AssertExpectations(t)
 }
 
+

@@ -1,12 +1,10 @@
 package category
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sonbn-225/goen-api/internal/apperrors"
-	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/response"
 )
 
@@ -37,15 +35,15 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /categories [get]
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
 	items, err := h.svc.List(r.Context(), userID)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
@@ -64,9 +62,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /categories/{categoryId} [get]
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -78,18 +76,10 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.svc.Get(r.Context(), userID, id)
 	if err != nil {
-		h.writeServiceError(w, err)
+		httpx.WriteServiceError(w, err)
 		return
 	}
 
 	response.WriteJSON(w, http.StatusOK, item)
 }
 
-func (h *Handler) writeServiceError(w http.ResponseWriter, err error) {
-	var se *apperrors.Error
-	if errors.As(err, &se) {
-		response.WriteError(w, se.HTTPStatus(), string(se.Kind), se.Message, se.Details)
-		return
-	}
-	response.WriteInternalError(w, err)
-}

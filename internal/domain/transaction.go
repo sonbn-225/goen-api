@@ -73,3 +73,4 @@ type TransactionPatch struct {
 	LineItems         *[]TransactionLineItem     // nil = no change, non-nil = replace all
 	GroupParticipants *[]GroupExpenseParticipant // nil = no change, non-nil = replace all (only unsettled)
 }
+

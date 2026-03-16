@@ -43,3 +43,4 @@ type RotatingSavingsRepository interface {
 	CreateContribution(ctx context.Context, userID string, c RotatingSavingsContribution) error
 	ListContributions(ctx context.Context, userID string, groupID string) ([]RotatingSavingsContribution, error)
 }
+

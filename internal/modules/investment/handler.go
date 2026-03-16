@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sonbn-225/goen-api/internal/httpapi"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/response"
 )
 
@@ -44,9 +44,9 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 // It creates missing cashflow transactions for trade principal (buy/sell notional)
 // so broker account balances reflect trades, not only fees/taxes.
 func (h *Handler) BackfillCash(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -67,9 +67,9 @@ func (h *Handler) BackfillCash(w http.ResponseWriter, r *http.Request) {
 
 // PatchInvestmentAccount handles PATCH /investment-accounts/{investmentAccountId}
 func (h *Handler) PatchInvestmentAccount(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -96,9 +96,9 @@ func (h *Handler) PatchInvestmentAccount(w http.ResponseWriter, r *http.Request)
 
 // CreateTrade handles POST /investment-accounts/{investmentAccountId}/trades
 func (h *Handler) CreateTrade(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -125,9 +125,9 @@ func (h *Handler) CreateTrade(w http.ResponseWriter, r *http.Request) {
 
 // PatchTrade handles PATCH /investment-accounts/{investmentAccountId}/trades/{tradeId}
 func (h *Handler) PatchTrade(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -155,9 +155,9 @@ func (h *Handler) PatchTrade(w http.ResponseWriter, r *http.Request) {
 
 // DeleteTrade handles DELETE /investment-accounts/{investmentAccountId}/trades/{tradeId}
 func (h *Handler) DeleteTrade(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -178,9 +178,9 @@ func (h *Handler) DeleteTrade(w http.ResponseWriter, r *http.Request) {
 
 // ListInvestmentAccounts handles GET /investment-accounts
 func (h *Handler) ListInvestmentAccounts(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -195,9 +195,9 @@ func (h *Handler) ListInvestmentAccounts(w http.ResponseWriter, r *http.Request)
 
 // GetInvestmentAccount handles GET /investment-accounts/{investmentAccountId}
 func (h *Handler) GetInvestmentAccount(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -222,9 +222,9 @@ func (h *Handler) GetInvestmentAccount(w http.ResponseWriter, r *http.Request) {
 
 // ListSecurities handles GET /securities
 func (h *Handler) ListSecurities(w http.ResponseWriter, r *http.Request) {
-	_, ok := httpapi.UserIDFromContext(r.Context())
+	_, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -239,9 +239,9 @@ func (h *Handler) ListSecurities(w http.ResponseWriter, r *http.Request) {
 
 // GetSecurity handles GET /securities/{securityId}
 func (h *Handler) GetSecurity(w http.ResponseWriter, r *http.Request) {
-	_, ok := httpapi.UserIDFromContext(r.Context())
+	_, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -266,9 +266,9 @@ func (h *Handler) GetSecurity(w http.ResponseWriter, r *http.Request) {
 
 // ListTrades handles GET /investment-accounts/{investmentAccountId}/trades
 func (h *Handler) ListTrades(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -289,9 +289,9 @@ func (h *Handler) ListTrades(w http.ResponseWriter, r *http.Request) {
 
 // ListHoldings handles GET /investment-accounts/{investmentAccountId}/holdings
 func (h *Handler) ListHoldings(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -312,9 +312,9 @@ func (h *Handler) ListHoldings(w http.ResponseWriter, r *http.Request) {
 
 // ListSecurityPrices handles GET /securities/{securityId}/prices-daily
 func (h *Handler) ListSecurityPrices(w http.ResponseWriter, r *http.Request) {
-	_, ok := httpapi.UserIDFromContext(r.Context())
+	_, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -346,9 +346,9 @@ func (h *Handler) ListSecurityPrices(w http.ResponseWriter, r *http.Request) {
 
 // ListSecurityEvents handles GET /securities/{securityId}/events
 func (h *Handler) ListSecurityEvents(w http.ResponseWriter, r *http.Request) {
-	_, ok := httpapi.UserIDFromContext(r.Context())
+	_, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -380,9 +380,9 @@ func (h *Handler) ListSecurityEvents(w http.ResponseWriter, r *http.Request) {
 
 // ListEligibleActions handles GET /investment-accounts/{investmentAccountId}/eligible-actions
 func (h *Handler) ListEligibleActions(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -403,9 +403,9 @@ func (h *Handler) ListEligibleActions(w http.ResponseWriter, r *http.Request) {
 
 // ClaimAction handles POST /investment-accounts/{investmentAccountId}/actions/{eventId}/claim
 func (h *Handler) ClaimAction(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -433,9 +433,9 @@ func (h *Handler) ClaimAction(w http.ResponseWriter, r *http.Request) {
 
 // GetRealizedPNLReport handles GET /investment-accounts/{investmentAccountId}/reports/realized-pnl
 func (h *Handler) GetRealizedPNLReport(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpapi.UserIDFromContext(r.Context())
+	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		httpx.WriteUnauthorized(w)
 		return
 	}
 
@@ -453,3 +453,4 @@ func (h *Handler) GetRealizedPNLReport(w http.ResponseWriter, r *http.Request) {
 
 	response.WriteJSON(w, http.StatusOK, report)
 }
+

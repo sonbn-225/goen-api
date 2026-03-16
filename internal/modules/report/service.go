@@ -55,3 +55,4 @@ func (s *Service) GetDashboardReport(ctx context.Context, userID string) (*domai
 
 	return report, nil
 }
+

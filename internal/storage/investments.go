@@ -1268,3 +1268,4 @@ func (r *InvestmentRepo) ListDividends(ctx context.Context, userID string, broke
 	}
 	return out, rows.Err()
 }
+

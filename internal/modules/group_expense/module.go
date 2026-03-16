@@ -26,3 +26,4 @@ func NewModule(deps ModuleDeps) *Module {
 	h := NewHandler(svc)
 	return &Module{Service: svc, Handler: h}
 }
+

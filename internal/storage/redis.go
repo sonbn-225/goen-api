@@ -74,3 +74,4 @@ func (r *Redis) Close() {
 	_ = r.client.Close()
 	r.client = nil
 }
+
