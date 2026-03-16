@@ -50,6 +50,7 @@ type AccountServiceDep interface {
 // TransactionServiceDep defines the transaction service methods needed by this module.
 type TransactionServiceDep interface {
 	Create(ctx context.Context, userID string, req transaction.CreateRequest) (*domain.Transaction, error)
+	Delete(ctx context.Context, userID, transactionID string) error
 }
 
 // NewModule creates a new investment module with all dependencies wired.
