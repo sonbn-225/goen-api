@@ -630,6 +630,180 @@ func (r *InvestmentRepo) ListTrades(ctx context.Context, userID string, brokerAc
 	return out, rows.Err()
 }
 
+func (r *InvestmentRepo) GetTrade(ctx context.Context, userID string, tradeID string) (*domain.Trade, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	row := pool.QueryRow(ctx, `
+		SELECT t.id, t.client_id, t.broker_account_id, t.security_id,
+		       t.fee_transaction_id, t.tax_transaction_id,
+		       t.side::text, t.quantity::text, t.price::text, t.fees::text, t.taxes::text,
+		       t.occurred_at, t.note, t.created_at, t.updated_at
+		FROM trades t
+		JOIN investment_accounts ia ON ia.id = t.broker_account_id
+		JOIN accounts a ON a.id = ia.account_id
+		JOIN user_accounts ua ON ua.account_id = a.id
+		WHERE t.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
+	`, tradeID, userID)
+
+	var t domain.Trade
+	if err := row.Scan(
+		&t.ID,
+		&t.ClientID,
+		&t.BrokerAccountID,
+		&t.SecurityID,
+		&t.FeeTransactionID,
+		&t.TaxTransactionID,
+		&t.Side,
+		&t.Quantity,
+		&t.Price,
+		&t.Fees,
+		&t.Taxes,
+		&t.OccurredAt,
+		&t.Note,
+		&t.CreatedAt,
+		&t.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.ErrTradeNotFound
+		}
+		return nil, err
+	}
+	return &t, nil
+}
+
+func (r *InvestmentRepo) DeleteTrade(ctx context.Context, userID string, tradeID string) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	cmd, err := pool.Exec(ctx, `
+		DELETE FROM trades
+		WHERE id = $1 AND EXISTS (
+			SELECT 1
+			FROM trades t
+			JOIN investment_accounts ia ON ia.id = t.broker_account_id
+			JOIN accounts a ON a.id = ia.account_id
+			JOIN user_accounts ua ON ua.account_id = a.id
+			WHERE t.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
+			  AND ua.permission IN ('owner','editor')
+		)
+	`, tradeID, userID)
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() == 0 {
+		return apperrors.ErrInvestmentForbidden
+	}
+	return nil
+}
+
+func (r *InvestmentRepo) DeleteShareLotsByTradeID(ctx context.Context, userID string, tradeID string) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = pool.Exec(ctx, `
+		DELETE FROM share_lots
+		WHERE buy_trade_id = $1 AND EXISTS (
+			SELECT 1
+			FROM share_lots l
+			JOIN investment_accounts ia ON ia.id = l.broker_account_id
+			JOIN accounts a ON a.id = ia.account_id
+			JOIN user_accounts ua ON ua.account_id = a.id
+			WHERE l.buy_trade_id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
+			  AND ua.permission IN ('owner','editor')
+		)
+	`, tradeID, userID)
+	return err
+}
+
+func (r *InvestmentRepo) DeleteRealizedLogsByTradeID(ctx context.Context, userID string, tradeID string) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = pool.Exec(ctx, `
+		DELETE FROM realized_trade_logs
+		WHERE sell_trade_id = $1 AND EXISTS (
+			SELECT 1
+			FROM realized_trade_logs l
+			JOIN investment_accounts ia ON ia.id = l.broker_account_id
+			JOIN accounts a ON a.id = ia.account_id
+			JOIN user_accounts ua ON ua.account_id = a.id
+			WHERE l.sell_trade_id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
+			  AND ua.permission IN ('owner','editor')
+		)
+	`, tradeID, userID)
+	return err
+}
+
+func (r *InvestmentRepo) ListRealizedLogsByTradeID(ctx context.Context, userID, tradeID string) ([]domain.RealizedTradeLog, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT l.id, l.broker_account_id, l.security_id, l.sell_trade_id, l.source_share_lot_id,
+		       l.quantity::text, l.acquisition_date::text, l.cost_basis_total::text,
+		       l.sell_price::text, l.proceeds::text, l.realized_pnl::text, l.provenance::text, l.created_at
+		FROM realized_trade_logs l
+		JOIN investment_accounts ia ON ia.id = l.broker_account_id
+		JOIN accounts a ON a.id = ia.account_id
+		JOIN user_accounts ua ON ua.account_id = a.id
+		WHERE l.sell_trade_id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
+	`, tradeID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []domain.RealizedTradeLog{}
+	for rows.Next() {
+		var l domain.RealizedTradeLog
+		if err := rows.Scan(
+			&l.ID,
+			&l.BrokerAccountID,
+			&l.SecurityID,
+			&l.SellTradeID,
+			&l.SourceShareLot,
+			&l.Quantity,
+			&l.AcquisitionDate,
+			&l.CostBasisTotal,
+			&l.SellPrice,
+			&l.Proceeds,
+			&l.RealizedPnL,
+			&l.Provenance,
+			&l.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
+}
+
 func (r *InvestmentRepo) ListHoldings(ctx context.Context, userID string, brokerAccountID string) ([]domain.Holding, error) {
 	if r.db == nil {
 		return nil, apperrors.ErrDatabaseNotReady
@@ -1002,4 +1176,95 @@ func nullStringPtr(ns sql.NullString) *string {
 		return nil
 	}
 	return &v
+}
+func (r *InvestmentRepo) ListRealizedLogs(ctx context.Context, userID string, brokerAccountID string) ([]domain.RealizedTradeLog, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT l.id, l.broker_account_id, l.security_id, l.sell_trade_id, l.source_share_lot_id,
+		       l.quantity::text, l.acquisition_date::text, l.cost_basis_total::text,
+		       l.sell_price::text, l.proceeds::text, l.realized_pnl::text, l.provenance::text, l.created_at
+		FROM realized_trade_logs l
+		JOIN investment_accounts ia ON ia.id = l.broker_account_id
+		JOIN accounts a ON a.id = ia.account_id
+		JOIN user_accounts ua ON ua.account_id = a.id
+		WHERE l.broker_account_id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
+		ORDER BY l.created_at DESC
+	`, brokerAccountID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []domain.RealizedTradeLog{}
+	for rows.Next() {
+		var l domain.RealizedTradeLog
+		if err := rows.Scan(
+			&l.ID,
+			&l.BrokerAccountID,
+			&l.SecurityID,
+			&l.SellTradeID,
+			&l.SourceShareLot,
+			&l.Quantity,
+			&l.AcquisitionDate,
+			&l.CostBasisTotal,
+			&l.SellPrice,
+			&l.Proceeds,
+			&l.RealizedPnL,
+			&l.Provenance,
+			&l.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
+}
+
+func (r *InvestmentRepo) ListDividends(ctx context.Context, userID string, brokerAccountID string) ([]domain.Transaction, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// We look for transactions linked to this investment account's ledger
+	// which are tagged as dividends (via ExternalRef pattern).
+	rows, err := pool.Query(ctx, `
+		SELECT t.id, t.client_id, t.external_ref, t.type, t.occurred_at, t.occurred_date,
+		       t.amount::text, t.description, t.account_id, t.status, t.created_at, t.updated_at
+		FROM transactions t
+		JOIN investment_accounts ia ON ia.account_id = t.account_id
+		JOIN user_accounts ua ON ua.account_id = ia.account_id
+		WHERE ia.id = $1 AND ua.user_id = $2 AND ua.status = 'active'
+		  AND t.deleted_at IS NULL
+		  AND t.type = 'income'
+		  AND t.external_ref LIKE 'event:%'
+		ORDER BY t.occurred_at DESC
+	`, brokerAccountID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []domain.Transaction{}
+	for rows.Next() {
+		var t domain.Transaction
+		if err := rows.Scan(
+			&t.ID, &t.ClientID, &t.ExternalRef, &t.Type, &t.OccurredAt, &t.OccurredDate,
+			&t.Amount, &t.Description, &t.AccountID, &t.Status, &t.CreatedAt, &t.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
 }

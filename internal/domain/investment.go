@@ -138,6 +138,25 @@ type RealizedTradeLog struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
+type RealizedPNLReportItem struct {
+	SecurityID        string `json:"security_id"`
+	Symbol            string `json:"symbol"`
+	GrossRealizedGain string `json:"gross_realized_gain"`
+	TradeGain         string `json:"trade_gain"`
+	DividendGain      string `json:"dividend_gain"`
+	Proceeds          string `json:"proceeds"`
+	CostBasis         string `json:"cost_basis"`
+	Fees              string `json:"fees"`
+	Taxes             string `json:"taxes"`
+	NetPNL            string `json:"net_pnl"`
+}
+
+type RealizedPNLReport struct {
+	Items      []RealizedPNLReportItem `json:"items"`
+	TotalNet   string                 `json:"total_net"`
+	TotalGross string                 `json:"total_gross"`
+}
+
 type InvestmentRepository interface {
 	// Investment accounts
 	CreateInvestmentAccount(ctx context.Context, userID string, ia InvestmentAccount) error
@@ -160,7 +179,9 @@ type InvestmentRepository interface {
 
 	// Trades
 	CreateTrade(ctx context.Context, userID string, t Trade) error
+	GetTrade(ctx context.Context, userID string, tradeID string) (*Trade, error)
 	ListTrades(ctx context.Context, userID string, brokerAccountID string) ([]Trade, error)
+	DeleteTrade(ctx context.Context, userID string, tradeID string) error
 
 	// Holdings
 	ListHoldings(ctx context.Context, userID string, brokerAccountID string) ([]Holding, error)
@@ -171,5 +192,10 @@ type InvestmentRepository interface {
 	ListShareLots(ctx context.Context, userID string, brokerAccountID string, securityID string) ([]ShareLot, error)
 	CreateShareLot(ctx context.Context, userID string, lot ShareLot) error
 	UpdateShareLotQuantity(ctx context.Context, userID string, lotID string, quantity string) error
+	DeleteShareLotsByTradeID(ctx context.Context, userID string, tradeID string) error
 	CreateRealizedTradeLog(ctx context.Context, userID string, log RealizedTradeLog) error
+	ListRealizedLogsByTradeID(ctx context.Context, userID string, tradeID string) ([]RealizedTradeLog, error)
+	DeleteRealizedLogsByTradeID(ctx context.Context, userID string, tradeID string) error
+	ListRealizedLogs(ctx context.Context, userID string, brokerAccountID string) ([]RealizedTradeLog, error)
+	ListDividends(ctx context.Context, userID string, brokerAccountID string) ([]Transaction, error)
 }

@@ -28,11 +28,16 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 	r.With(authMiddleware).Post("/investment-accounts/{investmentAccountId}/backfill-cash", h.BackfillCash)
 	r.With(authMiddleware).Post("/investment-accounts/{investmentAccountId}/trades", h.CreateTrade)
 	r.With(authMiddleware).Get("/investment-accounts/{investmentAccountId}/trades", h.ListTrades)
+	r.With(authMiddleware).Patch("/investment-accounts/{investmentAccountId}/trades/{tradeId}", h.PatchTrade)
+	r.With(authMiddleware).Delete("/investment-accounts/{investmentAccountId}/trades/{tradeId}", h.DeleteTrade)
 	r.With(authMiddleware).Get("/investment-accounts/{investmentAccountId}/holdings", h.ListHoldings)
 	r.With(authMiddleware).Get("/securities", h.ListSecurities)
 	r.With(authMiddleware).Get("/securities/{securityId}", h.GetSecurity)
 	r.With(authMiddleware).Get("/securities/{securityId}/prices-daily", h.ListSecurityPrices)
 	r.With(authMiddleware).Get("/securities/{securityId}/events", h.ListSecurityEvents)
+	r.With(authMiddleware).Get("/investment-accounts/{investmentAccountId}/eligible-actions", h.ListEligibleActions)
+	r.With(authMiddleware).Post("/investment-accounts/{investmentAccountId}/actions/{eventId}/claim", h.ClaimAction)
+	r.With(authMiddleware).Get("/investment-accounts/{investmentAccountId}/reports/realized-pnl", h.GetRealizedPNLReport)
 }
 
 // BackfillCash handles POST /investment-accounts/{investmentAccountId}/backfill-cash
@@ -116,6 +121,59 @@ func (h *Handler) CreateTrade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteJSON(w, http.StatusCreated, trade)
+}
+
+// PatchTrade handles PATCH /investment-accounts/{investmentAccountId}/trades/{tradeId}
+func (h *Handler) PatchTrade(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	brokerAccountID := chi.URLParam(r, "investmentAccountId")
+	tradeID := chi.URLParam(r, "tradeId")
+	if brokerAccountID == "" || tradeID == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "investmentAccountId and tradeId are required", nil)
+		return
+	}
+
+	var req CreateTradeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		return
+	}
+
+	trade, err := h.svc.UpdateTrade(r.Context(), userID, brokerAccountID, tradeID, req)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, trade)
+}
+
+// DeleteTrade handles DELETE /investment-accounts/{investmentAccountId}/trades/{tradeId}
+func (h *Handler) DeleteTrade(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	brokerAccountID := chi.URLParam(r, "investmentAccountId")
+	tradeID := chi.URLParam(r, "tradeId")
+	if brokerAccountID == "" || tradeID == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "investmentAccountId and tradeId are required", nil)
+		return
+	}
+
+	if err := h.svc.DeleteTrade(r.Context(), userID, brokerAccountID, tradeID); err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 // ListInvestmentAccounts handles GET /investment-accounts
@@ -318,4 +376,80 @@ func (h *Handler) ListSecurityEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.WriteJSON(w, http.StatusOK, events)
+}
+
+// ListEligibleActions handles GET /investment-accounts/{investmentAccountId}/eligible-actions
+func (h *Handler) ListEligibleActions(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	id := chi.URLParam(r, "investmentAccountId")
+	if id == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "investmentAccountId is required", nil)
+		return
+	}
+
+	actions, err := h.svc.ListEligibleCorporateActions(r.Context(), userID, id)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, actions)
+}
+
+// ClaimAction handles POST /investment-accounts/{investmentAccountId}/actions/{eventId}/claim
+func (h *Handler) ClaimAction(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	bid := chi.URLParam(r, "investmentAccountId")
+	evID := chi.URLParam(r, "eventId")
+	if bid == "" || evID == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "investmentAccountId and eventId are required", nil)
+		return
+	}
+
+	var req ClaimCorporateActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		return
+	}
+
+	res, err := h.svc.ClaimCorporateAction(r.Context(), userID, bid, evID, req)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, res)
+}
+
+// GetRealizedPNLReport handles GET /investment-accounts/{investmentAccountId}/reports/realized-pnl
+func (h *Handler) GetRealizedPNLReport(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "unauthorized", nil)
+		return
+	}
+
+	id := chi.URLParam(r, "investmentAccountId")
+	if id == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "investmentAccountId is required", nil)
+		return
+	}
+
+	report, err := h.svc.GetRealizedPNLReport(r.Context(), userID, id)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, report)
 }

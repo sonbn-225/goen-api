@@ -58,6 +58,19 @@ type Service struct {
 	redis      *storage.Redis
 }
 
+type EligibleAction struct {
+	Event            domain.SecurityEvent `json:"event"`
+	HoldingQuantity  string               `json:"holding_quantity"`
+	EntitledQuantity string               `json:"entitled_quantity"`
+	Status           string               `json:"status"` // 'eligible', 'claimed', 'dismissed'
+	ElectionID       *string              `json:"election_id,omitempty"`
+}
+
+type ClaimCorporateActionRequest struct {
+	ElectedQuantity *string `json:"elected_quantity,omitempty"`
+	Note            *string `json:"note,omitempty"`
+}
+
 // NewService creates a new investment service.
 func NewService(
 	repo domain.InvestmentRepository,
@@ -113,6 +126,110 @@ func (s *Service) ListSecurityPrices(ctx context.Context, securityID string, fro
 // ListSecurityEvents lists events for a security.
 func (s *Service) ListSecurityEvents(ctx context.Context, securityID string, from, to *string) ([]domain.SecurityEvent, error) {
 	return s.repo.ListSecurityEvents(ctx, securityID, from, to)
+}
+
+func (s *Service) GetTrade(ctx context.Context, userID, tradeID string) (*domain.Trade, error) {
+	return s.repo.GetTrade(ctx, userID, tradeID)
+}
+
+func (s *Service) DeleteTrade(ctx context.Context, userID, investmentAccountID, tradeID string) error {
+	bid := strings.TrimSpace(investmentAccountID)
+	if bid == "" {
+		return apperrors.Validation("investmentAccountId is required", nil)
+	}
+
+	tr, err := s.repo.GetTrade(ctx, userID, tradeID)
+	if err != nil {
+		return err
+	}
+	if tr.BrokerAccountID != bid {
+		return apperrors.ErrInvestmentForbidden
+	}
+
+	// 1. If it's a Buy trade, check if share lots are still 'active' and quantity matches.
+	if tr.Side == "buy" {
+		lots, err := s.repo.ListShareLots(ctx, userID, bid, tr.SecurityID)
+		if err != nil {
+			return err
+		}
+		for _, l := range lots {
+			if l.BuyTradeID != nil && *l.BuyTradeID == tr.ID {
+				if l.Status != "active" || l.Quantity != tr.Quantity {
+					return apperrors.Validation("cannot delete buy trade because some of its shares have already been sold or modified", nil)
+				}
+			}
+		}
+		if err := s.repo.DeleteShareLotsByTradeID(ctx, userID, tr.ID); err != nil {
+			return err
+		}
+	} else {
+		// 2. If it's a Sell trade, restore quantity to original lots.
+		logs, err := s.repo.ListRealizedLogsByTradeID(ctx, userID, tr.ID)
+		if err != nil {
+			return err
+		}
+		for _, l := range logs {
+			lots, err := s.repo.ListShareLots(ctx, userID, bid, tr.SecurityID)
+			if err != nil {
+				return err
+			}
+			var targetLot *domain.ShareLot
+			for _, lot := range lots {
+				if lot.ID == l.SourceShareLot {
+					targetLot = &lot
+					break
+				}
+			}
+			if targetLot == nil {
+				return apperrors.Validation("source share lot not found for sell trade restoration", nil)
+			}
+
+			oldQ, _ := new(big.Rat).SetString(targetLot.Quantity)
+			soldQ, _ := new(big.Rat).SetString(l.Quantity)
+			newQ := new(big.Rat).Add(oldQ, soldQ)
+
+			if err := s.repo.UpdateShareLotQuantity(ctx, userID, targetLot.ID, newQ.FloatString(8)); err != nil {
+				return err
+			}
+		}
+		if err := s.repo.DeleteRealizedLogsByTradeID(ctx, userID, tr.ID); err != nil {
+			return err
+		}
+	}
+
+	// 3. Delete associated transactions (Fee & Tax).
+	if tr.FeeTransactionID != nil {
+		_ = s.txSvc.Delete(ctx, userID, *tr.FeeTransactionID)
+	}
+	if tr.TaxTransactionID != nil {
+		_ = s.txSvc.Delete(ctx, userID, *tr.TaxTransactionID)
+	}
+
+	// 4. Principal transaction by Deterministic ExternalRef.
+	// Since we don't have transaction ID for principal, we rely on the Deterministic ExternalRef
+	// which is trade:{clientID}:{tradeID}:principal or trade:{tradeID}:principal.
+	// However, without a Search/DeleteByExternalRef method in txSvc, we might leave it orphaned
+	// until we implement a better cleanup.
+	// TODO: Add DeleteByExternalRef to transaction module or store principal_transaction_id in trades table.
+
+	// 5. Delete the trade record.
+	if err := s.repo.DeleteTrade(ctx, userID, tr.ID); err != nil {
+		return err
+	}
+
+	// 6. Refresh holding.
+	return s.upsertHoldingFromLots(ctx, userID, bid, tr.SecurityID)
+}
+
+func (s *Service) UpdateTrade(ctx context.Context, userID, investmentAccountID, tradeID string, req CreateTradeRequest) (*domain.Trade, error) {
+	// Revert-and-Apply: delete old trade effects and create new ones.
+	if err := s.DeleteTrade(ctx, userID, investmentAccountID, tradeID); err != nil {
+		return nil, err
+	}
+
+	// Create new trade. Note: we might want to preserve the old trade ID if possible,
+	// but CreateTrade returns a new ID. For now, this is the safest path.
+	return s.CreateTrade(ctx, userID, investmentAccountID, req)
 }
 
 func (s *Service) UpdateInvestmentAccountSettings(ctx context.Context, userID, investmentAccountID string, req PatchInvestmentAccountRequest) (*domain.InvestmentAccount, error) {
@@ -1284,6 +1401,396 @@ func normalizeTimeToHHMM(t string) string {
 		return parsed.Format("15:04")
 	}
 	return "00:00"
+}
+
+func (s *Service) ListEligibleCorporateActions(ctx context.Context, userID, investmentAccountID string) ([]EligibleAction, error) {
+	bid := strings.TrimSpace(investmentAccountID)
+	if bid == "" {
+		return nil, apperrors.Validation("investmentAccountId is required", nil)
+	}
+
+	holdings, err := s.repo.ListHoldings(ctx, userID, bid)
+	if err != nil {
+		return nil, err
+	}
+
+	elections, err := s.repo.ListSecurityEventElections(ctx, userID, bid, nil)
+	if err != nil {
+		return nil, err
+	}
+	electionMap := make(map[string]domain.SecurityEventElection)
+	for _, el := range elections {
+		electionMap[el.SecurityEventID] = el
+	}
+
+	var out []EligibleAction
+	for _, h := range holdings {
+		qty, _ := new(big.Rat).SetString(h.Quantity)
+		if qty.Cmp(new(big.Rat)) <= 0 {
+			continue
+		}
+
+		events, err := s.repo.ListSecurityEvents(ctx, h.SecurityID, nil, nil)
+		if err != nil {
+			continue
+		}
+
+		for _, ev := range events {
+			el, claimed := electionMap[ev.ID]
+			if claimed && el.Status == "dismissed" {
+				continue
+			}
+
+			status := "eligible"
+			if claimed {
+				status = "claimed"
+			}
+
+			// Simple logic: entitled = current_holding * ratio or cash_per_share.
+			// In production goen, we might check holding as of ex_date.
+			entitled := "0"
+			if ev.EventType == "dividend_cash" && ev.CashAmountPerShare != nil {
+				cash, _ := new(big.Rat).SetString(*ev.CashAmountPerShare)
+				entitled = formatRatDecimalScale(new(big.Rat).Mul(qty, cash), 2)
+			} else if (ev.EventType == "bonus_issue" || ev.EventType == "split" || ev.EventType == "stock_dividend") && ev.RatioNumerator != nil && ev.RatioDenominator != nil {
+				num, _ := new(big.Rat).SetString(*ev.RatioNumerator)
+				den, _ := new(big.Rat).SetString(*ev.RatioDenominator)
+				if den.Cmp(new(big.Rat)) > 0 {
+					entitled = formatRatDecimalScale(new(big.Rat).Quo(new(big.Rat).Mul(qty, num), den), 8)
+				}
+			}
+
+			var elID *string
+			if claimed {
+				elID = &el.ID
+			}
+
+			out = append(out, EligibleAction{
+				Event:            ev,
+				HoldingQuantity:  h.Quantity,
+				EntitledQuantity: entitled,
+				Status:           status,
+				ElectionID:       elID,
+			})
+		}
+	}
+
+	return out, nil
+}
+
+func (s *Service) ClaimCorporateAction(ctx context.Context, userID, investmentAccountID, securityEventID string, req ClaimCorporateActionRequest) (*domain.SecurityEventElection, error) {
+	bid := strings.TrimSpace(investmentAccountID)
+	evID := strings.TrimSpace(securityEventID)
+	if bid == "" || evID == "" {
+		return nil, apperrors.Validation("investmentAccountId and securityEventId are required", nil)
+	}
+
+	ev, err := s.repo.GetSecurityEvent(ctx, evID)
+	if err != nil {
+		return nil, err
+	}
+
+	h, err := s.repo.GetHolding(ctx, userID, bid, ev.SecurityID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Double-claim check.
+	elections, err := s.repo.ListSecurityEventElections(ctx, userID, bid, nil)
+	if err == nil {
+		for _, el := range elections {
+			if el.SecurityEventID == evID && el.Status != "dismissed" {
+				return nil, apperrors.Validation("this event has already been claimed for this account", nil)
+			}
+		}
+	}
+
+	qty, _ := new(big.Rat).SetString(h.Quantity)
+	entitled := "0"
+	if ev.EventType == "dividend_cash" && ev.CashAmountPerShare != nil {
+		cash, _ := new(big.Rat).SetString(*ev.CashAmountPerShare)
+		entitled = formatRatDecimalScale(new(big.Rat).Mul(qty, cash), 2)
+	} else if (ev.EventType == "bonus_issue" || ev.EventType == "split" || ev.EventType == "stock_dividend") && ev.RatioNumerator != nil && ev.RatioDenominator != nil {
+		num, _ := new(big.Rat).SetString(*ev.RatioNumerator)
+		den, _ := new(big.Rat).SetString(*ev.RatioDenominator)
+		if den.Cmp(new(big.Rat)) > 0 {
+			entitled = formatRatDecimalScale(new(big.Rat).Quo(new(big.Rat).Mul(qty, num), den), 8)
+		}
+	}
+
+	elected := entitled
+	if req.ElectedQuantity != nil && strings.TrimSpace(*req.ElectedQuantity) != "" {
+		elected = *req.ElectedQuantity
+	}
+
+	now := time.Now().UTC()
+	election := domain.SecurityEventElection{
+		ID:                           uuid.NewString(),
+		UserID:                       userID,
+		BrokerAccountID:              bid,
+		SecurityEventID:              evID,
+		SecurityID:                   ev.SecurityID,
+		EntitlementDate:              derefString(ev.ExDate),
+		HoldingQuantityAtEntitlement: h.Quantity,
+		EntitledQuantity:             entitled,
+		ElectedQuantity:              elected,
+		Status:                       "confirmed",
+		ConfirmedAt:                  &now,
+		Note:                         req.Note,
+		CreatedAt:                    now,
+		UpdatedAt:                    now,
+	}
+
+	// 1. Create the election record.
+	res, err := s.repo.UpsertSecurityEventElection(ctx, userID, election)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Perform the actual action.
+	if ev.EventType == "dividend_cash" {
+		ia, _ := s.repo.GetInvestmentAccount(ctx, userID, bid)
+		desc := fmt.Sprintf("Cash Dividend: %s", ev.SecurityID)
+		if ev.Note != nil {
+			desc += " - " + *ev.Note
+		}
+		occDate := time.Now().UTC().Format("2006-01-02")
+		if ev.PayDate != nil {
+			occDate = *ev.PayDate
+		}
+		_, err = s.txSvc.Create(ctx, userID, transaction.CreateRequest{
+			Type:         "income",
+			OccurredDate: &occDate,
+			Amount:       elected,
+			Description:  &desc,
+			AccountID:    &ia.AccountID,
+			ExternalRef:  ptr(deriveEventExternalRef(evID, bid, "cash")),
+		})
+	} else if ev.EventType == "bonus_issue" || ev.EventType == "stock_dividend" || ev.EventType == "split" {
+		occDate := time.Now().UTC().Format("2006-01-02")
+		if ev.EffectiveDate != nil {
+			occDate = *ev.EffectiveDate
+		}
+
+		// Calculation for stock-based events:
+		// 1. Trade quantity = Floor(elected entitlement)
+		// 2. Residual cash = Fraction * 10,000 (par value in VND)
+		entRat, _ := new(big.Rat).SetString(elected)
+		
+		floorQty := new(big.Int).Div(entRat.Num(), entRat.Denom())
+		tradeQty := new(big.Rat).SetInt(floorQty)
+		
+		residualQty := new(big.Rat).Sub(entRat, tradeQty)
+		
+		// Create trade for whole shares if any
+		if tradeQty.Cmp(big.NewRat(0, 1)) > 0 {
+			prov := "stock_dividend"
+			_, err = s.CreateTrade(ctx, userID, bid, CreateTradeRequest{
+				SecurityID:   ev.SecurityID,
+				Side:         "buy",
+				Quantity:     tradeQty.FloatString(8),
+				Price:        "0",
+				Provenance:   &prov,
+				OccurredDate: &occDate,
+				Note:         req.Note,
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Create income transaction for residual cash if any
+		if residualQty.Cmp(big.NewRat(0, 1)) > 0 {
+			parValue := big.NewRat(10000, 1)
+			cashAmt := new(big.Rat).Mul(residualQty, parValue)
+			cashAmtStr := formatRatDecimalScale(cashAmt, 2)
+			
+			ia, _ := s.repo.GetInvestmentAccount(ctx, userID, bid)
+			desc := fmt.Sprintf("Residual Cash (%s): %s", ev.EventType, ev.SecurityID)
+			
+			_, err = s.txSvc.Create(ctx, userID, transaction.CreateRequest{
+				Type:         "income",
+				OccurredDate: &occDate,
+				Amount:       cashAmtStr,
+				Description:  &desc,
+				AccountID:    &ia.AccountID,
+				ExternalRef:  ptr(deriveEventExternalRef(evID, bid, "residual")),
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return res, err
+}
+
+func deriveEventExternalRef(eventID, brokerAccountID, suffix string) string {
+	return fmt.Sprintf("event:%s:%s:%s", eventID, brokerAccountID, suffix)
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func ptr[T any](v T) *T {
+	return &v
+}
+
+func (s *Service) GetRealizedPNLReport(ctx context.Context, userID, brokerAccountID string) (*domain.RealizedPNLReport, error) {
+	// 1. Fetch data
+	logs, err := s.repo.ListRealizedLogs(ctx, userID, brokerAccountID)
+	if err != nil {
+		return nil, err
+	}
+	divs, err := s.repo.ListDividends(ctx, userID, brokerAccountID)
+	if err != nil {
+		return nil, err
+	}
+	trades, err := s.repo.ListTrades(ctx, userID, brokerAccountID)
+	if err != nil {
+		return nil, err
+	}
+	securities, err := s.repo.ListSecurities(ctx)
+	if err != nil {
+		return nil, err
+	}
+	secMap := make(map[string]domain.Security)
+	for _, sec := range securities {
+		secMap[sec.ID] = sec
+	}
+
+	// 2. Aggregate
+	items := make(map[string]*domain.RealizedPNLReportItem)
+
+	// Process Trade Logs (Proceeds, Cost Basis, Trade PNL)
+	for _, l := range logs {
+		it := items[l.SecurityID]
+		if it == nil {
+			it = &domain.RealizedPNLReportItem{
+				SecurityID:        l.SecurityID,
+				Symbol:            secMap[l.SecurityID].Symbol,
+				GrossRealizedGain: "0",
+				TradeGain:         "0",
+				DividendGain:      "0",
+				Proceeds:          "0",
+				CostBasis:         "0",
+				Fees:              "0",
+				Taxes:             "0",
+				NetPNL:            "0",
+			}
+			items[l.SecurityID] = it
+		}
+		it.TradeGain = addMoneyStrings(it.TradeGain, l.RealizedPnL)
+		it.Proceeds = addMoneyStrings(it.Proceeds, l.Proceeds)
+		it.CostBasis = addMoneyStrings(it.CostBasis, l.CostBasisTotal)
+	}
+
+	// Process Dividends
+	// We need to map dividend transactions to securities.
+	// Since we don't have a direct link in Transaction struct, we'll fetch events to map IDs.
+	// (Optimization: we could parse ExternalRef if it contains SecurityID, but currently it's eventID).
+	eventToSec := make(map[string]string)
+	for _, d := range divs {
+		if d.ExternalRef == nil {
+			continue
+		}
+		parts := strings.Split(*d.ExternalRef, ":")
+		if len(parts) >= 2 && parts[0] == "event" {
+			evID := parts[1]
+			if _, ok := eventToSec[evID]; !ok {
+				ev, err := s.repo.GetSecurityEvent(ctx, evID)
+				if err == nil && ev != nil {
+					eventToSec[evID] = ev.SecurityID
+				}
+			}
+			secID := eventToSec[evID]
+			if secID != "" {
+				it := items[secID]
+				if it == nil {
+					it = &domain.RealizedPNLReportItem{
+						SecurityID:        secID,
+						Symbol:            secMap[secID].Symbol,
+						GrossRealizedGain: "0",
+						TradeGain:         "0",
+						DividendGain:      "0",
+						Proceeds:          "0",
+						CostBasis:         "0",
+						Fees:              "0",
+						Taxes:             "0",
+						NetPNL:            "0",
+					}
+					items[secID] = it
+				}
+				it.DividendGain = addMoneyStrings(it.DividendGain, d.Amount)
+			}
+		}
+	}
+
+	// Process Fees and Taxes from Trades
+	// Note: We sum all fees/taxes for the security. 
+	// In some contexts, you might only want SELL fees for realized PNL, 
+	// but usually all trade costs for that security are deducted from its lifecycle profit.
+	for _, t := range trades {
+		it := items[t.SecurityID]
+		if it == nil {
+			continue // No realized gains yet, and we only report on realized items for now.
+		}
+		it.Fees = addMoneyStrings(it.Fees, t.Fees)
+		it.Taxes = addMoneyStrings(it.Taxes, t.Taxes)
+	}
+
+	// 3. Finalize items (Gross and Net)
+	var report domain.RealizedPNLReport
+	totalGross := big.NewRat(0, 1)
+	totalNet := big.NewRat(0, 1)
+
+	for _, it := range items {
+		gross := addMoneyStrings(it.TradeGain, it.DividendGain)
+		it.GrossRealizedGain = gross
+		
+		costs := addMoneyStrings(it.Fees, it.Taxes)
+		it.NetPNL = subMoneyStrings(gross, costs)
+
+		gRat, _ := new(big.Rat).SetString(it.GrossRealizedGain)
+		nRat, _ := new(big.Rat).SetString(it.NetPNL)
+		totalGross.Add(totalGross, gRat)
+		totalNet.Add(totalNet, nRat)
+
+		report.Items = append(report.Items, *it)
+	}
+
+	report.TotalGross = formatRatDecimalScale(totalGross, 2)
+	report.TotalNet = formatRatDecimalScale(totalNet, 2)
+
+	return &report, nil
+}
+
+func addMoneyStrings(a, b string) string {
+	ra, ok1 := new(big.Rat).SetString(strings.TrimSpace(a))
+	rb, ok2 := new(big.Rat).SetString(strings.TrimSpace(b))
+	if !ok1 {
+		ra = big.NewRat(0, 1)
+	}
+	if !ok2 {
+		rb = big.NewRat(0, 1)
+	}
+	return formatRatDecimalScale(new(big.Rat).Add(ra, rb), 2)
+}
+
+func subMoneyStrings(a, b string) string {
+	ra, ok1 := new(big.Rat).SetString(strings.TrimSpace(a))
+	rb, ok2 := new(big.Rat).SetString(strings.TrimSpace(b))
+	if !ok1 {
+		ra = big.NewRat(0, 1)
+	}
+	if !ok2 {
+		rb = big.NewRat(0, 1)
+	}
+	return formatRatDecimalScale(new(big.Rat).Sub(ra, rb), 2)
 }
 
 func isValidDecimal(s string) bool {
