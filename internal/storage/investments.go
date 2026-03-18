@@ -506,7 +506,7 @@ func (r *InvestmentRepo) ListSecurityEventElections(ctx context.Context, userID 
 		  AND ua.user_id = $2
 		  AND ua.status = 'active'
 		  AND a.deleted_at IS NULL
-		  AND ($3::text IS NULL OR e.status = $3)
+		  AND ($3::text IS NULL OR e.status = $3::security_event_election_status)
 		ORDER BY e.updated_at DESC
 	`, brokerAccountID, userID, normStatus)
 	if err != nil {
@@ -1239,7 +1239,8 @@ func (r *InvestmentRepo) ListDividends(ctx context.Context, userID string, broke
 	// We look for transactions linked to this investment account's ledger
 	// which are tagged as dividends (via ExternalRef pattern).
 	rows, err := pool.Query(ctx, `
-		SELECT t.id, t.client_id, t.external_ref, t.type, t.occurred_at, t.occurred_date,
+		SELECT t.id, t.client_id, t.external_ref, t.type, t.occurred_at,
+		       to_char(t.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS occurred_date,
 		       t.amount::text, t.description, t.account_id, t.status, t.created_at, t.updated_at
 		FROM transactions t
 		JOIN investment_accounts ia ON ia.account_id = t.account_id

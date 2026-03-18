@@ -3,11 +3,12 @@ package investment
 import (
 	"context"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/sonbn-225/goen-api/internal/domain"
 	"github.com/sonbn-225/goen-api/internal/modules/transaction"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 type MockRepo struct {
@@ -239,7 +240,7 @@ func TestClaimCorporateAction_Residuals(t *testing.T) {
 	repo.On("GetHolding", ctx, userID, bid, secID).Return(h, nil).Once() // First call for entitlement
 	repo.On("ListSecurityEventElections", ctx, userID, bid, mock.Anything).Return([]domain.SecurityEventElection{}, nil)
 	repo.On("UpsertSecurityEventElection", ctx, userID, mock.Anything).Return(&domain.SecurityEventElection{}, nil)
-	
+
 	// Expectations for CreateTrade (service method) -> repo.CreateTrade
 	repo.On("CreateTrade", ctx, userID, mock.MatchedBy(func(tr domain.Trade) bool {
 		return tr.Quantity == "12.00000000" && tr.Price == "0"
@@ -247,7 +248,7 @@ func TestClaimCorporateAction_Residuals(t *testing.T) {
 
 	// Expectations for CreateTrade (service method) -> repo.CreateShareLot
 	repo.On("CreateShareLot", ctx, userID, mock.Anything).Return(nil)
-	
+
 	// Expectations for upsertHoldingFromLots
 	repo.On("ListShareLots", ctx, userID, bid, secID).Return([]domain.ShareLot{
 		{
@@ -307,7 +308,7 @@ func TestClaimCorporateAction_Split_Residuals(t *testing.T) {
 	repo.On("GetHolding", ctx, userID, bid, secID).Return(h, nil).Once() // First call for entitlement
 	repo.On("ListSecurityEventElections", ctx, userID, bid, mock.Anything).Return([]domain.SecurityEventElection{}, nil)
 	repo.On("UpsertSecurityEventElection", ctx, userID, mock.Anything).Return(&domain.SecurityEventElection{}, nil)
-	
+
 	// Expect Trade for 151 shares
 	repo.On("CreateTrade", ctx, userID, mock.MatchedBy(func(tr domain.Trade) bool {
 		return tr.Quantity == "151.00000000" && tr.Price == "0"
@@ -333,4 +334,78 @@ func TestClaimCorporateAction_Split_Residuals(t *testing.T) {
 	txSvc.AssertExpectations(t)
 }
 
+func TestListEligibleCorporateActions_UsesPointInTimeHoldings(t *testing.T) {
+	repo := new(MockRepo)
+	txSvc := new(MockTxService)
+	accSvc := new(MockAccountService)
+	svc := NewService(repo, accSvc, txSvc, nil, nil)
 
+	ctx := context.Background()
+	userID := "user1"
+	bid := "account1"
+	secID := "VNM"
+
+	repo.On("ListHoldings", ctx, userID, bid).Return([]domain.Holding{{
+		SecurityID: secID,
+		Quantity:   "999",
+	}}, nil)
+	repo.On("ListTrades", ctx, userID, bid).Return([]domain.Trade{
+		{SecurityID: secID, Side: "buy", Quantity: "100", OccurredAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
+		{SecurityID: secID, Side: "sell", Quantity: "30", OccurredAt: time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)},
+		{SecurityID: secID, Side: "buy", Quantity: "20", OccurredAt: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)},
+	}, nil)
+	repo.On("ListSecurityEventElections", ctx, userID, bid, mock.Anything).Return([]domain.SecurityEventElection{}, nil)
+	repo.On("ListSecurityEvents", ctx, secID, (*string)(nil), (*string)(nil)).Return([]domain.SecurityEvent{
+		{
+			ID:                 "ev-ex-dividend",
+			SecurityID:         secID,
+			EventType:          "dividend_cash",
+			ExDate:             ptr("2026-01-10"),
+			CashAmountPerShare: ptr("1"),
+		},
+		{
+			ID:               "ev-ex-bonus",
+			SecurityID:       secID,
+			EventType:        "bonus_issue",
+			ExDate:           ptr("2026-01-20"),
+			RatioNumerator:   ptr("1"),
+			RatioDenominator: ptr("10"),
+		},
+		{
+			ID:               "ev-record-split",
+			SecurityID:       secID,
+			EventType:        "split",
+			RecordDate:       ptr("2026-02-10"),
+			RatioNumerator:   ptr("1"),
+			RatioDenominator: ptr("2"),
+		},
+		{
+			ID:         "ev-no-date",
+			SecurityID: secID,
+			EventType:  "dividend_cash",
+		},
+	}, nil)
+
+	out, err := svc.ListEligibleCorporateActions(ctx, userID, bid)
+	assert.NoError(t, err)
+	assert.Len(t, out, 3)
+
+	byID := make(map[string]EligibleAction)
+	for _, item := range out {
+		byID[item.Event.ID] = item
+	}
+
+	assert.Equal(t, "100.00000000", byID["ev-ex-dividend"].HoldingQuantity)
+	assert.Equal(t, "100.00", byID["ev-ex-dividend"].EntitledQuantity)
+
+	assert.Equal(t, "70.00000000", byID["ev-ex-bonus"].HoldingQuantity)
+	assert.Equal(t, "7.00000000", byID["ev-ex-bonus"].EntitledQuantity)
+
+	assert.Equal(t, "90.00000000", byID["ev-record-split"].HoldingQuantity)
+	assert.Equal(t, "45.00000000", byID["ev-record-split"].EntitledQuantity)
+
+	_, hasNoDate := byID["ev-no-date"]
+	assert.False(t, hasNoDate)
+
+	repo.AssertExpectations(t)
+}
