@@ -14,9 +14,9 @@ import (
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/config"
 	"github.com/sonbn-225/goen-api/internal/domain"
-	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/i18n"
 	"github.com/sonbn-225/goen-api/internal/modules/transaction"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/storage"
 )
 
@@ -1414,6 +1414,29 @@ func (s *Service) ListEligibleCorporateActions(ctx context.Context, userID, inve
 		return nil, err
 	}
 
+	trades, err := s.repo.ListTrades(ctx, userID, bid)
+	if err != nil {
+		return nil, err
+	}
+
+	tradesBySecurity := make(map[string][]domain.Trade)
+	securityIDs := make(map[string]struct{})
+	for _, tr := range trades {
+		securityID := strings.TrimSpace(tr.SecurityID)
+		if securityID == "" {
+			continue
+		}
+		tradesBySecurity[securityID] = append(tradesBySecurity[securityID], tr)
+		securityIDs[securityID] = struct{}{}
+	}
+	for _, h := range holdings {
+		securityID := strings.TrimSpace(h.SecurityID)
+		if securityID == "" {
+			continue
+		}
+		securityIDs[securityID] = struct{}{}
+	}
+
 	elections, err := s.repo.ListSecurityEventElections(ctx, userID, bid, nil)
 	if err != nil {
 		return nil, err
@@ -1424,18 +1447,21 @@ func (s *Service) ListEligibleCorporateActions(ctx context.Context, userID, inve
 	}
 
 	var out []EligibleAction
-	for _, h := range holdings {
-		qty, _ := new(big.Rat).SetString(h.Quantity)
-		if qty.Cmp(new(big.Rat)) <= 0 {
-			continue
-		}
-
-		events, err := s.repo.ListSecurityEvents(ctx, h.SecurityID, nil, nil)
+	for securityID := range securityIDs {
+		events, err := s.repo.ListSecurityEvents(ctx, securityID, nil, nil)
 		if err != nil {
 			continue
 		}
 
 		for _, ev := range events {
+			entitlementDate, hasEntitlementDate := entitlementAsOfDate(ev)
+			if !hasEntitlementDate {
+				continue
+			}
+
+			holdingQty := holdingQuantityAsOf(tradesBySecurity[securityID], entitlementDate)
+			holdingQtyText := formatRatDecimalScale(holdingQty, 8)
+
 			el, claimed := electionMap[ev.ID]
 			if claimed && el.Status == "dismissed" {
 				continue
@@ -1446,16 +1472,18 @@ func (s *Service) ListEligibleCorporateActions(ctx context.Context, userID, inve
 				status = "claimed"
 			}
 
-			// Simple logic: entitled = current_holding * ratio or cash_per_share.
-			// In production goen, we might check holding as of ex_date.
+			// Entitlement is computed from point-in-time holdings at ex_date (or record_date fallback).
 			entitled := "0"
+			qty := holdingQty
 			if ev.EventType == "dividend_cash" && ev.CashAmountPerShare != nil {
-				cash, _ := new(big.Rat).SetString(*ev.CashAmountPerShare)
-				entitled = formatRatDecimalScale(new(big.Rat).Mul(qty, cash), 2)
+				cash, ok := new(big.Rat).SetString(*ev.CashAmountPerShare)
+				if ok {
+					entitled = formatRatDecimalScale(new(big.Rat).Mul(qty, cash), 2)
+				}
 			} else if (ev.EventType == "bonus_issue" || ev.EventType == "split" || ev.EventType == "stock_dividend") && ev.RatioNumerator != nil && ev.RatioDenominator != nil {
-				num, _ := new(big.Rat).SetString(*ev.RatioNumerator)
-				den, _ := new(big.Rat).SetString(*ev.RatioDenominator)
-				if den.Cmp(new(big.Rat)) > 0 {
+				num, numOK := new(big.Rat).SetString(*ev.RatioNumerator)
+				den, denOK := new(big.Rat).SetString(*ev.RatioDenominator)
+				if numOK && denOK && den.Cmp(new(big.Rat)) > 0 {
 					entitled = formatRatDecimalScale(new(big.Rat).Quo(new(big.Rat).Mul(qty, num), den), 8)
 				}
 			}
@@ -1467,7 +1495,7 @@ func (s *Service) ListEligibleCorporateActions(ctx context.Context, userID, inve
 
 			out = append(out, EligibleAction{
 				Event:            ev,
-				HoldingQuantity:  h.Quantity,
+				HoldingQuantity:  holdingQtyText,
 				EntitledQuantity: entitled,
 				Status:           status,
 				ElectionID:       elID,
@@ -1476,6 +1504,58 @@ func (s *Service) ListEligibleCorporateActions(ctx context.Context, userID, inve
 	}
 
 	return out, nil
+}
+
+func entitlementAsOfDate(ev domain.SecurityEvent) (time.Time, bool) {
+	if dt, ok := parseEventDate(ev.ExDate); ok {
+		return dt, true
+	}
+	if dt, ok := parseEventDate(ev.RecordDate); ok {
+		return dt, true
+	}
+	return time.Time{}, false
+}
+
+func parseEventDate(raw *string) (time.Time, bool) {
+	if raw == nil {
+		return time.Time{}, false
+	}
+	s := strings.TrimSpace(*raw)
+	if s == "" {
+		return time.Time{}, false
+	}
+	date, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return date.UTC().Add(24*time.Hour - time.Nanosecond), true
+}
+
+func holdingQuantityAsOf(trades []domain.Trade, asOf time.Time) *big.Rat {
+	total := big.NewRat(0, 1)
+	for _, tr := range trades {
+		if tr.OccurredAt.UTC().After(asOf) {
+			continue
+		}
+
+		qty, ok := new(big.Rat).SetString(strings.TrimSpace(tr.Quantity))
+		if !ok {
+			continue
+		}
+
+		side := strings.ToLower(strings.TrimSpace(tr.Side))
+		switch side {
+		case "buy":
+			total = new(big.Rat).Add(total, qty)
+		case "sell":
+			total = new(big.Rat).Sub(total, qty)
+		}
+	}
+
+	if total.Cmp(big.NewRat(0, 1)) < 0 {
+		return big.NewRat(0, 1)
+	}
+	return total
 }
 
 func (s *Service) ClaimCorporateAction(ctx context.Context, userID, investmentAccountID, securityEventID string, req ClaimCorporateActionRequest) (*domain.SecurityEventElection, error) {
@@ -1576,12 +1656,12 @@ func (s *Service) ClaimCorporateAction(ctx context.Context, userID, investmentAc
 		// 1. Trade quantity = Floor(elected entitlement)
 		// 2. Residual cash = Fraction * 10,000 (par value in VND)
 		entRat, _ := new(big.Rat).SetString(elected)
-		
+
 		floorQty := new(big.Int).Div(entRat.Num(), entRat.Denom())
 		tradeQty := new(big.Rat).SetInt(floorQty)
-		
+
 		residualQty := new(big.Rat).Sub(entRat, tradeQty)
-		
+
 		// Create trade for whole shares if any
 		if tradeQty.Cmp(big.NewRat(0, 1)) > 0 {
 			prov := "stock_dividend"
@@ -1604,10 +1684,10 @@ func (s *Service) ClaimCorporateAction(ctx context.Context, userID, investmentAc
 			parValue := big.NewRat(10000, 1)
 			cashAmt := new(big.Rat).Mul(residualQty, parValue)
 			cashAmtStr := formatRatDecimalScale(cashAmt, 2)
-			
+
 			ia, _ := s.repo.GetInvestmentAccount(ctx, userID, bid)
 			desc := fmt.Sprintf("Residual Cash (%s): %s", ev.EventType, ev.SecurityID)
-			
+
 			_, err = s.txSvc.Create(ctx, userID, transaction.CreateRequest{
 				Type:         "income",
 				OccurredDate: &occDate,
@@ -1731,8 +1811,8 @@ func (s *Service) GetRealizedPNLReport(ctx context.Context, userID, brokerAccoun
 	}
 
 	// Process Fees and Taxes from Trades
-	// Note: We sum all fees/taxes for the security. 
-	// In some contexts, you might only want SELL fees for realized PNL, 
+	// Note: We sum all fees/taxes for the security.
+	// In some contexts, you might only want SELL fees for realized PNL,
 	// but usually all trade costs for that security are deducted from its lifecycle profit.
 	for _, t := range trades {
 		it := items[t.SecurityID]
@@ -1751,14 +1831,16 @@ func (s *Service) GetRealizedPNLReport(ctx context.Context, userID, brokerAccoun
 	for _, it := range items {
 		gross := addMoneyStrings(it.TradeGain, it.DividendGain)
 		it.GrossRealizedGain = gross
-		
+
 		costs := addMoneyStrings(it.Fees, it.Taxes)
 		it.NetPNL = subMoneyStrings(gross, costs)
 
-		gRat, _ := new(big.Rat).SetString(it.GrossRealizedGain)
-		nRat, _ := new(big.Rat).SetString(it.NetPNL)
-		totalGross.Add(totalGross, gRat)
-		totalNet.Add(totalNet, nRat)
+		if gRat, ok := new(big.Rat).SetString(it.GrossRealizedGain); ok {
+			totalGross.Add(totalGross, gRat)
+		}
+		if nRat, ok := new(big.Rat).SetString(it.NetPNL); ok {
+			totalNet.Add(totalNet, nRat)
+		}
 
 		report.Items = append(report.Items, *it)
 	}
@@ -1800,4 +1882,3 @@ func isValidDecimal(s string) bool {
 	_, ok := new(big.Rat).SetString(strings.TrimSpace(s))
 	return ok
 }
-
