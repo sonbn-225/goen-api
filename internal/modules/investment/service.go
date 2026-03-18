@@ -293,6 +293,11 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 		return nil, apperrors.Validation("price must be a decimal string", nil)
 	}
 
+	occurredAt, occurredDate, err := normalizeOccurredAt(req.OccurredAt, req.OccurredDate, req.OccurredTime)
+	if err != nil {
+		return nil, err
+	}
+
 	provenance := normalizeLotProvenance(req.Provenance)
 	if provenance == "" {
 		provenance = "regular_buy"
@@ -327,7 +332,7 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 							BrokerAccountID: bid,
 							SecurityID:      securityID,
 							Quantity:        lotQty.FloatString(8),
-							AcquisitionDate: time.Now().UTC().Format("2006-01-02"),
+							AcquisitionDate: occurredAt.UTC().Format("2006-01-02"),
 							CostBasisPer:    costPer,
 							Provenance:      "regular_buy",
 							Status:          "active",
@@ -344,7 +349,8 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 			}
 		}
 
-		plan, divQty, err := planFIFOSell(lots, quantity)
+		sellableLots := filterSellableLotsAsOf(lots, occurredAt.UTC())
+		plan, divQty, err := planFIFOSell(sellableLots, quantity)
 		if err != nil {
 			return nil, err
 		}
@@ -399,11 +405,6 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 	}
 	if !isValidDecimal(taxes) {
 		return nil, apperrors.Validation("taxes must be a decimal string", nil)
-	}
-
-	occurredAt, occurredDate, err := normalizeOccurredAt(req.OccurredAt, req.OccurredDate, req.OccurredTime)
-	if err != nil {
-		return nil, err
 	}
 
 	now := time.Now().UTC()
@@ -800,7 +801,7 @@ func planFIFOSell(lots []domain.ShareLot, sellQty string) ([]lotConsumptionPlan,
 		}
 	}
 	if available.Cmp(toSell) < 0 {
-		return nil, "0", apperrors.Validation("not enough shares to sell", map[string]any{"field": "quantity"})
+		return nil, "0", apperrors.Validation("not enough settled shares to sell (T+2)", map[string]any{"field": "quantity"})
 	}
 
 	dividendSold := big.NewRat(0, 1)
@@ -903,6 +904,28 @@ func addBusinessDays(d time.Time, days int) time.Time {
 		}
 	}
 	return cur
+}
+
+func filterSellableLotsAsOf(lots []domain.ShareLot, asOf time.Time) []domain.ShareLot {
+	asOfDate := asOf.UTC().Truncate(24 * time.Hour)
+	filtered := make([]domain.ShareLot, 0, len(lots))
+	for _, lot := range lots {
+		acqRaw := strings.TrimSpace(lot.AcquisitionDate)
+		if acqRaw == "" {
+			continue
+		}
+
+		acqDate, err := time.Parse("2006-01-02", acqRaw)
+		if err != nil {
+			continue
+		}
+
+		if !acqDate.UTC().After(asOfDate) {
+			filtered = append(filtered, lot)
+		}
+	}
+
+	return filtered
 }
 
 func (s *Service) upsertHoldingFromLots(ctx context.Context, userID, brokerAccountID, securityID string) error {

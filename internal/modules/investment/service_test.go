@@ -409,3 +409,32 @@ func TestListEligibleCorporateActions_UsesPointInTimeHoldings(t *testing.T) {
 
 	repo.AssertExpectations(t)
 }
+
+func TestFilterSellableLotsAsOf_TPlus2(t *testing.T) {
+	asOf := time.Date(2026, 3, 18, 15, 0, 0, 0, time.UTC)
+	lots := []domain.ShareLot{
+		{ID: "lot-same-day", AcquisitionDate: "2026-03-18", Status: "active"},
+		{ID: "lot-before", AcquisitionDate: "2026-03-17", Status: "active"},
+		{ID: "lot-after", AcquisitionDate: "2026-03-19", Status: "active"},
+		{ID: "lot-empty-date", AcquisitionDate: "", Status: "active"},
+		{ID: "lot-invalid-date", AcquisitionDate: "not-a-date", Status: "active"},
+	}
+
+	filtered := filterSellableLotsAsOf(lots, asOf)
+	ids := make(map[string]struct{})
+	for _, lot := range filtered {
+		ids[lot.ID] = struct{}{}
+	}
+
+	_, hasSameDay := ids["lot-same-day"]
+	_, hasBefore := ids["lot-before"]
+	_, hasAfter := ids["lot-after"]
+	_, hasEmptyDate := ids["lot-empty-date"]
+	_, hasInvalidDate := ids["lot-invalid-date"]
+
+	assert.True(t, hasSameDay)
+	assert.True(t, hasBefore)
+	assert.False(t, hasAfter)
+	assert.False(t, hasEmptyDate)
+	assert.False(t, hasInvalidDate)
+}
