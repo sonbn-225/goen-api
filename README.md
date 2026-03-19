@@ -125,20 +125,20 @@ Steps:
 
 Then:
 
-- Pick a domain for Traefik routing by setting `API_DOMAIN` in `.env`.
-  - Example (dev): `API_DOMAIN=api.your-dev-domain.localhost`
+- Pick a domain for Traefik routing by setting `GOEN_DOMAIN` in `.env`.
+  - Example (dev): `GOEN_DOMAIN=api.your-dev-domain.localhost`
 
-- Endpoints (replace `<API_DOMAIN>` with your configured value):
-  - `http://<API_DOMAIN>/api/v1/healthz`
-  - `http://<API_DOMAIN>/api/v1/readyz`
-  - `http://<API_DOMAIN>/api/v1/ping`
-  - `http://<API_DOMAIN>/api/v1/connectivity`
-  - Swagger UI: `http://<API_DOMAIN>/swagger/`
+- Endpoints (replace `<GOEN_DOMAIN>` with your configured value):
+  - `http://<GOEN_DOMAIN>/api/v1/healthz`
+  - `http://<GOEN_DOMAIN>/api/v1/readyz`
+  - `http://<GOEN_DOMAIN>/api/v1/ping`
+  - `http://<GOEN_DOMAIN>/api/v1/connectivity`
+  - Swagger UI: `http://<GOEN_DOMAIN>/swagger/`
 
-PowerShell note (Windows): if `<API_DOMAIN>` does not resolve in PowerShell, call through `http://localhost` and set the `Host` header:
+PowerShell note (Windows): if `<GOEN_DOMAIN>` does not resolve in PowerShell, call through `http://localhost` and set the `Host` header:
 
 ```powershell
-$apiDomain = "api.your-dev-domain.localhost" # set to your API_DOMAIN
+$apiDomain = "api.your-dev-domain.localhost" # set to your GOEN_DOMAIN
 Invoke-RestMethod -Uri "http://localhost/api/v1/ping" -Headers @{ Host = $apiDomain }
 ```
 
@@ -206,24 +206,57 @@ This repo uses **feature-based modules**. Each feature is a self-contained modul
 
 ## Run (prod)
 
-- Configure `.env` (set `API_DOMAIN`, `DATABASE_URL`, `REDIS_URL`)
+- Configure `.env` (set `GOEN_DOMAIN`, `JWT_SECRET`, `DATABASE_URL`, `REDIS_URL`)
 - Start: `docker compose --env-file .env -f docker-compose.prod.yml up -d --build`
+
+## CI/CD (Jenkins)
+
+Repository supports Jenkins pipeline deployment via `Jenkinsfile` (same pattern as `bewithyou`).
+
+### Required Jenkins credentials
+
+- `GOEN_API_CONTAINER_NAME`
+- `PLATFORM`
+- `SUNFLOWER_TZ`
+- `GOEN_V2_DOMAIN`
+- `TRAEFIK_NETWORK`
+- `DATA_NETWORK`
+- `GOEN_API_JWT_SECRET`
+- `POSTGRES_CONTAINER_NAME`
+- `POSTGRES_PORT`
+- `POSTGRES_DEFAULT`
+- `POSTGRES_PASSWORD`
+- `REDIS_CONTAINER_NAME`
+- `REDIS_PORT`
+- `REDIS_USERNAME`
+- `REDIS_PASSWORD`
+- `GOEN_MARKET_DATA_CONTAINER_NAME`
+- `GOEN_MARKET_DATA_STATUS_PORT`
+
+### Pipeline behavior
+
+- Deploy stage runs: `docker compose -f docker-compose.prod.yml up -d --build`
+- Jenkins maps `GOEN_V2_DOMAIN` credential to `GOEN_DOMAIN` env before running compose.
+- `GOEN_V2_DOMAIN` should be a bare host only (example: `goen-dev.sonbn.xyz`), without `http://`, `https://`, or path.
+- Health check stage waits for `${CONTAINER_NAME}` to reach running status
+- Post stage prunes dangling images: `docker image prune -f`
 
 ## Database Migrations
 
 This project uses [goose](https://github.com/pressly/goose) for database migrations. Goose is installed in the Docker container.
 
+At runtime, the API also auto-runs migrations on startup by default:
+
+- `MIGRATE_ON_START=true` (default)
+- `MIGRATION_DIR=migrations` (default)
+
 ### Baseline (squashed) migration for DB resets
 
 For fresh installs / local database resets, this repo keeps a single baseline migration:
 
-- `migrations/20260114000000_baseline_schema.sql`
+- `migrations/20260315000000_baseline_schema.sql`
 
 This baseline also initializes TimescaleDB (creates the extension if available) and converts selected time-series tables into hypertables.
-
-All older step-by-step migrations are archived in:
-
-- `migrations/legacy/`
 
 Notes:
 

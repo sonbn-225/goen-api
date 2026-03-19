@@ -28,7 +28,7 @@ func (r *CategoryRepo) GetCategory(ctx context.Context, userID string, categoryI
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, name, parent_category_id, type, sort_order, is_active, is_system, icon, color, created_at, updated_at, deleted_at
+		SELECT id, parent_category_id, type, sort_order, is_active, icon, color, created_at, updated_at, deleted_at
 		FROM categories
 		WHERE id = $1 AND deleted_at IS NULL
 	`, categoryID)
@@ -41,12 +41,10 @@ func (r *CategoryRepo) GetCategory(ctx context.Context, userID string, categoryI
 	var deletedAtNull sql.NullTime
 	if err := row.Scan(
 		&c.ID,
-		&c.Name,
 		&parentIDNull,
 		&typeNull,
 		&c.SortOrder,
 		&c.IsActive,
-		&c.IsSystem,
 		&iconNull,
 		&colorNull,
 		&c.CreatedAt,
@@ -87,10 +85,10 @@ func (r *CategoryRepo) ListCategories(ctx context.Context, userID string) ([]dom
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT id, name, parent_category_id, type, sort_order, is_active, is_system, icon, color, created_at, updated_at, deleted_at
+		SELECT id, parent_category_id, type, sort_order, is_active, icon, color, created_at, updated_at, deleted_at
 		FROM categories
-		WHERE deleted_at IS NULL AND is_system = false
-		ORDER BY COALESCE(sort_order, 0) ASC, name ASC
+		WHERE deleted_at IS NULL AND is_active = true
+		ORDER BY COALESCE(sort_order, 0) ASC, id ASC
 	`)
 	if err != nil {
 		return nil, err
@@ -107,12 +105,10 @@ func (r *CategoryRepo) ListCategories(ctx context.Context, userID string) ([]dom
 		var deletedAtNull sql.NullTime
 		if err := rows.Scan(
 			&c.ID,
-			&c.Name,
 			&parentIDNull,
 			&typeNull,
 			&c.SortOrder,
 			&c.IsActive,
-			&c.IsSystem,
 			&iconNull,
 			&colorNull,
 			&c.CreatedAt,
@@ -145,3 +141,8 @@ func (r *CategoryRepo) ListCategories(ctx context.Context, userID string) ([]dom
 	return out, nil
 }
 
+func (r *CategoryRepo) FindCategoryByName(ctx context.Context, userID string, name string) (*domain.Category, error) {
+	// NOTE: FindCategoryByName is deprecated. Categories no longer have a name column.
+	// Use GetCategory with category ID instead. For imports, provide category IDs directly.
+	return nil, apperrors.ErrCategoryNotFound
+}

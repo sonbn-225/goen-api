@@ -10,6 +10,8 @@ services:
       - GOEN_ENV=development
       - TZ=${SUNFLOWER_TZ:-Asia/Ho_Chi_Minh}
       - PORT=${PORT:-8080}
+      - MIGRATE_ON_START=${MIGRATE_ON_START:-true}
+      - MIGRATION_DIR=${MIGRATION_DIR:-migrations}
       - JWT_SECRET=${JWT_SECRET:-}
       - JWT_ACCESS_TTL_MINUTES=${JWT_ACCESS_TTL_MINUTES:-60}
       - DATABASE_URL=${DATABASE_URL:-}
@@ -31,8 +33,9 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=${TRAEFIK_NETWORK:-proxy_network}"
-      - "traefik.http.routers.goen-api.rule=Host(`${API_DOMAIN:-api.localhost}`)"
+      - "traefik.http.routers.goen-api.rule=Host(`${GOEN_DOMAIN:-api.localhost}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.goen-api.entrypoints=web"
+      - "traefik.http.routers.goen-api.priority=10"
       - "traefik.http.services.goen-api.loadbalancer.server.port=8080"
     restart: unless-stopped
 

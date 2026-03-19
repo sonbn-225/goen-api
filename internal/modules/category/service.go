@@ -36,8 +36,35 @@ func (s *Service) Get(ctx context.Context, userID, categoryID string) (*domain.C
 	return item, nil
 }
 
-// List returns all categories for a user.
-func (s *Service) List(ctx context.Context, userID string) ([]domain.Category, error) {
-	return s.repo.ListCategories(ctx, userID)
-}
+// List returns all categories for a user, optionally filtered by transaction type.
+// If txType is provided (income, expense), only returns categories that support that type.
+func (s *Service) List(ctx context.Context, userID string, txType string) ([]domain.Category, error) {
+	cats, err := s.repo.ListCategories(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 
+	// If no type filter specified, return all categories
+	if txType == "" {
+		return cats, nil
+	}
+
+	// Filter by transaction type
+	// For income: include categories with type="income" or type="both"
+	// For expense: include categories with type="expense" or type="both"
+	filtered := make([]domain.Category, 0, len(cats))
+	for _, cat := range cats {
+		if cat.Type == nil {
+			// Include categories with no type restriction
+			filtered = append(filtered, cat)
+			continue
+		}
+		catType := *cat.Type
+		if txType == "income" && (catType == "income" || catType == "both") {
+			filtered = append(filtered, cat)
+		} else if txType == "expense" && (catType == "expense" || catType == "both") {
+			filtered = append(filtered, cat)
+		}
+	}
+	return filtered, nil
+}

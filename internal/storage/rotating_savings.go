@@ -32,7 +32,7 @@ func (r *RotatingSavingsRepo) CreateGroup(ctx context.Context, userID string, g 
 			id, user_id, self_label, account_id, name, member_count,
 			contribution_amount, early_payout_fee_rate, cycle_frequency, start_date, status,
 			created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 	`,
 		g.ID,
 		g.UserID,
@@ -187,7 +187,7 @@ func (r *RotatingSavingsRepo) CreateContribution(ctx context.Context, userID str
 	}
 
 	// Ensure the group belongs to the user.
-	_, err = pool.Exec(ctx, `
+	cmd, err := pool.Exec(ctx, `
 		INSERT INTO rotating_savings_contributions (
 			id, group_id, transaction_id, kind, cycle_no, due_date, amount, occurred_at, note, created_at
 		)
@@ -208,7 +208,13 @@ func (r *RotatingSavingsRepo) CreateContribution(ctx context.Context, userID str
 		c.CreatedAt,
 		userID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if cmd.RowsAffected() == 0 {
+		return apperrors.ErrRotatingSavingsGroupNotFound
+	}
+	return nil
 }
 
 func (r *RotatingSavingsRepo) ListContributions(ctx context.Context, userID string, groupID string) ([]domain.RotatingSavingsContribution, error) {
@@ -280,4 +286,3 @@ func (r *RotatingSavingsRepo) ListContributions(ctx context.Context, userID stri
 	}
 	return out, nil
 }
-

@@ -13,12 +13,14 @@ type Module struct {
 
 // ModuleDeps contains dependencies for the transaction module.
 type ModuleDeps struct {
-	Repo domain.TransactionRepository
+	Repo         domain.TransactionRepository
+	CategoryRepo domain.CategoryRepository
+	AccountRepo  domain.AccountRepository
 }
 
 // NewModule creates a new transaction module.
 func NewModule(deps ModuleDeps) *Module {
-	svc := NewService(deps.Repo)
+	svc := NewService(deps.Repo, deps.CategoryRepo, deps.AccountRepo)
 	h := NewHandler(svc)
 
 	return &Module{
@@ -26,4 +28,3 @@ func NewModule(deps ModuleDeps) *Module {
 		Handler: h,
 	}
 }
-

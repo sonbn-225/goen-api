@@ -37,10 +37,15 @@ func (t *rotTxServiceAdapter) Create(ctx context.Context, userID string, req rot
 		OccurredDate: req.OccurredDate,
 		OccurredTime: req.OccurredTime,
 		Amount:       req.Amount,
+		CategoryID:   req.CategoryID,
 		Description:  mergedDescription,
 		AccountID:    req.AccountID,
 	}
 	return t.svc.Create(ctx, userID, mapped)
+}
+
+func (t *rotTxServiceAdapter) Delete(ctx context.Context, userID, transactionID string) error {
+	return t.svc.Delete(ctx, userID, transactionID)
 }
 
 type investmentAccountServiceAdapter struct {
@@ -50,4 +55,3 @@ type investmentAccountServiceAdapter struct {
 func (a *investmentAccountServiceAdapter) GetAccountByID(ctx context.Context, userID, accountID string) (*domain.Account, error) {
 	return a.svc.Get(ctx, userID, accountID)
 }
-
