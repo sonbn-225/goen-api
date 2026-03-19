@@ -5,10 +5,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: prod
     environment:
       - GOEN_ENV=production
       - TZ=${SUNFLOWER_TZ:-Asia/Ho_Chi_Minh}
       - PORT=${PORT:-8080}
+      - MIGRATE_ON_START=${MIGRATE_ON_START:-true}
+      - MIGRATION_DIR=${MIGRATION_DIR:-migrations}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_ACCESS_TTL_MINUTES=${JWT_ACCESS_TTL_MINUTES:-60}
       - DATABASE_URL=${DATABASE_URL}
@@ -16,16 +19,24 @@ services:
       - MARKET_DATA_STATUS_URL=${MARKET_DATA_STATUS_URL:-http://goen-market-data:8090/status}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - SEAWEEDFS_ENDPOINT=${SEAWEEDFS_ENDPOINT:-sunflower-seaweedfs:8333}
+      - SEAWEEDFS_ACCESS_KEY_ID=${SEAWEEDFS_ACCESS_KEY_ID:-}
+      - SEAWEEDFS_SECRET_ACCESS_KEY=${SEAWEEDFS_SECRET_ACCESS_KEY:-}
+      - SEAWEEDFS_BUCKET=${SEAWEEDFS_BUCKET:-goen}
+      - SEAWEEDFS_USE_SSL=${SEAWEEDFS_USE_SSL:-false}
+      - SEAWEEDFS_PUBLIC_BASE_URL=${SEAWEEDFS_PUBLIC_BASE_URL:-}
     networks:
       - traefik_network
       - sunflower_data
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=${TRAEFIK_NETWORK:-proxy_network}"
-      - "traefik.http.routers.goen-api.rule=Host(`${API_DOMAIN}`)"
-      - "traefik.http.routers.goen-api.entrypoints=websecure"
-      - "traefik.http.routers.goen-api.tls.certresolver=le"
-      - "traefik.http.services.goen-api.loadbalancer.server.port=8080"
+      - "traefik.http.routers.goen-api-service.rule=Host(`${GOEN_DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.goen-api-service.entrypoints=websecure"
+      - "traefik.http.routers.goen-api-service.tls.certresolver=le"
+      - "traefik.http.routers.goen-api-service.priority=10"
+      - "traefik.http.routers.goen-api-service.service=goen-api-service"
+      - "traefik.http.services.goen-api-service.loadbalancer.server.port=8080"
     restart: unless-stopped
 
 networks:

@@ -16,6 +16,7 @@ type Module struct {
 // TransactionServiceInterface defines the transaction service contract.
 type TransactionServiceInterface interface {
 	Create(ctx context.Context, userID string, req TxCreateRequest) (*domain.Transaction, error)
+	Delete(ctx context.Context, userID, transactionID string) error
 }
 
 // ModuleDeps contains dependencies for the rotating savings module.
@@ -35,4 +36,3 @@ func NewModule(deps ModuleDeps) *Module {
 		Handler: h,
 	}
 }
-

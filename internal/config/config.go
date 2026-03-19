@@ -15,6 +15,8 @@ type Config struct {
 	Host                string
 	Port                int
 	LogLevel            slog.Level
+	MigrateOnStart      bool
+	MigrationDir        string
 	DatabaseURL         string
 	RedisURL            string
 	CORSOrigins         []string
@@ -36,6 +38,8 @@ func Load() (*Config, error) {
 	cfg.Host = getenvDefault("HOST", "0.0.0.0")
 	cfg.Port = getenvIntDefault("PORT", 8080)
 	cfg.JWTAccessTTLMinutes = getenvIntDefault("JWT_ACCESS_TTL_MINUTES", 60)
+	cfg.MigrateOnStart = getenvBoolDefault("MIGRATE_ON_START", true)
+	cfg.MigrationDir = getenvDefault("MIGRATION_DIR", "migrations")
 
 	levelStr := strings.ToLower(getenvDefault("LOG_LEVEL", "info"))
 	switch levelStr {
@@ -118,6 +122,21 @@ func getenvIntDefault(key string, def int) int {
 	return i
 }
 
+func getenvBoolDefault(key string, def bool) bool {
+	v := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	if v == "" {
+		return def
+	}
+	switch v {
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return def
+	}
+}
+
 func splitCSV(v string) []string {
 	parts := strings.Split(v, ",")
 	out := make([]string, 0, len(parts))
@@ -130,4 +149,3 @@ func splitCSV(v string) []string {
 	}
 	return out
 }
-

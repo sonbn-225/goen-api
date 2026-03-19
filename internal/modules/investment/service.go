@@ -415,16 +415,16 @@ func (s *Service) CreateTrade(ctx context.Context, userID, brokerAccountID strin
 
 	principalCategoryID := req.PrincipalCategoryID
 	if principalCategoryID == nil || strings.TrimSpace(*principalCategoryID) == "" {
-		defaultPrincipalCategory := "cat_def_financial_invest_buy"
+		defaultPrincipalCategory := "cat_sys_invest_buy"
 		if side == "sell" {
-			defaultPrincipalCategory = "cat_def_financial_invest_sell"
+			defaultPrincipalCategory = "cat_sys_invest_sell"
 		}
 		principalCategoryID = &defaultPrincipalCategory
 	}
 
 	feeCategoryID := req.FeeCategoryID
 	if feeCategoryID == nil || strings.TrimSpace(*feeCategoryID) == "" {
-		defaultFeeCategory := "cat_def_financial_invest_fees"
+		defaultFeeCategory := "cat_sys_invest_fees"
 		feeCategoryID = &defaultFeeCategory
 	}
 
@@ -745,9 +745,9 @@ func (s *Service) BackfillTradePrincipalTransactions(ctx context.Context, userID
 			AccountID:   &ia.AccountID,
 			ExternalRef: externalRef,
 			CategoryID: func() *string {
-				cid := "cat_def_financial_invest_buy"
+				cid := "cat_sys_invest_buy"
 				if strings.TrimSpace(tr.Side) == "sell" {
-					cid = "cat_def_financial_invest_sell"
+					cid = "cat_sys_invest_sell"
 				}
 				return &cid
 			}(),
@@ -1498,7 +1498,7 @@ func (s *Service) ListEligibleCorporateActions(ctx context.Context, userID, inve
 			// Entitlement is computed from point-in-time holdings at ex_date (or record_date fallback).
 			entitled := "0"
 			qty := holdingQty
-			if ev.EventType == "dividend_cash" && ev.CashAmountPerShare != nil {
+			if ev.EventType == "cash_dividend" && ev.CashAmountPerShare != nil {
 				cash, ok := new(big.Rat).SetString(*ev.CashAmountPerShare)
 				if ok {
 					entitled = formatRatDecimalScale(new(big.Rat).Mul(qty, cash), 2)
@@ -1610,7 +1610,7 @@ func (s *Service) ClaimCorporateAction(ctx context.Context, userID, investmentAc
 
 	qty, _ := new(big.Rat).SetString(h.Quantity)
 	entitled := "0"
-	if ev.EventType == "dividend_cash" && ev.CashAmountPerShare != nil {
+	if ev.EventType == "cash_dividend" && ev.CashAmountPerShare != nil {
 		cash, _ := new(big.Rat).SetString(*ev.CashAmountPerShare)
 		entitled = formatRatDecimalScale(new(big.Rat).Mul(qty, cash), 2)
 	} else if (ev.EventType == "bonus_issue" || ev.EventType == "split" || ev.EventType == "stock_dividend") && ev.RatioNumerator != nil && ev.RatioDenominator != nil {
@@ -1651,7 +1651,7 @@ func (s *Service) ClaimCorporateAction(ctx context.Context, userID, investmentAc
 	}
 
 	// 2. Perform the actual action.
-	if ev.EventType == "dividend_cash" {
+	if ev.EventType == "cash_dividend" {
 		ia, _ := s.repo.GetInvestmentAccount(ctx, userID, bid)
 		desc := fmt.Sprintf("Cash Dividend: %s", ev.SecurityID)
 		if ev.Note != nil {

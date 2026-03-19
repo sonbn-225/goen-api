@@ -8,7 +8,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sonbn-225/goen-api/internal/config"
-	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/modules/account"
 	authMod "github.com/sonbn-225/goen-api/internal/modules/auth"
 	"github.com/sonbn-225/goen-api/internal/modules/budget"
@@ -18,11 +17,12 @@ import (
 	groupExpense "github.com/sonbn-225/goen-api/internal/modules/group_expense"
 	"github.com/sonbn-225/goen-api/internal/modules/investment"
 	"github.com/sonbn-225/goen-api/internal/modules/marketdata"
+	"github.com/sonbn-225/goen-api/internal/modules/report"
 	rotatingsavings "github.com/sonbn-225/goen-api/internal/modules/rotating_savings"
 	"github.com/sonbn-225/goen-api/internal/modules/savings"
-	"github.com/sonbn-225/goen-api/internal/modules/report"
 	"github.com/sonbn-225/goen-api/internal/modules/tag"
 	"github.com/sonbn-225/goen-api/internal/modules/transaction"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/storage"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
@@ -94,7 +94,9 @@ func New(cfg *config.Config) *App {
 
 	// Transaction module
 	txMod := transaction.NewModule(transaction.ModuleDeps{
-		Repo: txRepo,
+		Repo:         txRepo,
+		CategoryRepo: categoryRepo,
+		AccountRepo:  accountRepo,
 	})
 
 	// Budget module (depends on category repo)
@@ -228,7 +230,7 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 		httpSwagger.URL("/swagger/doc.json"),
 	))
 
-	r.Route("/api/v1", func(r chi.Router) {
+	registerV1Routes := func(r chi.Router) {
 		// Diagnostics (no auth required)
 		mods.diagnostics.Handler.RegisterRoutes(r)
 
@@ -273,8 +275,10 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 
 		// Report
 		mods.report.Handler.RegisterRoutes(r, authMiddleware)
-	})
+	}
+
+	r.Route("/api/v1", registerV1Routes)
+	r.Route("/v1", registerV1Routes)
 
 	return r
 }
-

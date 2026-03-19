@@ -3043,9 +3043,6 @@ const docTemplate = `{
                 "is_active": {
                     "type": "boolean"
                 },
-                "is_system": {
-                    "type": "boolean"
-                },
                 "name": {
                     "type": "string"
                 },

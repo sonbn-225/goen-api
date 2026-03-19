@@ -1241,7 +1241,15 @@ func (r *InvestmentRepo) ListDividends(ctx context.Context, userID string, broke
 	rows, err := pool.Query(ctx, `
 		SELECT t.id, t.client_id, t.external_ref, t.type, t.occurred_at,
 		       to_char(t.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS occurred_date,
-		       t.amount::text, t.description, t.account_id, t.status, t.created_at, t.updated_at
+		       t.amount::text,
+		       (
+				   SELECT li.note
+				   FROM transaction_line_items li
+				   WHERE li.transaction_id = t.id
+				   ORDER BY li.id
+				   LIMIT 1
+		       ) AS description,
+		       t.account_id, t.status, t.created_at, t.updated_at
 		FROM transactions t
 		JOIN investment_accounts ia ON ia.account_id = t.account_id
 		JOIN user_accounts ua ON ua.account_id = ia.account_id
@@ -1269,4 +1277,3 @@ func (r *InvestmentRepo) ListDividends(ctx context.Context, userID string, broke
 	}
 	return out, rows.Err()
 }
-

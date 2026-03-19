@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -102,11 +103,11 @@ func createTransactionTx(ctx context.Context, dbtx pgx.Tx, userID string, tx dom
 
 	_, err := dbtx.Exec(ctx, `
 		INSERT INTO transactions (
-			id, client_id, external_ref, type, occurred_at, amount, description,
+			id, client_id, external_ref, type, occurred_at, amount,
 			from_amount, to_amount,
 			account_id, from_account_id, to_account_id, exchange_rate,
 			status, created_at, updated_at, created_by, updated_by, deleted_at
-		) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7,$8::numeric,$9::numeric,$10,$11,$12,$13::numeric,$14,$15,$16,$17,$18,$19)
+		) VALUES ($1,$2,$3,$4,$5,$6::numeric,$7::numeric,$8::numeric,$9,$10,$11,$12::numeric,$13,$14,$15,$16,$17,$18)
 	`,
 		tx.ID,
 		tx.ClientID,
@@ -114,7 +115,6 @@ func createTransactionTx(ctx context.Context, dbtx pgx.Tx, userID string, tx dom
 		tx.Type,
 		tx.OccurredAt,
 		tx.Amount,
-		tx.Description,
 		tx.FromAmount,
 		tx.ToAmount,
 		tx.AccountID,
@@ -237,7 +237,13 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 			t.amount::text,
 			CASE WHEN t.from_amount IS NULL THEN NULL ELSE t.from_amount::text END,
 			CASE WHEN t.to_amount IS NULL THEN NULL ELSE t.to_amount::text END,
-			t.description,
+			(
+				SELECT li.note
+				FROM transaction_line_items li
+				WHERE li.transaction_id = t.id
+				ORDER BY li.id
+				LIMIT 1
+			) AS description,
 			t.account_id,
 			t.from_account_id,
 			t.to_account_id,
@@ -333,69 +339,81 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 	return &t, nil
 }
 
-func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, filter domain.TransactionListFilter) ([]domain.Transaction, *string, error) {
+func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, filter domain.TransactionListFilter) ([]domain.Transaction, *string, int, error) {
 	if r.db == nil {
-		return nil, nil, apperrors.ErrDatabaseNotReady
+		return nil, nil, 0, apperrors.ErrDatabaseNotReady
 	}
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 50
-	}
-	if limit > 200 {
-		limit = 200
+	rawLimit := filter.Limit
+	allItemsMode := filter.Page > 0 && rawLimit == 0
+	limit := rawLimit
+	if !allItemsMode {
+		if limit <= 0 {
+			limit = 50
+		}
+		if limit > 200 {
+			limit = 200
+		}
 	}
 
-	cursorTime, cursorID, err := decodeCursor(filter.Cursor)
-	if err != nil {
-		return nil, nil, apperrors.ErrInvalidCursor
+	page := filter.Page
+	if page < 0 {
+		page = 0
 	}
 
-	args := []any{userID}
-	whereExtra := ""
+	argsBase := []any{userID}
+	whereBase := ""
 	if filter.From != nil {
-		args = append(args, *filter.From)
-		whereExtra += fmt.Sprintf(" AND t.occurred_at >= $%d", len(args))
+		argsBase = append(argsBase, *filter.From)
+		whereBase += fmt.Sprintf(" AND t.occurred_at >= $%d", len(argsBase))
 	}
 	if filter.To != nil {
-		args = append(args, *filter.To)
-		whereExtra += fmt.Sprintf(" AND t.occurred_at <= $%d", len(args))
+		argsBase = append(argsBase, *filter.To)
+		whereBase += fmt.Sprintf(" AND t.occurred_at <= $%d", len(argsBase))
 	}
 	if filter.AccountID != nil && strings.TrimSpace(*filter.AccountID) != "" {
-		args = append(args, *filter.AccountID)
-		idx := len(args)
-		whereExtra += fmt.Sprintf(" AND (t.account_id = $%d OR t.from_account_id = $%d OR t.to_account_id = $%d)", idx, idx, idx)
+		argsBase = append(argsBase, *filter.AccountID)
+		idx := len(argsBase)
+		whereBase += fmt.Sprintf(" AND (t.account_id = $%d OR t.from_account_id = $%d OR t.to_account_id = $%d)", idx, idx, idx)
 	}
 	if filter.CategoryID != nil && strings.TrimSpace(*filter.CategoryID) != "" {
-		args = append(args, *filter.CategoryID)
-		whereExtra += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM transaction_line_items tli WHERE tli.transaction_id = t.id AND tli.category_id = $%d)", len(args))
+		argsBase = append(argsBase, *filter.CategoryID)
+		whereBase += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM transaction_line_items tli WHERE tli.transaction_id = t.id AND tli.category_id = $%d)", len(argsBase))
 	}
 	if filter.Type != nil && strings.TrimSpace(*filter.Type) != "" {
-		args = append(args, *filter.Type)
-		whereExtra += fmt.Sprintf(" AND t.type = $%d", len(args))
+		argsBase = append(argsBase, *filter.Type)
+		whereBase += fmt.Sprintf(" AND t.type = $%d", len(argsBase))
 	}
 	if filter.Search != nil && strings.TrimSpace(*filter.Search) != "" {
-		args = append(args, "%"+*filter.Search+"%")
-		whereExtra += fmt.Sprintf(" AND t.description ILIKE $%d", len(args))
+		argsBase = append(argsBase, "%"+*filter.Search+"%")
+		whereBase += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM transaction_line_items li WHERE li.transaction_id = t.id AND li.note ILIKE $%d)", len(argsBase))
 	}
 	if filter.ExternalRefFamily != nil && strings.TrimSpace(*filter.ExternalRefFamily) != "" {
-		args = append(args, strings.TrimSpace(*filter.ExternalRefFamily))
-		whereExtra += fmt.Sprintf(" AND t.external_ref LIKE ($%d || ':%%')", len(args))
-	}
-	if cursorTime != nil && cursorID != nil {
-		args = append(args, *cursorTime)
-		args = append(args, *cursorID)
-		whereExtra += fmt.Sprintf(" AND (t.occurred_at, t.id) < ($%d, $%d)", len(args)-1, len(args))
+		argsBase = append(argsBase, strings.TrimSpace(*filter.ExternalRefFamily))
+		whereBase += fmt.Sprintf(" AND t.external_ref LIKE ($%d || ':%%')", len(argsBase))
 	}
 
-	args = append(args, limit+1)
-	limitArg := len(args)
+	whereQuery := whereBase
+	argsQuery := make([]any, 0, len(argsBase)+4)
+	argsQuery = append(argsQuery, argsBase...)
 
-	rows, err := pool.Query(ctx, fmt.Sprintf(`
+	if page <= 0 {
+		cursorTime, cursorID, err := decodeCursor(filter.Cursor)
+		if err != nil {
+			return nil, nil, 0, apperrors.ErrInvalidCursor
+		}
+		if cursorTime != nil && cursorID != nil {
+			argsQuery = append(argsQuery, *cursorTime)
+			argsQuery = append(argsQuery, *cursorID)
+			whereQuery += fmt.Sprintf(" AND (t.occurred_at, t.id) < ($%d, $%d)", len(argsQuery)-1, len(argsQuery))
+		}
+	}
+
+	selectSQL := `
 		SELECT
 			t.id,
 			t.client_id,
@@ -406,7 +424,13 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 			t.amount::text,
 			CASE WHEN t.from_amount IS NULL THEN NULL ELSE t.from_amount::text END,
 			CASE WHEN t.to_amount IS NULL THEN NULL ELSE t.to_amount::text END,
-			t.description,
+			(
+				SELECT li.note
+				FROM transaction_line_items li
+				WHERE li.transaction_id = t.id
+				ORDER BY li.id
+				LIMIT 1
+			) AS description,
 			t.account_id,
 			t.from_account_id,
 			t.to_account_id,
@@ -445,16 +469,67 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 				WHERE ua.user_id = $1 AND ua.account_id = t.to_account_id AND ua.status = 'active'
 			))
 		  )
-		  %s
-		ORDER BY t.occurred_at DESC, t.id DESC
-		LIMIT $%d
-	`, whereExtra, limitArg), args...)
+	`
+
+	countSQL := `
+		SELECT COUNT(*)
+		FROM transactions t
+		WHERE t.deleted_at IS NULL
+		  AND (
+			(t.type IN ('expense','income') AND EXISTS (
+				SELECT 1 FROM user_accounts ua
+				WHERE ua.user_id = $1 AND ua.account_id = t.account_id AND ua.status = 'active'
+			))
+			OR
+			(t.type = 'transfer' AND EXISTS (
+				SELECT 1 FROM user_accounts ua
+				WHERE ua.user_id = $1 AND ua.account_id = t.from_account_id AND ua.status = 'active'
+			) AND EXISTS (
+				SELECT 1 FROM user_accounts ua
+				WHERE ua.user_id = $1 AND ua.account_id = t.to_account_id AND ua.status = 'active'
+			))
+		  )
+	`
+
+	var totalCount int
+	queryTail := ""
+	if page > 0 {
+		if err := pool.QueryRow(ctx, fmt.Sprintf(`%s %s`, countSQL, whereBase), argsBase...).Scan(&totalCount); err != nil {
+			return nil, nil, 0, err
+		}
+		if allItemsMode {
+			queryTail = " ORDER BY t.occurred_at DESC, t.id DESC"
+		} else {
+			offset := (page - 1) * limit
+			if offset < 0 {
+				offset = 0
+			}
+			argsQuery = append(argsQuery, limit)
+			limitArg := len(argsQuery)
+			argsQuery = append(argsQuery, offset)
+			offsetArg := len(argsQuery)
+			queryTail = fmt.Sprintf(" ORDER BY t.occurred_at DESC, t.id DESC LIMIT $%d OFFSET $%d", limitArg, offsetArg)
+		}
+	} else {
+		argsQuery = append(argsQuery, limit+1)
+		limitArg := len(argsQuery)
+		queryTail = fmt.Sprintf(" ORDER BY t.occurred_at DESC, t.id DESC LIMIT $%d", limitArg)
+	}
+
+	rows, err := pool.Query(ctx, fmt.Sprintf(`%s %s %s`, selectSQL, whereQuery, queryTail), argsQuery...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	defer rows.Close()
 
-	out := make([]domain.Transaction, 0, limit)
+	initialCap := limit
+	if allItemsMode {
+		initialCap = totalCount
+	}
+	if initialCap < 0 {
+		initialCap = 0
+	}
+	out := make([]domain.Transaction, 0, initialCap)
 	for rows.Next() {
 		var t domain.Transaction
 		if err := rows.Scan(
@@ -484,12 +559,16 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 			&t.TagIDs,
 			&t.CategoryIDs,
 		); err != nil {
-			return nil, nil, err
+			return nil, nil, 0, err
 		}
 		out = append(out, t)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
+	}
+
+	if page > 0 {
+		return out, nil, totalCount, nil
 	}
 
 	var nextCursor *string
@@ -500,7 +579,204 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 		nextCursor = &c
 	}
 
-	return out, nextCursor, nil
+	return out, nextCursor, 0, nil
+}
+
+func (r *TransactionRepo) patchTransactionTx(ctx context.Context, dbtx pgx.Tx, userID, transactionID string, patch domain.TransactionPatch, now time.Time) error {
+	auditAt := time.Now().UTC()
+	// Fetch current (for permission check + existing values)
+	cur, err := r.GetTransaction(ctx, userID, transactionID)
+	if err != nil {
+		return err
+	}
+
+	// require write permission on linked accounts
+	switch cur.Type {
+	case "expense", "income":
+		if cur.AccountID == nil {
+			return apperrors.ErrTransactionForbidden
+		}
+		if err := requireAccountPermission(ctx, dbtx, userID, *cur.AccountID, true); err != nil {
+			return err
+		}
+	case "transfer":
+		if cur.FromAccountID == nil || cur.ToAccountID == nil {
+			return apperrors.ErrTransactionForbidden
+		}
+		if err := requireAccountPermission(ctx, dbtx, userID, *cur.FromAccountID, true); err != nil {
+			return err
+		}
+		if err := requireAccountPermission(ctx, dbtx, userID, *cur.ToAccountID, true); err != nil {
+			return err
+		}
+	}
+
+	amount := cur.Amount
+	if patch.Amount != nil {
+		amount = *patch.Amount
+	}
+
+	occurredAt := cur.OccurredAt
+	if patch.OccurredAt != nil {
+		occurredAt = *patch.OccurredAt
+	}
+
+	status := cur.Status
+	if patch.Status != nil && strings.TrimSpace(*patch.Status) != "" {
+		status = strings.TrimSpace(*patch.Status)
+	}
+
+	_, err = dbtx.Exec(ctx, `
+		UPDATE transactions
+		SET amount = $1::numeric,
+		    occurred_at = $2,
+		    status = $3::transaction_status,
+		    updated_at = $4,
+		    updated_by = $5
+		WHERE id = $6 AND deleted_at IS NULL
+	`, amount, occurredAt, status, now, userID, transactionID)
+	if err != nil {
+		return err
+	}
+
+	if patch.Description != nil {
+		note := strings.TrimSpace(*patch.Description)
+		if note != "" {
+			var firstLineID string
+			err := dbtx.QueryRow(ctx, `SELECT id FROM transaction_line_items WHERE transaction_id = $1 ORDER BY id LIMIT 1`, transactionID).Scan(&firstLineID)
+			if err == nil {
+				if _, err := dbtx.Exec(ctx, `UPDATE transaction_line_items SET note = $1 WHERE id = $2`, note, firstLineID); err != nil {
+					return err
+				}
+			} else {
+				lineItemID := uuid.NewString()
+				if _, err := dbtx.Exec(ctx, `
+					INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note)
+					VALUES ($1, $2, NULL, $3::numeric, $4)
+				`, lineItemID, transactionID, amount, note); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Update FIRST line item if amount or single category changes
+	if patch.Amount != nil || len(patch.CategoryIDs) == 1 {
+		var liID string
+		err := dbtx.QueryRow(ctx, `SELECT id FROM transaction_line_items WHERE transaction_id = $1 ORDER BY id LIMIT 1`, transactionID).Scan(&liID)
+		if err == nil {
+			setClause := ""
+			args := []any{liID}
+			if patch.Amount != nil {
+				setClause += "amount = $2"
+				args = append(args, *patch.Amount)
+			}
+			if len(patch.CategoryIDs) == 1 {
+				if setClause != "" {
+					setClause += ", "
+				}
+				setClause += fmt.Sprintf("category_id = $%d", len(args)+1)
+				args = append(args, patch.CategoryIDs[0])
+			}
+
+			if setClause != "" {
+				_, err = dbtx.Exec(ctx, "UPDATE transaction_line_items SET "+setClause+" WHERE id = $1", args...)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Handle Tags
+	if patch.TagIDs != nil {
+		_, err = dbtx.Exec(ctx, `DELETE FROM transaction_tags WHERE transaction_id = $1`, transactionID)
+		if err != nil {
+			return err
+		}
+		if len(patch.TagIDs) > 0 {
+			_, err = dbtx.Exec(ctx, `
+				INSERT INTO transaction_tags (transaction_id, tag_id, created_at)
+				SELECT $1, unnest($2::text[]), $3
+			`, transactionID, patch.TagIDs, now)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Handle LineItems: replace all
+	if patch.LineItems != nil {
+		_, err = dbtx.Exec(ctx, `DELETE FROM transaction_line_items WHERE transaction_id = $1`, transactionID)
+		if err != nil {
+			return err
+		}
+		for _, li := range *patch.LineItems {
+			if li.ID == "" {
+				li.ID = uuid.NewString()
+			}
+			_, err = dbtx.Exec(ctx, `
+				INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note)
+				VALUES ($1, $2, $3, $4::numeric, $5)
+			`, li.ID, transactionID, li.CategoryID, li.Amount, li.Note)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Handle GroupParticipants: delete unsettled + insert new
+	if patch.GroupParticipants != nil {
+		_, err = dbtx.Exec(ctx, `
+			DELETE FROM group_expense_participants
+			WHERE transaction_id = $1 AND user_id = $2 AND is_settled = false
+		`, transactionID, userID)
+		if err != nil {
+			return err
+		}
+		for _, p := range *patch.GroupParticipants {
+			if p.ID == "" {
+				p.ID = uuid.NewString()
+			}
+			_, err = dbtx.Exec(ctx, `
+				INSERT INTO group_expense_participants (
+					id, user_id, transaction_id, participant_name,
+					original_amount, share_amount,
+					is_settled, settlement_transaction_id,
+					created_at, updated_at
+				) VALUES ($1,$2,$3,$4,$5::numeric,$6::numeric,$7,$8,$9,$10)
+			`,
+				p.ID, p.UserID, transactionID, p.ParticipantName,
+				p.OriginalAmount, p.ShareAmount,
+				p.IsSettled, p.SettlementTransactionID,
+				p.CreatedAt, p.UpdatedAt,
+			)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Audit (UC-007)
+	auditDiff := map[string]any{
+		"description": patch.Description,
+		"status":      patch.Status,
+	}
+	switch cur.Type {
+	case "expense", "income":
+		if cur.AccountID != nil {
+			_ = insertAuditEvent(ctx, dbtx, *cur.AccountID, userID, "transaction.update", "transaction", cur.ID, auditAt, auditDiff)
+		}
+	case "transfer":
+		if cur.FromAccountID != nil {
+			_ = insertAuditEvent(ctx, dbtx, *cur.FromAccountID, userID, "transaction.update", "transaction", cur.ID, auditAt, auditDiff)
+		}
+		if cur.ToAccountID != nil {
+			_ = insertAuditEvent(ctx, dbtx, *cur.ToAccountID, userID, "transaction.update", "transaction", cur.ID, auditAt, auditDiff)
+		}
+	}
+
+	return nil
 }
 
 func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, transactionID string, patch domain.TransactionPatch) (*domain.Transaction, error) {
@@ -513,195 +789,67 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 	}
 
 	now := time.Now().UTC()
-
-	var updated *domain.Transaction
 	err = withTx(ctx, pool, func(dbtx pgx.Tx) error {
-		auditAt := time.Now().UTC()
-		// Fetch current (for permission check + existing values)
-		cur, err := r.GetTransaction(ctx, userID, transactionID)
-		if err != nil {
-			return err
-		}
-
-		// require write permission on linked accounts
-		switch cur.Type {
-		case "expense", "income":
-			if cur.AccountID == nil {
-				return apperrors.ErrTransactionForbidden
-			}
-			if err := requireAccountPermission(ctx, dbtx, userID, *cur.AccountID, true); err != nil {
-				return err
-			}
-		case "transfer":
-			if cur.FromAccountID == nil || cur.ToAccountID == nil {
-				return apperrors.ErrTransactionForbidden
-			}
-			if err := requireAccountPermission(ctx, dbtx, userID, *cur.FromAccountID, true); err != nil {
-				return err
-			}
-			if err := requireAccountPermission(ctx, dbtx, userID, *cur.ToAccountID, true); err != nil {
-				return err
-			}
-		}
-
-		desc := cur.Description
-		if patch.Description != nil {
-			desc = patch.Description
-		}
-
-		amount := cur.Amount
-		if patch.Amount != nil {
-			amount = *patch.Amount
-		}
-
-		occurredAt := cur.OccurredAt
-		if patch.OccurredAt != nil {
-			occurredAt = *patch.OccurredAt
-		}
-
-		_, err = dbtx.Exec(ctx, `
-			UPDATE transactions
-			SET description = $1,
-			    amount = $2::numeric,
-			    occurred_at = $3,
-			    updated_at = $4,
-			    updated_by = $5
-			WHERE id = $6 AND deleted_at IS NULL
-		`, desc, amount, occurredAt, now, userID, transactionID)
-		if err != nil {
-			return err
-		}
-
-		// Update FIRST line item if amount or single category changes
-		if patch.Amount != nil || len(patch.CategoryIDs) == 1 {
-			var liID string
-			err := dbtx.QueryRow(ctx, `SELECT id FROM transaction_line_items WHERE transaction_id = $1 ORDER BY id LIMIT 1`, transactionID).Scan(&liID)
-			if err == nil {
-				setClause := ""
-				args := []any{liID}
-				if patch.Amount != nil {
-					setClause += "amount = $2"
-					args = append(args, *patch.Amount)
-				}
-				if len(patch.CategoryIDs) == 1 {
-					if setClause != "" {
-						setClause += ", "
-					}
-					setClause += fmt.Sprintf("category_id = $%d", len(args)+1)
-					args = append(args, patch.CategoryIDs[0])
-				}
-
-				if setClause != "" {
-					_, err = dbtx.Exec(ctx, "UPDATE transaction_line_items SET "+setClause+" WHERE id = $1", args...)
-					if err != nil {
-						return err
-					}
-				}
-			}
-		}
-
-		// Handle Tags
-		if patch.TagIDs != nil {
-			_, err = dbtx.Exec(ctx, `DELETE FROM transaction_tags WHERE transaction_id = $1`, transactionID)
-			if err != nil {
-				return err
-			}
-			if len(patch.TagIDs) > 0 {
-				_, err = dbtx.Exec(ctx, `
-					INSERT INTO transaction_tags (transaction_id, tag_id, created_at)
-					SELECT $1, unnest($2::text[]), $3
-				`, transactionID, patch.TagIDs, now)
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		// Handle LineItems: replace all
-		if patch.LineItems != nil {
-			_, err = dbtx.Exec(ctx, `DELETE FROM transaction_line_items WHERE transaction_id = $1`, transactionID)
-			if err != nil {
-				return err
-			}
-			for _, li := range *patch.LineItems {
-				if li.ID == "" {
-					li.ID = uuid.NewString()
-				}
-				_, err = dbtx.Exec(ctx, `
-					INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note)
-					VALUES ($1, $2, $3, $4::numeric, $5)
-				`, li.ID, transactionID, li.CategoryID, li.Amount, li.Note)
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		// Handle GroupParticipants: delete unsettled + insert new
-		if patch.GroupParticipants != nil {
-			_, err = dbtx.Exec(ctx, `
-				DELETE FROM group_expense_participants
-				WHERE transaction_id = $1 AND user_id = $2 AND is_settled = false
-			`, transactionID, userID)
-			if err != nil {
-				return err
-			}
-			for _, p := range *patch.GroupParticipants {
-				if p.ID == "" {
-					p.ID = uuid.NewString()
-				}
-				_, err = dbtx.Exec(ctx, `
-					INSERT INTO group_expense_participants (
-						id, user_id, transaction_id, participant_name,
-						original_amount, share_amount,
-						is_settled, settlement_transaction_id,
-						created_at, updated_at
-					) VALUES ($1,$2,$3,$4,$5::numeric,$6::numeric,$7,$8,$9,$10)
-				`,
-					p.ID, p.UserID, transactionID, p.ParticipantName,
-					p.OriginalAmount, p.ShareAmount,
-					p.IsSettled, p.SettlementTransactionID,
-					p.CreatedAt, p.UpdatedAt,
-				)
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		fetched, err := r.GetTransaction(ctx, userID, transactionID)
-		if err != nil {
-			return err
-		}
-
-		// Audit (UC-007)
-		auditDiff := map[string]any{
-			"description": patch.Description,
-		}
-		switch cur.Type {
-		case "expense", "income":
-			if cur.AccountID != nil {
-				_ = insertAuditEvent(ctx, dbtx, *cur.AccountID, userID, "transaction.update", "transaction", cur.ID, auditAt, auditDiff)
-			}
-		case "transfer":
-			if cur.FromAccountID != nil {
-				_ = insertAuditEvent(ctx, dbtx, *cur.FromAccountID, userID, "transaction.update", "transaction", cur.ID, auditAt, auditDiff)
-			}
-			if cur.ToAccountID != nil {
-				_ = insertAuditEvent(ctx, dbtx, *cur.ToAccountID, userID, "transaction.update", "transaction", cur.ID, auditAt, auditDiff)
-			}
-		}
-
-		updated = fetched
-		return nil
+		return r.patchTransactionTx(ctx, dbtx, userID, transactionID, patch, now)
 	})
 	if err != nil {
 		return nil, err
 	}
-	if updated == nil {
-		return nil, apperrors.ErrTransactionPatchFailed
+
+	updated, err := r.GetTransaction(ctx, userID, transactionID)
+	if err != nil {
+		return nil, err
 	}
 	return updated, nil
+}
+
+func (r *TransactionRepo) BatchPatchTransactions(ctx context.Context, userID string, transactionIDs []string, patches map[string]domain.TransactionPatch, mode string) ([]string, []string, error) {
+	if r.db == nil {
+		return nil, nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if mode == "partial" {
+		updatedIDs := make([]string, 0, len(transactionIDs))
+		failedIDs := make([]string, 0)
+		for _, transactionID := range transactionIDs {
+			patch, ok := patches[transactionID]
+			if !ok {
+				failedIDs = append(failedIDs, transactionID)
+				continue
+			}
+			if _, err := r.PatchTransaction(ctx, userID, transactionID, patch); err != nil {
+				failedIDs = append(failedIDs, transactionID)
+				continue
+			}
+			updatedIDs = append(updatedIDs, transactionID)
+		}
+		return updatedIDs, failedIDs, nil
+	}
+
+	now := time.Now().UTC()
+	err = withTx(ctx, pool, func(dbtx pgx.Tx) error {
+		for _, transactionID := range transactionIDs {
+			patch, ok := patches[transactionID]
+			if !ok {
+				return apperrors.Validation("missing patch for transaction id", map[string]any{"transaction_id": transactionID})
+			}
+			if err := r.patchTransactionTx(ctx, dbtx, userID, transactionID, patch, now); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	updatedIDs := make([]string, len(transactionIDs))
+	copy(updatedIDs, transactionIDs)
+	return updatedIDs, []string{}, nil
 }
 
 func (r *TransactionRepo) DeleteTransaction(ctx context.Context, userID string, transactionID string) error {
@@ -774,3 +922,484 @@ func (r *TransactionRepo) DeleteTransaction(ctx context.Context, userID string, 
 	})
 }
 
+func (r *TransactionRepo) CreateImportedTransactions(ctx context.Context, userID string, items []domain.ImportedTransactionCreate) ([]domain.ImportedTransaction, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(items) == 0 {
+		return []domain.ImportedTransaction{}, nil
+	}
+
+	now := time.Now().UTC()
+	created := make([]domain.ImportedTransaction, 0, len(items))
+
+	err = withTx(ctx, pool, func(dbtx pgx.Tx) error {
+		for _, item := range items {
+			id := uuid.NewString()
+			payload := item.RawPayload
+			if payload == nil {
+				payload = map[string]any{}
+			}
+			payloadBytes, err := json.Marshal(payload)
+			if err != nil {
+				return err
+			}
+
+			if item.MappedAccountID != nil && strings.TrimSpace(*item.MappedAccountID) != "" {
+				if err := requireAccountPermission(ctx, dbtx, userID, strings.TrimSpace(*item.MappedAccountID), true); err != nil {
+					return err
+				}
+			}
+
+			if item.MappedCategoryID != nil && strings.TrimSpace(*item.MappedCategoryID) != "" {
+				var catExists bool
+				err := dbtx.QueryRow(ctx, `
+					SELECT EXISTS (
+						SELECT 1
+						FROM categories
+						WHERE id = $1
+						  AND deleted_at IS NULL
+						  AND is_active = true
+					)
+				`, strings.TrimSpace(*item.MappedCategoryID)).Scan(&catExists)
+				if err != nil {
+					return err
+				}
+				if !catExists {
+					return apperrors.ErrCategoryIDInvalid
+				}
+			}
+
+			_, err = dbtx.Exec(ctx, `
+				INSERT INTO imported_transactions (
+					id, user_id, source,
+					transaction_date, amount, description, transaction_type,
+					imported_account_name, imported_category_name,
+					mapped_account_id, mapped_category_id,
+					raw_payload, created_at, updated_at
+				) VALUES (
+					$1, $2, $3,
+					$4::date, $5::numeric, $6, $7,
+					$8, $9,
+					$10, $11,
+					$12::jsonb, $13, $14
+				)
+			`,
+				id,
+				userID,
+				item.Source,
+				item.TransactionDate,
+				item.Amount,
+				item.Description,
+				item.TransactionType,
+				item.ImportedAccountName,
+				item.ImportedCategoryName,
+				normalizeOptionalImportString(item.MappedAccountID),
+				normalizeOptionalImportString(item.MappedCategoryID),
+				payloadBytes,
+				now,
+				now,
+			)
+			if err != nil {
+				return err
+			}
+
+			created = append(created, domain.ImportedTransaction{
+				ID:                   id,
+				UserID:               userID,
+				Source:               item.Source,
+				TransactionDate:      item.TransactionDate,
+				Amount:               item.Amount,
+				Description:          item.Description,
+				TransactionType:      normalizeOptionalString(item.TransactionType),
+				ImportedAccountName:  item.ImportedAccountName,
+				ImportedCategoryName: item.ImportedCategoryName,
+				MappedAccountID:      normalizeOptionalImportString(item.MappedAccountID),
+				MappedCategoryID:     normalizeOptionalImportString(item.MappedCategoryID),
+				RawPayload:           payload,
+				CreatedAt:            now,
+				UpdatedAt:            now,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return created, nil
+}
+
+func (r *TransactionRepo) ListImportedTransactions(ctx context.Context, userID string) ([]domain.ImportedTransaction, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT
+			id,
+			source,
+			transaction_date,
+			amount,
+			description,
+			transaction_type,
+			imported_account_name,
+			imported_category_name,
+			mapped_account_id,
+			mapped_category_id,
+			raw_payload,
+			created_at,
+			updated_at
+		FROM imported_transactions
+		WHERE user_id = $1
+		ORDER BY transaction_date DESC, created_at DESC, id DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]domain.ImportedTransaction, 0)
+	for rows.Next() {
+		var (
+			it              domain.ImportedTransaction
+			transactionDate time.Time
+			rawPayloadBytes []byte
+		)
+		err := rows.Scan(
+			&it.ID,
+			&it.Source,
+			&transactionDate,
+			&it.Amount,
+			&it.Description,
+			&it.TransactionType,
+			&it.ImportedAccountName,
+			&it.ImportedCategoryName,
+			&it.MappedAccountID,
+			&it.MappedCategoryID,
+			&rawPayloadBytes,
+			&it.CreatedAt,
+			&it.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		it.TransactionDate = transactionDate.UTC().Format("2006-01-02")
+		if len(rawPayloadBytes) > 0 {
+			_ = json.Unmarshal(rawPayloadBytes, &it.RawPayload)
+		}
+		if it.RawPayload == nil {
+			it.RawPayload = map[string]any{}
+		}
+		items = append(items, it)
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return items, nil
+}
+
+func (r *TransactionRepo) PatchImportedTransaction(ctx context.Context, userID string, importID string, patch domain.ImportedTransactionPatch) (*domain.ImportedTransaction, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	var item domain.ImportedTransaction
+	var transactionDate time.Time
+	var rawPayloadBytes []byte
+
+	err = withTx(ctx, pool, func(dbtx pgx.Tx) error {
+		if patch.MappedAccountID != nil && strings.TrimSpace(*patch.MappedAccountID) != "" {
+			if err := requireAccountPermission(ctx, dbtx, userID, strings.TrimSpace(*patch.MappedAccountID), true); err != nil {
+				return err
+			}
+		}
+		if patch.MappedCategoryID != nil && strings.TrimSpace(*patch.MappedCategoryID) != "" {
+			var catExists bool
+			err := dbtx.QueryRow(ctx, `
+				SELECT EXISTS (
+					SELECT 1
+					FROM categories
+					WHERE id = $1
+					  AND deleted_at IS NULL
+					  AND is_active = true
+				)
+			`, strings.TrimSpace(*patch.MappedCategoryID)).Scan(&catExists)
+			if err != nil {
+				return err
+			}
+			if !catExists {
+				return apperrors.ErrCategoryIDInvalid
+			}
+		}
+
+		row := dbtx.QueryRow(ctx, `
+			UPDATE imported_transactions
+			SET mapped_account_id = COALESCE($1, mapped_account_id),
+			    mapped_category_id = COALESCE($2, mapped_category_id),
+			    updated_at = $3
+			WHERE id = $4 AND user_id = $5
+			RETURNING
+				id,
+				source,
+				transaction_date,
+				amount,
+				description,
+				transaction_type,
+				imported_account_name,
+				imported_category_name,
+				mapped_account_id,
+				mapped_category_id,
+				raw_payload,
+				created_at,
+				updated_at
+		`, normalizeOptionalImportString(patch.MappedAccountID), normalizeOptionalImportString(patch.MappedCategoryID), now, importID, userID)
+
+		if err := row.Scan(
+			&item.ID,
+			&item.Source,
+			&transactionDate,
+			&item.Amount,
+			&item.Description,
+			&item.TransactionType,
+			&item.ImportedAccountName,
+			&item.ImportedCategoryName,
+			&item.MappedAccountID,
+			&item.MappedCategoryID,
+			&rawPayloadBytes,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return apperrors.ErrTransactionNotFound
+			}
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	item.TransactionDate = transactionDate.UTC().Format("2006-01-02")
+	if len(rawPayloadBytes) > 0 {
+		_ = json.Unmarshal(rawPayloadBytes, &item.RawPayload)
+	}
+	if item.RawPayload == nil {
+		item.RawPayload = map[string]any{}
+	}
+	return &item, nil
+}
+
+func (r *TransactionRepo) DeleteImportedTransaction(ctx context.Context, userID string, importID string) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	ct, err := pool.Exec(ctx, `DELETE FROM imported_transactions WHERE id = $1 AND user_id = $2`, importID, userID)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return apperrors.ErrTransactionNotFound
+	}
+	return nil
+}
+
+func (r *TransactionRepo) DeleteAllImportedTransactions(ctx context.Context, userID string) (int64, error) {
+	if r.db == nil {
+		return 0, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	ct, err := pool.Exec(ctx, `DELETE FROM imported_transactions WHERE user_id = $1`, userID)
+	if err != nil {
+		return 0, err
+	}
+	return ct.RowsAffected(), nil
+}
+
+func normalizeOptionalImportString(v *string) *string {
+	if v == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*v)
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func normalizeRuleSourceName(v string) string {
+	return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(v)), " "))
+}
+
+func (r *TransactionRepo) UpsertImportMappingRules(ctx context.Context, userID string, rules []domain.ImportMappingRuleUpsert) ([]domain.ImportMappingRule, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	if len(rules) == 0 {
+		return []domain.ImportMappingRule{}, nil
+	}
+
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]domain.ImportMappingRule, 0, len(rules))
+	err = withTx(ctx, pool, func(dbtx pgx.Tx) error {
+		now := time.Now().UTC()
+		for _, rule := range rules {
+			kind := strings.ToLower(strings.TrimSpace(rule.Kind))
+			sourceName := strings.TrimSpace(rule.SourceName)
+			mappedID := strings.TrimSpace(rule.MappedID)
+			if sourceName == "" || mappedID == "" {
+				continue
+			}
+
+			switch kind {
+			case "account":
+				if err := requireAccountPermission(ctx, dbtx, userID, mappedID, true); err != nil {
+					return err
+				}
+				if err := requireAccountActive(ctx, dbtx, mappedID); err != nil {
+					return err
+				}
+			case "category":
+				var exists bool
+				err := dbtx.QueryRow(ctx, `
+					SELECT EXISTS (
+						SELECT 1
+						FROM categories
+						WHERE id = $1
+						  AND deleted_at IS NULL
+						  AND is_active = true
+					)
+				`, mappedID).Scan(&exists)
+				if err != nil {
+					return err
+				}
+				if !exists {
+					return apperrors.ErrCategoryIDInvalid
+				}
+			default:
+				return apperrors.Validation("rule.kind must be account or category", map[string]any{"field": "kind"})
+			}
+
+			normalized := normalizeRuleSourceName(sourceName)
+			var outRule domain.ImportMappingRule
+			err := dbtx.QueryRow(ctx, `
+				INSERT INTO import_mapping_rules (
+					id, user_id, kind, source_name, normalized_source_name, mapped_id, created_at, updated_at
+				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+				ON CONFLICT (user_id, kind, normalized_source_name)
+				DO UPDATE SET
+					source_name = EXCLUDED.source_name,
+					mapped_id = EXCLUDED.mapped_id,
+					updated_at = EXCLUDED.updated_at
+				RETURNING id, user_id, kind, source_name, mapped_id, created_at, updated_at
+			`, uuid.NewString(), userID, kind, sourceName, normalized, mappedID, now, now).Scan(
+				&outRule.ID,
+				&outRule.UserID,
+				&outRule.Kind,
+				&outRule.SourceName,
+				&outRule.MappedID,
+				&outRule.CreatedAt,
+				&outRule.UpdatedAt,
+			)
+			if err != nil {
+				return err
+			}
+			out = append(out, outRule)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *TransactionRepo) ListImportMappingRules(ctx context.Context, userID string) ([]domain.ImportMappingRule, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT id, user_id, kind, source_name, mapped_id, created_at, updated_at
+		FROM import_mapping_rules
+		WHERE user_id = $1
+		ORDER BY kind ASC, source_name ASC, created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]domain.ImportMappingRule, 0)
+	for rows.Next() {
+		var rule domain.ImportMappingRule
+		if err := rows.Scan(
+			&rule.ID,
+			&rule.UserID,
+			&rule.Kind,
+			&rule.SourceName,
+			&rule.MappedID,
+			&rule.CreatedAt,
+			&rule.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, rule)
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	return out, nil
+}
+
+func (r *TransactionRepo) DeleteImportMappingRule(ctx context.Context, userID string, ruleID string) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	ct, err := pool.Exec(ctx, `DELETE FROM import_mapping_rules WHERE id = $1 AND user_id = $2`, ruleID, userID)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return apperrors.ErrTransactionNotFound
+	}
+	return nil
+}

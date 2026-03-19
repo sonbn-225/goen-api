@@ -41,7 +41,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE transaction_status AS ENUM ('posted','voided');
+  CREATE TYPE transaction_status AS ENUM ('pending','posted','cancelled');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
@@ -113,7 +113,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE security_event_type AS ENUM ('dividend_cash','split','reverse_split','rights_issue','bonus_issue','additional_issue','listing');
+  CREATE TYPE security_event_type AS ENUM ('cash_dividend','stock_dividend','split','reverse_split','rights_issue','bonus_issue','additional_issue','listing');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
@@ -140,7 +140,7 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lot_provenance') THEN
-    CREATE TYPE lot_provenance AS ENUM ('regular_buy', 'stock_dividend', 'rights_offering');
+    CREATE TYPE lot_provenance AS ENUM ('regular_buy','stock_dividend','rights_offering');
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lot_status') THEN
@@ -233,12 +233,11 @@ CREATE TABLE IF NOT EXISTS transactions (
   from_amount numeric(18,2),
   to_amount numeric(18,2),
 
-  description text,
   account_id text,
   from_account_id text,
   to_account_id text,
   exchange_rate numeric(18,8),
-  status transaction_status NOT NULL DEFAULT 'posted',
+  status transaction_status NOT NULL DEFAULT 'pending',
 
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
@@ -371,12 +370,10 @@ CREATE INDEX IF NOT EXISTS idx_gep_user_participant_name ON group_expense_partic
 
 CREATE TABLE IF NOT EXISTS categories (
   id text PRIMARY KEY,
-  name text NOT NULL,
   parent_category_id text,
   type text,
   sort_order int,
   is_active boolean NOT NULL DEFAULT true,
-  is_system boolean NOT NULL DEFAULT false,
   icon text,
   color text,
   created_at timestamptz NOT NULL,
@@ -388,11 +385,6 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 CREATE INDEX IF NOT EXISTS idx_categories_parent_category_id ON categories(parent_category_id);
-CREATE INDEX IF NOT EXISTS idx_categories_is_system ON categories(is_system);
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_categories_name_parent_type
-  ON categories (lower(name), parent_category_id, COALESCE(type, ''))
-  WHERE deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_tli_category_id ON transaction_line_items(category_id);
 
@@ -858,190 +850,11 @@ SELECT public.create_hypertable('security_price_dailies', 'price_date', if_not_e
 SELECT public.create_hypertable('audit_events', 'occurred_at', if_not_exists => TRUE);
 
 
--- Seed data (categories)
-INSERT INTO categories (id, name, parent_category_id, type, sort_order, is_active, icon, color, created_at, updated_at)
-VALUES
-  -- Income
-  ('cat_def_income', 'Income', NULL, 'income', 5, true, 'cash', 'green', now(), now()),
+-- Seed data (categories) moved to separate migration file.
+-- See: 20260316000001_seed_categories.sql
 
-  -- Expense parents
-  ('cat_def_food', 'Food & Drinks', NULL, 'expense', 10, true, 'salad', 'orange', now(), now()),
-  ('cat_def_transport', 'Transport', NULL, 'expense', 20, true, 'car', 'blue', now(), now()),
-  ('cat_def_shopping', 'Shopping', NULL, 'expense', 30, true, 'shopping-bag', 'violet', now(), now()),
-  ('cat_def_bills', 'Bills', NULL, 'expense', 40, true, 'receipt', 'cyan', now(), now()),
-  ('cat_def_health', 'Health', NULL, 'expense', 50, true, 'heart', 'red', now(), now()),
-  ('cat_def_entertainment', 'Entertainment', NULL, 'expense', 60, true, 'mask', 'grape', now(), now()),
-  ('cat_def_education', 'Education', NULL, 'expense', 70, true, 'book', 'teal', now(), now()),
-  ('cat_def_other_expense', 'Other', NULL, 'expense', 90, true, 'dots', 'gray', now(), now()),
 
-  -- Income children
-  ('cat_def_income_salary', 'Salary', 'cat_def_income', 'income', 6, true, 'cash', 'green', now(), now()),
-  ('cat_def_income_bonus', 'Bonus', 'cat_def_income', 'income', 7, true, 'cash', 'green', now(), now()),
-  ('cat_def_income_other', 'Other income', 'cat_def_income', 'income', 8, true, 'cash', 'green', now(), now()),
-  ('cat_def_income_business', 'Business income', 'cat_def_income', 'income', 9, true, 'briefcase', 'green', now(), now()),
-  ('cat_def_income_invest_interest', 'Interest', 'cat_def_income', 'income', 10, true, 'percentage', 'green', now(), now()),
-  ('cat_def_income_invest_dividend', 'Dividends', 'cat_def_income', 'income', 11, true, 'chart-line', 'green', now(), now()),
-  ('cat_def_income_rental', 'Rental income', 'cat_def_income', 'income', 12, true, 'home', 'green', now(), now()),
-  ('cat_def_income_gift', 'Gifts received', 'cat_def_income', 'income', 13, true, 'gift', 'green', now(), now()),
-  ('cat_def_income_refund', 'Refunds', 'cat_def_income', 'income', 14, true, 'rotate', 'green', now(), now()),
-  ('cat_def_income_reimbursement', 'Reimbursements', 'cat_def_income', 'income', 15, true, 'receipt-refund', 'green', now(), now()),
-  ('cat_def_income_cashback', 'Cashback', 'cat_def_income', 'income', 16, true, 'coin', 'green', now(), now()),
-  ('cat_def_income_sale', 'Sell items', 'cat_def_income', 'income', 17, true, 'tag', 'green', now(), now()),
 
-  -- Food & Drinks children
-  ('cat_def_food_groceries', 'Groceries', 'cat_def_food', 'expense', 11, true, 'salad', 'orange', now(), now()),
-  ('cat_def_food_eating_out', 'Eating out', 'cat_def_food', 'expense', 12, true, 'salad', 'orange', now(), now()),
-  ('cat_def_food_coffee', 'Coffee & Tea', 'cat_def_food', 'expense', 13, true, 'salad', 'orange', now(), now()),
-  ('cat_def_food_delivery', 'Delivery', 'cat_def_food', 'expense', 14, true, 'scooter', 'orange', now(), now()),
-  ('cat_def_food_snacks', 'Snacks', 'cat_def_food', 'expense', 15, true, 'cookie', 'orange', now(), now()),
-  ('cat_def_food_alcohol', 'Alcohol', 'cat_def_food', 'expense', 16, true, 'glass', 'orange', now(), now()),
-
-  -- Beauty & Grooming
-  ('cat_def_beauty', 'Beauty & Grooming', NULL, 'expense', 18, true, 'sparkles', 'pink', now(), now()),
-  ('cat_def_beauty_haircut', 'Haircut', 'cat_def_beauty', 'expense', 19, true, 'cut', 'pink', now(), now()),
-  ('cat_def_beauty_spa', 'Spa & Massage', 'cat_def_beauty', 'expense', 20, true, 'leaf', 'pink', now(), now()),
-  ('cat_def_beauty_cosmetics', 'Cosmetics', 'cat_def_beauty', 'expense', 21, true, 'sparkles', 'pink', now(), now()),
-
-  -- Social & Gifts
-  ('cat_def_social', 'Social & Gifts', NULL, 'expense', 23, true, 'users', 'grape', now(), now()),
-  ('cat_def_social_wedding', 'Wedding', 'cat_def_social', 'expense', 24, true, 'heart', 'grape', now(), now()),
-  ('cat_def_social_funeral', 'Funeral', 'cat_def_social', 'expense', 25, true, 'shredder', 'grape', now(), now()),
-  ('cat_def_social_gift', 'Gifts given', 'cat_def_social', 'expense', 26, true, 'gift', 'grape', now(), now()),
-
-  -- Transport children
-  ('cat_def_transport_gas', 'Gas', 'cat_def_transport', 'expense', 31, true, 'car', 'blue', now(), now()),
-  ('cat_def_transport_taxi', 'Taxi / Grab', 'cat_def_transport', 'expense', 32, true, 'car', 'blue', now(), now()),
-  ('cat_def_transport_public', 'Public transit', 'cat_def_transport', 'expense', 33, true, 'car', 'blue', now(), now()),
-  ('cat_def_transport_parking', 'Parking', 'cat_def_transport', 'expense', 34, true, 'car', 'blue', now(), now()),
-  ('cat_def_transport_tolls', 'Tolls', 'cat_def_transport', 'expense', 35, true, 'road', 'blue', now(), now()),
-  ('cat_def_transport_maintenance', 'Vehicle maintenance', 'cat_def_transport', 'expense', 36, true, 'tools', 'blue', now(), now()),
-  ('cat_def_transport_insurance', 'Vehicle insurance', 'cat_def_transport', 'expense', 37, true, 'shield', 'blue', now(), now()),
-  ('cat_def_transport_car_payment', 'Car payment', 'cat_def_transport', 'expense', 38, true, 'credit-card', 'blue', now(), now()),
-
-  -- Shopping children
-  ('cat_def_shopping_household', 'Household', 'cat_def_shopping', 'expense', 41, true, 'shopping-bag', 'violet', now(), now()),
-  ('cat_def_shopping_clothes', 'Clothes', 'cat_def_shopping', 'expense', 42, true, 'shopping-bag', 'violet', now(), now()),
-  ('cat_def_shopping_electronics', 'Electronics', 'cat_def_shopping', 'expense', 43, true, 'shopping-bag', 'violet', now(), now()),
-  ('cat_def_shopping_personal_care', 'Personal care', 'cat_def_shopping', 'expense', 44, true, 'sparkles', 'violet', now(), now()),
-  ('cat_def_shopping_gifts', 'Gifts', 'cat_def_shopping', 'expense', 45, true, 'gift', 'violet', now(), now()),
-  ('cat_def_shopping_online', 'Online shopping', 'cat_def_shopping', 'expense', 46, true, 'shopping-cart', 'violet', now(), now()),
-  ('cat_def_shopping_cosmetics', 'Cosmetics (Shopping)', 'cat_def_shopping', 'expense', 47, true, 'sparkles', 'violet', now(), now()),
-
-  -- Home & Life
-  ('cat_def_house', 'Home & Life', NULL, 'expense', 48, true, 'home', 'teal', now(), now()),
-  ('cat_def_home_furniture', 'Furniture', 'cat_def_house', 'expense', 49, true, 'armchair', 'teal', now(), now()),
-  ('cat_def_home_decor', 'Home Decor', 'cat_def_house', 'expense', 50, true, 'lamp', 'teal', now(), now()),
-  ('cat_def_home_cleaning', 'Cleaning', 'cat_def_house', 'expense', 51, true, 'trash', 'teal', now(), now()),
-
-  -- Work & Career
-  ('cat_def_work', 'Work & Career', NULL, 'expense', 52, true, 'briefcase', 'indigo', now(), now()),
-  ('cat_def_work_supplies', 'Office Supplies', 'cat_def_work', 'expense', 53, true, 'pencil', 'indigo', now(), now()),
-  ('cat_def_work_travel', 'Work Travel', 'cat_def_work', 'expense', 54, true, 'plane', 'indigo', now(), now()),
-  ('cat_def_work_lunch', 'Business Lunch', 'cat_def_work', 'expense', 55, true, 'tools', 'indigo', now(), now()),
-
-  -- Technology
-  ('cat_def_tech', 'Technology', NULL, 'expense', 56, true, 'cpu', 'cyan', now(), now()),
-  ('cat_def_tech_gadgets', 'Gadgets', 'cat_def_tech', 'expense', 57, true, 'device-mobile', 'cyan', now(), now()),
-  ('cat_def_tech_software', 'Software / Subscriptions', 'cat_def_tech', 'expense', 58, true, 'code', 'cyan', now(), now()),
-  ('cat_def_tech_cloud', 'Cloud Storage', 'cat_def_tech', 'expense', 59, true, 'cloud', 'cyan', now(), now()),
-
-  -- Bills children
-  ('cat_def_transport_gas', 'Gas', 'cat_def_transport', 'expense', 21, true, 'car', 'blue', now(), now()),
-  ('cat_def_transport_taxi', 'Taxi / Grab', 'cat_def_transport', 'expense', 22, true, 'car', 'blue', now(), now()),
-  ('cat_def_transport_public', 'Public transit', 'cat_def_transport', 'expense', 23, true, 'car', 'blue', now(), now()),
-  ('cat_def_transport_parking', 'Parking', 'cat_def_transport', 'expense', 24, true, 'car', 'blue', now(), now()),
-  ('cat_def_transport_tolls', 'Tolls', 'cat_def_transport', 'expense', 25, true, 'road', 'blue', now(), now()),
-  ('cat_def_transport_maintenance', 'Vehicle maintenance', 'cat_def_transport', 'expense', 26, true, 'tools', 'blue', now(), now()),
-  ('cat_def_transport_insurance', 'Vehicle insurance', 'cat_def_transport', 'expense', 27, true, 'shield', 'blue', now(), now()),
-  ('cat_def_transport_car_payment', 'Car payment', 'cat_def_transport', 'expense', 28, true, 'credit-card', 'blue', now(), now()),
-
-  -- Shopping children
-  ('cat_def_shopping_household', 'Household', 'cat_def_shopping', 'expense', 31, true, 'shopping-bag', 'violet', now(), now()),
-  ('cat_def_shopping_clothes', 'Clothes', 'cat_def_shopping', 'expense', 32, true, 'shopping-bag', 'violet', now(), now()),
-  ('cat_def_shopping_electronics', 'Electronics', 'cat_def_shopping', 'expense', 33, true, 'shopping-bag', 'violet', now(), now()),
-  ('cat_def_shopping_personal_care', 'Personal care', 'cat_def_shopping', 'expense', 34, true, 'sparkles', 'violet', now(), now()),
-  ('cat_def_shopping_gifts', 'Gifts', 'cat_def_shopping', 'expense', 35, true, 'gift', 'violet', now(), now()),
-  ('cat_def_shopping_online', 'Online shopping', 'cat_def_shopping', 'expense', 36, true, 'shopping-cart', 'violet', now(), now()),
-  ('cat_def_shopping_cosmetics', 'Cosmetics', 'cat_def_shopping', 'expense', 37, true, 'sparkles', 'violet', now(), now()),
-
-  -- Bills children
-  ('cat_def_bills_rent', 'Rent', 'cat_def_bills', 'expense', 41, true, 'receipt', 'cyan', now(), now()),
-  ('cat_def_bills_utilities', 'Utilities', 'cat_def_bills', 'expense', 42, true, 'receipt', 'cyan', now(), now()),
-  ('cat_def_bills_internet', 'Internet', 'cat_def_bills', 'expense', 43, true, 'receipt', 'cyan', now(), now()),
-  ('cat_def_bills_phone', 'Phone', 'cat_def_bills', 'expense', 44, true, 'receipt', 'cyan', now(), now()),
-  ('cat_def_bills_mortgage', 'Mortgage', 'cat_def_bills', 'expense', 45, true, 'home', 'cyan', now(), now()),
-  ('cat_def_bills_hoa', 'HOA / Building fees', 'cat_def_bills', 'expense', 46, true, 'building', 'cyan', now(), now()),
-  ('cat_def_bills_repairs', 'Home repairs', 'cat_def_bills', 'expense', 47, true, 'hammer', 'cyan', now(), now()),
-  ('cat_def_bills_subscriptions', 'Subscriptions', 'cat_def_bills', 'expense', 48, true, 'device-tv', 'cyan', now(), now()),
-  ('cat_def_bills_insurance', 'Home insurance', 'cat_def_bills', 'expense', 49, true, 'shield-home', 'cyan', now(), now()),
-  ('cat_def_bills_electricity', 'Electricity', 'cat_def_bills', 'expense', 50, true, 'bolt', 'cyan', now(), now()),
-  ('cat_def_bills_water', 'Water', 'cat_def_bills', 'expense', 51, true, 'droplet', 'cyan', now(), now()),
-  ('cat_def_bills_gas', 'Gas (utility)', 'cat_def_bills', 'expense', 52, true, 'flame', 'cyan', now(), now()),
-  ('cat_def_bills_trash', 'Trash', 'cat_def_bills', 'expense', 53, true, 'trash', 'cyan', now(), now()),
-  ('cat_def_bills_property_tax', 'Property tax', 'cat_def_bills', 'expense', 54, true, 'building-bank', 'cyan', now(), now()),
-
-  -- Health children
-  ('cat_def_health_medical', 'Medical', 'cat_def_health', 'expense', 51, true, 'heart', 'red', now(), now()),
-  ('cat_def_health_pharmacy', 'Pharmacy', 'cat_def_health', 'expense', 52, true, 'heart', 'red', now(), now()),
-  ('cat_def_health_insurance', 'Insurance', 'cat_def_health', 'expense', 53, true, 'heart', 'red', now(), now()),
-  ('cat_def_health_dental', 'Dental', 'cat_def_health', 'expense', 54, true, 'tooth', 'red', now(), now()),
-  ('cat_def_health_vision', 'Vision', 'cat_def_health', 'expense', 55, true, 'eye', 'red', now(), now()),
-  ('cat_def_health_gym', 'Gym / Fitness', 'cat_def_health', 'expense', 56, true, 'barbell', 'red', now(), now()),
-  ('cat_def_health_mental', 'Mental health', 'cat_def_health', 'expense', 57, true, 'brain', 'red', now(), now()),
-
-  -- Entertainment children
-  ('cat_def_ent_movies', 'Movies', 'cat_def_entertainment', 'expense', 61, true, 'mask', 'grape', now(), now()),
-  ('cat_def_ent_games', 'Games', 'cat_def_entertainment', 'expense', 62, true, 'mask', 'grape', now(), now()),
-  ('cat_def_ent_travel', 'Travel', 'cat_def_entertainment', 'expense', 63, true, 'mask', 'grape', now(), now()),
-  ('cat_def_ent_streaming', 'Streaming', 'cat_def_entertainment', 'expense', 64, true, 'device-tv', 'grape', now(), now()),
-  ('cat_def_ent_events', 'Events', 'cat_def_entertainment', 'expense', 65, true, 'ticket', 'grape', now(), now()),
-  ('cat_def_ent_hobbies', 'Hobbies', 'cat_def_entertainment', 'expense', 66, true, 'palette', 'grape', now(), now()),
-  ('cat_def_ent_music', 'Music', 'cat_def_entertainment', 'expense', 67, true, 'music', 'grape', now(), now()),
-  ('cat_def_ent_sports', 'Sports', 'cat_def_entertainment', 'expense', 68, true, 'ball-basketball', 'grape', now(), now()),
-
-  -- Education children
-  ('cat_def_edu_courses', 'Courses', 'cat_def_education', 'expense', 71, true, 'book', 'teal', now(), now()),
-  ('cat_def_edu_books', 'Books', 'cat_def_education', 'expense', 72, true, 'book', 'teal', now(), now()),
-  ('cat_def_edu_tuition', 'Tuition', 'cat_def_education', 'expense', 73, true, 'school', 'teal', now(), now()),
-  ('cat_def_edu_supplies', 'Supplies', 'cat_def_education', 'expense', 74, true, 'pencil', 'teal', now(), now()),
-  ('cat_def_edu_certifications', 'Certifications', 'cat_def_education', 'expense', 75, true, 'certificate', 'teal', now(), now()),
-
-  -- Family
-  ('cat_def_family', 'Family', NULL, 'expense', 80, true, 'users', 'pink', now(), now()),
-  ('cat_def_family_childcare', 'Childcare', 'cat_def_family', 'expense', 81, true, 'baby-carriage', 'pink', now(), now()),
-  ('cat_def_family_kids', 'Kids', 'cat_def_family', 'expense', 82, true, 'balloon', 'pink', now(), now()),
-  ('cat_def_family_parents', 'Parents', 'cat_def_family', 'expense', 83, true, 'heart-handshake', 'pink', now(), now()),
-
-  -- Pets
-  ('cat_def_pets', 'Pets', NULL, 'expense', 85, true, 'paw', 'lime', now(), now()),
-  ('cat_def_pets_food', 'Pet food', 'cat_def_pets', 'expense', 86, true, 'bone', 'lime', now(), now()),
-  ('cat_def_pets_vet', 'Vet', 'cat_def_pets', 'expense', 87, true, 'stethoscope', 'lime', now(), now()),
-  ('cat_def_pets_grooming', 'Grooming', 'cat_def_pets', 'expense', 88, true, 'cut', 'lime', now(), now()),
-
-  -- Financial
-  ('cat_def_financial', 'Financial', NULL, 'expense', 88, true, 'building-bank', 'yellow', now(), now()),
-  ('cat_def_financial_bank_fees', 'Bank fees', 'cat_def_financial', 'expense', 89, true, 'receipt-tax', 'yellow', now(), now()),
-  ('cat_def_financial_loan_interest', 'Loan interest', 'cat_def_financial', 'expense', 90, true, 'percentage', 'yellow', now(), now()),
-  ('cat_def_financial_invest_fees', 'Investment fees', 'cat_def_financial', 'expense', 91, true, 'chart-line', 'yellow', now(), now()),
-
-  -- Other expense
-  ('cat_def_other_fees', 'Fees', 'cat_def_other_expense', 'expense', 92, true, 'receipt-tax', 'gray', now(), now()),
-  ('cat_def_other_donations', 'Donations', 'cat_def_other_expense', 'expense', 93, true, 'heart-handshake', 'gray', now(), now()),
-  ('cat_def_other_taxes', 'Taxes', 'cat_def_other_expense', 'expense', 94, true, 'building-bank', 'gray', now(), now()),
-
-  -- Financial Investment (System)
-  ('cat_def_financial_invest_buy', 'Invest: Buy', 'cat_def_financial', 'expense', 92, true, 'chart-line', 'yellow', now(), now()),
-  ('cat_def_financial_invest_sell', 'Invest: Sell', 'cat_def_financial', 'income', 93, true, 'chart-line', 'yellow', now(), now()),
-
-  -- System-only categories
-  ('cat_sys_internal', 'System', NULL, 'both', 10000, true, 'settings', 'gray', now(), now()),
-  ('cat_sys_internal_adjustment', 'System adjustment', 'cat_sys_internal', 'both', 10001, true, 'settings', 'gray', now(), now()),
-  ('cat_sys_internal_sync', 'System sync', 'cat_sys_internal', 'both', 10002, true, 'settings', 'gray', now(), now())
-ON CONFLICT (id) DO NOTHING;
-
-UPDATE categories
-SET is_system = true
-WHERE id IN ('cat_sys_internal','cat_sys_internal_adjustment','cat_sys_internal_sync','cat_def_financial_invest_buy','cat_def_financial_invest_sell');
 
 
 -- +goose Down

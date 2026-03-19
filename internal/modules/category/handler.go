@@ -27,9 +27,10 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 
 // List handles GET /categories
 // @Summary List categories
-// @Description List categories accessible to current user.
+// @Description List categories accessible to current user. Optionally filter by transaction type.
 // @Tags categories
 // @Produce json
+// @Param type query string false "Filter by transaction type (income, expense, both)"
 // @Success 200 {array} domain.Category
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
@@ -41,7 +42,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := h.svc.List(r.Context(), userID)
+	txType := r.URL.Query().Get("type")
+	items, err := h.svc.List(r.Context(), userID, txType)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return
@@ -82,4 +84,3 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	response.WriteJSON(w, http.StatusOK, item)
 }
-

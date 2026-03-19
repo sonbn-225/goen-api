@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/domain"
-	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/i18n"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 )
 
 // TxCreateRequest is a local representation of transaction create request.
@@ -21,10 +21,16 @@ type TxCreateRequest struct {
 	OccurredDate *string `json:"occurred_date,omitempty"`
 	OccurredTime *string `json:"occurred_time,omitempty"`
 	Amount       string  `json:"amount"`
+	CategoryID   *string `json:"category_id,omitempty"`
 	Description  *string `json:"description,omitempty"`
 	AccountID    *string `json:"account_id,omitempty"`
 	Notes        *string `json:"notes,omitempty"`
 }
+
+const (
+	categorySystemRotatingContribution = "cat_sys_rotating_savings_contribution"
+	categorySystemRotatingPayout       = "cat_sys_rotating_savings_payout"
+)
 
 // CreateGroupRequest contains group create parameters.
 type CreateGroupRequest struct {
@@ -228,8 +234,10 @@ func (s *Service) CreateContribution(ctx context.Context, userID, groupID string
 	}
 
 	txType := "expense"
+	categoryID := categorySystemRotatingContribution
 	if kind == "payout" {
 		txType = "income"
+		categoryID = categorySystemRotatingPayout
 	}
 
 	lang := httpx.LangFromContext(ctx)
@@ -239,6 +247,7 @@ func (s *Service) CreateContribution(ctx context.Context, userID, groupID string
 		OccurredDate: &occurredDate,
 		OccurredTime: normalizeOptionalString(req.OccurredTime),
 		Amount:       amount,
+		CategoryID:   &categoryID,
 		Description:  &desc,
 		AccountID:    accountID,
 		Notes:        normalizeOptionalString(req.Note),
@@ -266,6 +275,7 @@ func (s *Service) CreateContribution(ctx context.Context, userID, groupID string
 	}
 
 	if err := s.repo.CreateContribution(ctx, userID, c); err != nil {
+		_ = s.tx.Delete(ctx, userID, tx.ID)
 		return nil, err
 	}
 
@@ -307,4 +317,3 @@ func isValidDecimal(s string) bool {
 	_, ok := new(big.Rat).SetString(s)
 	return ok
 }
-

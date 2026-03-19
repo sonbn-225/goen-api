@@ -72,7 +72,7 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 	if cat == nil || !cat.IsActive {
 		return nil, apperrors.Validation("category_id is invalid", map[string]any{"field": "category_id"})
 	}
-	if cat.IsSystem {
+	if strings.HasPrefix(cat.ID, "cat_sys") {
 		return nil, apperrors.Validation("category_id is invalid", map[string]any{"field": "category_id"})
 	}
 
@@ -279,4 +279,3 @@ func isValidDecimal(s string) bool {
 	_, ok := new(big.Rat).SetString(s)
 	return ok
 }
-

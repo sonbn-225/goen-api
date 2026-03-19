@@ -21,6 +21,7 @@ import (
 	_ "github.com/sonbn-225/goen-api/docs"
 	"github.com/sonbn-225/goen-api/internal/app"
 	"github.com/sonbn-225/goen-api/internal/config"
+	"github.com/sonbn-225/goen-api/internal/storage"
 )
 
 func main() {
@@ -31,6 +32,15 @@ func main() {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	slog.SetDefault(logger)
+
+	if cfg.MigrateOnStart {
+		logger.Info("running database migrations", "dir", cfg.MigrationDir)
+		if err := storage.RunMigrations(cfg.DatabaseURL, cfg.MigrationDir); err != nil {
+			logger.Error("failed to run migrations", "err", err)
+			os.Exit(1)
+		}
+		logger.Info("database migrations completed")
+	}
 
 	a := app.New(cfg)
 

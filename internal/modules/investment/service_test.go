@@ -359,7 +359,7 @@ func TestListEligibleCorporateActions_UsesPointInTimeHoldings(t *testing.T) {
 		{
 			ID:                 "ev-ex-dividend",
 			SecurityID:         secID,
-			EventType:          "dividend_cash",
+			EventType:          "cash_dividend",
 			ExDate:             ptr("2026-01-10"),
 			CashAmountPerShare: ptr("1"),
 		},
@@ -382,7 +382,7 @@ func TestListEligibleCorporateActions_UsesPointInTimeHoldings(t *testing.T) {
 		{
 			ID:         "ev-no-date",
 			SecurityID: secID,
-			EventType:  "dividend_cash",
+			EventType:  "cash_dividend",
 		},
 	}, nil)
 
