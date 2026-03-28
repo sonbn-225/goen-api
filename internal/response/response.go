@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+// Envelope wraps success messages.
+type Envelope struct {
+	Message string `json:"message"`
+}
+
 // ErrorEnvelope wraps error responses.
 type ErrorEnvelope struct {
 	Error ErrorBody `json:"error"`

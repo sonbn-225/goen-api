@@ -375,6 +375,39 @@
                 }
             }
         },
+        "/auth/me/change-password": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Change password",
+                "parameters": [
+                    {
+                        "description": "Password change request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Envelope"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/me/profile": {
             "patch": {
                 "consumes": [
@@ -386,7 +419,7 @@
                 "tags": [
                     "auth"
                 ],
-                "summary": "Update profile display name",
+                "summary": "Update profile (name, email, phone)",
                 "parameters": [
                     {
                         "description": "Profile patch",
@@ -1565,7 +1598,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/domain.RotatingSavingsGroup"
+                                "$ref": "#/definitions/rotatingsavings.GroupSummary"
                             }
                         }
                     },
@@ -3226,7 +3259,10 @@
             "type": "object",
             "properties": {
                 "amount": {
-                    "type": "string"
+                    "type": "number"
+                },
+                "collected_fee_per_slot": {
+                    "type": "number"
                 },
                 "created_at": {
                     "type": "string"
@@ -3252,6 +3288,9 @@
                 "occurred_at": {
                     "type": "string"
                 },
+                "slots_taken": {
+                    "type": "integer"
+                },
                 "transaction_id": {
                     "type": "string"
                 }
@@ -3264,7 +3303,7 @@
                     "type": "string"
                 },
                 "contribution_amount": {
-                    "type": "string"
+                    "type": "number"
                 },
                 "created_at": {
                     "type": "string"
@@ -3275,8 +3314,8 @@
                 "cycle_frequency": {
                     "type": "string"
                 },
-                "early_payout_fee_rate": {
-                    "type": "string"
+                "fixed_interest_amount": {
+                    "type": "number"
                 },
                 "id": {
                     "type": "string"
@@ -3287,8 +3326,8 @@
                 "name": {
                     "type": "string"
                 },
-                "self_label": {
-                    "type": "string"
+                "payout_cycle_no": {
+                    "type": "integer"
                 },
                 "start_date": {
                     "type": "string"
@@ -3301,6 +3340,9 @@
                 },
                 "user_id": {
                     "type": "string"
+                },
+                "user_slots": {
+                    "type": "integer"
                 }
             }
         },
@@ -3658,6 +3700,14 @@
                 }
             }
         },
+        "response.Envelope": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "response.ErrorBody": {
             "type": "object",
             "properties": {
@@ -3690,6 +3740,9 @@
                 "amount": {
                     "type": "string"
                 },
+                "collected_fee_per_slot": {
+                    "type": "number"
+                },
                 "cycle_no": {
                     "type": "integer"
                 },
@@ -3707,6 +3760,9 @@
                 },
                 "occurred_time": {
                     "type": "string"
+                },
+                "slots_taken": {
+                    "type": "integer"
                 }
             }
         },
@@ -3717,13 +3773,13 @@
                     "type": "string"
                 },
                 "contribution_amount": {
-                    "type": "string"
+                    "type": "number"
                 },
                 "cycle_frequency": {
                     "type": "string"
                 },
-                "early_payout_fee_rate": {
-                    "type": "string"
+                "fixed_interest_amount": {
+                    "type": "number"
                 },
                 "member_count": {
                     "type": "integer"
@@ -3731,14 +3787,40 @@
                 "name": {
                     "type": "string"
                 },
-                "self_label": {
-                    "type": "string"
-                },
                 "start_date": {
                     "type": "string"
                 },
                 "status": {
                     "type": "string"
+                },
+                "user_slots": {
+                    "type": "integer"
+                }
+            }
+        },
+        "rotatingsavings.GroupSummary": {
+            "type": "object",
+            "properties": {
+                "completed_cycles": {
+                    "type": "integer"
+                },
+                "group": {
+                    "$ref": "#/definitions/domain.RotatingSavingsGroup"
+                },
+                "net_position": {
+                    "type": "number"
+                },
+                "next_due_date": {
+                    "type": "string"
+                },
+                "total_cycles": {
+                    "type": "integer"
+                },
+                "total_paid": {
+                    "type": "number"
+                },
+                "total_received": {
+                    "type": "number"
                 }
             }
         },

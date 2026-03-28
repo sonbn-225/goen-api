@@ -77,7 +77,11 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE rotating_savings_contribution_kind AS ENUM ('contribution','payout');
+  CREATE TYPE rotating_savings_contribution_kind AS ENUM (
+  'uncollected',
+  'payout',
+  'collected'
+);
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
@@ -480,12 +484,13 @@ CREATE INDEX IF NOT EXISTS idx_savings_instruments_status ON savings_instruments
 CREATE TABLE IF NOT EXISTS rotating_savings_groups (
   id text PRIMARY KEY,
   user_id text NOT NULL,
-  self_label text,
   account_id text NOT NULL,
   name text NOT NULL,
   member_count int NOT NULL,
+  user_slots int NOT NULL,
   contribution_amount numeric(18,2) NOT NULL,
-  early_payout_fee_rate numeric(18,8),
+  payout_cycle_no int,
+  fixed_interest_amount numeric(18,2),
   cycle_frequency rotating_savings_cycle_frequency NOT NULL,
   start_date date NOT NULL,
   status rotating_savings_group_status NOT NULL DEFAULT 'active',
@@ -506,6 +511,8 @@ CREATE TABLE IF NOT EXISTS rotating_savings_contributions (
   cycle_no int,
   due_date date,
   amount numeric(18,2) NOT NULL,
+  slots_taken int NOT NULL DEFAULT 0,
+  collected_fee_per_slot numeric(18,2) NOT NULL DEFAULT 0,
   occurred_at timestamptz NOT NULL,
   note text,
   created_at timestamptz NOT NULL,

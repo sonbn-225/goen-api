@@ -326,7 +326,9 @@ definitions:
   domain.RotatingSavingsContribution:
     properties:
       amount:
-        type: string
+        type: number
+      collected_fee_per_slot:
+        type: number
       created_at:
         type: string
       cycle_no:
@@ -343,6 +345,8 @@ definitions:
         type: string
       occurred_at:
         type: string
+      slots_taken:
+        type: integer
       transaction_id:
         type: string
     type: object
@@ -351,23 +355,23 @@ definitions:
       account_id:
         type: string
       contribution_amount:
-        type: string
+        type: number
       created_at:
         type: string
       currency:
         type: string
       cycle_frequency:
         type: string
-      early_payout_fee_rate:
-        type: string
+      fixed_interest_amount:
+        type: number
       id:
         type: string
       member_count:
         type: integer
       name:
         type: string
-      self_label:
-        type: string
+      payout_cycle_no:
+        type: integer
       start_date:
         type: string
       status:
@@ -376,6 +380,8 @@ definitions:
         type: string
       user_id:
         type: string
+      user_slots:
+        type: integer
     type: object
   domain.SavingsInstrument:
     properties:
@@ -610,6 +616,11 @@ definitions:
           type: string
         type: array
     type: object
+  response.Envelope:
+    properties:
+      message:
+        type: string
+    type: object
   response.ErrorBody:
     properties:
       code:
@@ -631,6 +642,8 @@ definitions:
         type: string
       amount:
         type: string
+      collected_fee_per_slot:
+        type: number
       cycle_no:
         type: integer
       due_date:
@@ -643,27 +656,46 @@ definitions:
         type: string
       occurred_time:
         type: string
+      slots_taken:
+        type: integer
     type: object
   rotatingsavings.CreateGroupRequest:
     properties:
       account_id:
         type: string
       contribution_amount:
-        type: string
+        type: number
       cycle_frequency:
         type: string
-      early_payout_fee_rate:
-        type: string
+      fixed_interest_amount:
+        type: number
       member_count:
         type: integer
       name:
-        type: string
-      self_label:
         type: string
       start_date:
         type: string
       status:
         type: string
+      user_slots:
+        type: integer
+    type: object
+  rotatingsavings.GroupSummary:
+    properties:
+      completed_cycles:
+        type: integer
+      group:
+        $ref: '#/definitions/domain.RotatingSavingsGroup'
+      net_position:
+        type: number
+      next_due_date:
+        type: string
+      total_cycles:
+        type: integer
+      total_paid:
+        type: number
+      total_received:
+        type: number
     type: object
   savings.CreateRequest:
     properties:
@@ -1103,6 +1135,27 @@ paths:
       summary: Upload profile avatar
       tags:
       - auth
+  /auth/me/change-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Password change request
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Envelope'
+      summary: Change password
+      tags:
+      - auth
   /auth/me/profile:
     patch:
       consumes:
@@ -1121,7 +1174,7 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/domain.User'
-      summary: Update profile display name
+      summary: Update profile (name, email, phone)
       tags:
       - auth
   /auth/me/settings:
@@ -1888,7 +1941,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/domain.RotatingSavingsGroup'
+              $ref: '#/definitions/rotatingsavings.GroupSummary'
             type: array
         "401":
           description: Unauthorized

@@ -26,8 +26,11 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 	r.With(authMiddleware).Post("/rotating-savings/groups", h.CreateGroup)
 	r.With(authMiddleware).Post("/rotating-savings/groups/", h.CreateGroup)
 	r.With(authMiddleware).Get("/rotating-savings/groups/{groupId}", h.GetGroup)
+	r.With(authMiddleware).Patch("/rotating-savings/groups/{groupId}", h.UpdateGroup)
 	r.With(authMiddleware).Get("/rotating-savings/groups/{groupId}/contributions", h.ListContributions)
 	r.With(authMiddleware).Post("/rotating-savings/groups/{groupId}/contributions", h.CreateContribution)
+	r.With(authMiddleware).Delete("/rotating-savings/groups/{groupId}", h.DeleteGroup)
+	r.With(authMiddleware).Delete("/rotating-savings/groups/{groupId}/contributions/{contributionId}", h.DeleteContribution)
 }
 
 // ListGroups handles GET /rotating-savings/groups
@@ -35,7 +38,7 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 // @Description List rotating savings groups owned by current user.
 // @Tags rotating_savings
 // @Produce json
-// @Success 200 {array} domain.RotatingSavingsGroup
+// @Success 200 {array} GroupSummary
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/groups [get]
@@ -113,7 +116,36 @@ func (h *Handler) GetGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, err := h.svc.GetGroup(r.Context(), userID, id)
+	item, err := h.svc.GetGroupDetail(r.Context(), userID, id)
+	if err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, item)
+}
+
+// UpdateGroup handles PATCH /rotating-savings/groups/{groupId}
+func (h *Handler) UpdateGroup(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpx.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteUnauthorized(w)
+		return
+	}
+
+	id := chi.URLParam(r, "groupId")
+	if id == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "groupId is required", map[string]any{"field": "groupId"})
+		return
+	}
+
+	var req UpdateGroupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json body", nil)
+		return
+	}
+
+	item, err := h.svc.UpdateGroup(r.Context(), userID, id, req)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return
@@ -197,3 +229,41 @@ func (h *Handler) CreateContribution(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, item)
 }
 
+func (h *Handler) DeleteContribution(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpx.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteUnauthorized(w)
+		return
+	}
+
+	groupID := chi.URLParam(r, "groupId")
+	contributionID := chi.URLParam(r, "contributionId")
+
+	if err := h.svc.DeleteContribution(r.Context(), userID, groupID, contributionID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpx.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteUnauthorized(w)
+		return
+	}
+
+	groupID := chi.URLParam(r, "groupId")
+	if groupID == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "groupId is required", map[string]any{"field": "groupId"})
+		return
+	}
+
+	if err := h.svc.DeleteGroup(r.Context(), userID, groupID); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
