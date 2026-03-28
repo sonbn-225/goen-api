@@ -18,7 +18,7 @@ func NewRotatingSavingsRepo(db *Postgres) *RotatingSavingsRepo {
 	return &RotatingSavingsRepo{db: db}
 }
 
-func (r *RotatingSavingsRepo) CreateGroup(ctx context.Context, userID string, g domain.RotatingSavingsGroup) error {
+func (r *RotatingSavingsRepo) CreateGroup(ctx context.Context, g domain.RotatingSavingsGroup) error {
 	if r.db == nil {
 		return apperrors.ErrDatabaseNotReady
 	}
@@ -29,19 +29,21 @@ func (r *RotatingSavingsRepo) CreateGroup(ctx context.Context, userID string, g 
 
 	_, err = pool.Exec(ctx, `
 		INSERT INTO rotating_savings_groups (
-			id, user_id, self_label, account_id, name, member_count,
-			contribution_amount, early_payout_fee_rate, cycle_frequency, start_date, status,
+			id, user_id, account_id, name, member_count, user_slots,
+			contribution_amount, payout_cycle_no,
+			fixed_interest_amount, cycle_frequency, start_date, status,
 			created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 	`,
 		g.ID,
 		g.UserID,
-		g.SelfLabel,
 		g.AccountID,
 		g.Name,
 		g.MemberCount,
+		g.UserSlots,
 		g.ContributionAmount,
-		g.EarlyPayoutFeeRate,
+		g.PayoutCycleNo,
+		g.FixedInterestAmount,
 		g.CycleFrequency,
 		g.StartDate,
 		g.Status,
@@ -62,9 +64,10 @@ func (r *RotatingSavingsRepo) GetGroup(ctx context.Context, userID string, group
 
 	row := pool.QueryRow(ctx, `
 		SELECT
-			g.id, g.user_id, g.self_label, g.account_id, g.name, a.currency, g.member_count,
-			g.contribution_amount::text,
-			CASE WHEN g.early_payout_fee_rate IS NULL THEN NULL ELSE g.early_payout_fee_rate::text END,
+			g.id, g.user_id, g.account_id, g.name, a.currency, g.member_count, g.user_slots,
+			g.contribution_amount,
+			g.payout_cycle_no,
+			g.fixed_interest_amount,
 			g.cycle_frequency::text,
 			to_char(g.start_date, 'YYYY-MM-DD'),
 			g.status::text,
@@ -75,19 +78,20 @@ func (r *RotatingSavingsRepo) GetGroup(ctx context.Context, userID string, group
 	`, groupID, userID)
 
 	var g domain.RotatingSavingsGroup
-	var selfNull sql.NullString
-	var earlyNull sql.NullString
+	var interestNull sql.NullFloat64
+	var payoutNull sql.NullInt32
 
 	if err := row.Scan(
 		&g.ID,
 		&g.UserID,
-		&selfNull,
 		&g.AccountID,
 		&g.Name,
 		&g.Currency,
 		&g.MemberCount,
+		&g.UserSlots,
 		&g.ContributionAmount,
-		&earlyNull,
+		&payoutNull,
+		&interestNull,
 		&g.CycleFrequency,
 		&g.StartDate,
 		&g.Status,
@@ -100,14 +104,55 @@ func (r *RotatingSavingsRepo) GetGroup(ctx context.Context, userID string, group
 		return nil, err
 	}
 
-	if selfNull.Valid {
-		g.SelfLabel = &selfNull.String
+	if payoutNull.Valid {
+		v := int(payoutNull.Int32)
+		g.PayoutCycleNo = &v
 	}
-	if earlyNull.Valid {
-		g.EarlyPayoutFeeRate = &earlyNull.String
+	if interestNull.Valid {
+		g.FixedInterestAmount = &interestNull.Float64
 	}
 
 	return &g, nil
+}
+
+func (r *RotatingSavingsRepo) UpdateGroup(ctx context.Context, g domain.RotatingSavingsGroup) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = pool.Exec(ctx, `
+		UPDATE rotating_savings_groups SET
+			account_id = $1,
+			name = $2,
+			member_count = $3,
+			user_slots = $4,
+			contribution_amount = $5,
+			payout_cycle_no = $6,
+			fixed_interest_amount = $7,
+			cycle_frequency = $8,
+			start_date = $9,
+			status = $10,
+			updated_at = $11
+		WHERE id = $12
+	`,
+		g.AccountID,
+		g.Name,
+		g.MemberCount,
+		g.UserSlots,
+		g.ContributionAmount,
+		g.PayoutCycleNo,
+		g.FixedInterestAmount,
+		g.CycleFrequency,
+		g.StartDate,
+		g.Status,
+		g.UpdatedAt,
+		g.ID,
+	)
+	return err
 }
 
 func (r *RotatingSavingsRepo) ListGroups(ctx context.Context, userID string) ([]domain.RotatingSavingsGroup, error) {
@@ -121,9 +166,10 @@ func (r *RotatingSavingsRepo) ListGroups(ctx context.Context, userID string) ([]
 
 	rows, err := pool.Query(ctx, `
 		SELECT
-			g.id, g.user_id, g.self_label, g.account_id, g.name, a.currency, g.member_count,
-			g.contribution_amount::text,
-			CASE WHEN g.early_payout_fee_rate IS NULL THEN NULL ELSE g.early_payout_fee_rate::text END,
+			g.id, g.user_id, g.account_id, g.name, a.currency, g.member_count, g.user_slots,
+			g.contribution_amount,
+			g.payout_cycle_no,
+			g.fixed_interest_amount,
 			g.cycle_frequency::text,
 			to_char(g.start_date, 'YYYY-MM-DD'),
 			g.status::text,
@@ -141,19 +187,20 @@ func (r *RotatingSavingsRepo) ListGroups(ctx context.Context, userID string) ([]
 	out := make([]domain.RotatingSavingsGroup, 0)
 	for rows.Next() {
 		var g domain.RotatingSavingsGroup
-		var selfNull sql.NullString
-		var earlyNull sql.NullString
+		var interestNull sql.NullFloat64
+		var payoutNull sql.NullInt32
 
 		if err := rows.Scan(
 			&g.ID,
 			&g.UserID,
-			&selfNull,
 			&g.AccountID,
 			&g.Name,
 			&g.Currency,
 			&g.MemberCount,
+			&g.UserSlots,
 			&g.ContributionAmount,
-			&earlyNull,
+			&payoutNull,
+			&interestNull,
 			&g.CycleFrequency,
 			&g.StartDate,
 			&g.Status,
@@ -162,11 +209,12 @@ func (r *RotatingSavingsRepo) ListGroups(ctx context.Context, userID string) ([]
 		); err != nil {
 			return nil, err
 		}
-		if selfNull.Valid {
-			g.SelfLabel = &selfNull.String
+		if payoutNull.Valid {
+			v := int(payoutNull.Int32)
+			g.PayoutCycleNo = &v
 		}
-		if earlyNull.Valid {
-			g.EarlyPayoutFeeRate = &earlyNull.String
+		if interestNull.Valid {
+			g.FixedInterestAmount = &interestNull.Float64
 		}
 
 		out = append(out, g)
@@ -177,7 +225,7 @@ func (r *RotatingSavingsRepo) ListGroups(ctx context.Context, userID string) ([]
 	return out, nil
 }
 
-func (r *RotatingSavingsRepo) CreateContribution(ctx context.Context, userID string, c domain.RotatingSavingsContribution) error {
+func (r *RotatingSavingsRepo) CreateContribution(ctx context.Context, c domain.RotatingSavingsContribution) error {
 	if r.db == nil {
 		return apperrors.ErrDatabaseNotReady
 	}
@@ -186,15 +234,10 @@ func (r *RotatingSavingsRepo) CreateContribution(ctx context.Context, userID str
 		return err
 	}
 
-	// Ensure the group belongs to the user.
-	cmd, err := pool.Exec(ctx, `
+	_, err = pool.Exec(ctx, `
 		INSERT INTO rotating_savings_contributions (
-			id, group_id, transaction_id, kind, cycle_no, due_date, amount, occurred_at, note, created_at
-		)
-		SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
-		WHERE EXISTS (
-			SELECT 1 FROM rotating_savings_groups g WHERE g.id = $2 AND g.user_id = $11
-		)
+			id, group_id, transaction_id, kind, cycle_no, due_date, amount, slots_taken, collected_fee_per_slot, occurred_at, note, created_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 	`,
 		c.ID,
 		c.GroupID,
@@ -203,18 +246,13 @@ func (r *RotatingSavingsRepo) CreateContribution(ctx context.Context, userID str
 		c.CycleNo,
 		c.DueDate,
 		c.Amount,
+		c.SlotsTaken,
+		c.CollectedFeePerSlot,
 		c.OccurredAt,
 		c.Note,
 		c.CreatedAt,
-		userID,
 	)
-	if err != nil {
-		return err
-	}
-	if cmd.RowsAffected() == 0 {
-		return apperrors.ErrRotatingSavingsGroupNotFound
-	}
-	return nil
+	return err
 }
 
 func (r *RotatingSavingsRepo) ListContributions(ctx context.Context, userID string, groupID string) ([]domain.RotatingSavingsContribution, error) {
@@ -234,7 +272,9 @@ func (r *RotatingSavingsRepo) ListContributions(ctx context.Context, userID stri
 			c.kind::text,
 			c.cycle_no,
 			CASE WHEN c.due_date IS NULL THEN NULL ELSE to_char(c.due_date, 'YYYY-MM-DD') END,
-			c.amount::text,
+			c.amount,
+			c.slots_taken,
+			c.collected_fee_per_slot,
 			c.occurred_at,
 			c.note,
 			c.created_at
@@ -263,6 +303,8 @@ func (r *RotatingSavingsRepo) ListContributions(ctx context.Context, userID stri
 			&cycleNull,
 			&dueNull,
 			&c.Amount,
+			&c.SlotsTaken,
+			&c.CollectedFeePerSlot,
 			&c.OccurredAt,
 			&noteNull,
 			&c.CreatedAt,
@@ -285,4 +327,94 @@ func (r *RotatingSavingsRepo) ListContributions(ctx context.Context, userID stri
 		return nil, err
 	}
 	return out, nil
+}
+func (r *RotatingSavingsRepo) GetContribution(ctx context.Context, userID string, id string) (*domain.RotatingSavingsContribution, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	row := pool.QueryRow(ctx, `
+		SELECT
+			c.id, c.group_id, c.transaction_id, c.kind::text, c.cycle_no,
+			to_char(c.due_date, 'YYYY-MM-DD'), c.amount, c.slots_taken,
+			c.collected_fee_per_slot, c.occurred_at, c.note, c.created_at
+		FROM rotating_savings_contributions c
+		JOIN rotating_savings_groups g ON g.id = c.group_id
+		WHERE c.id = $1 AND g.user_id = $2
+	`, id, userID)
+
+	var c domain.RotatingSavingsContribution
+	var cycleNull sql.NullInt32
+	var dueNull sql.NullString
+	var noteNull sql.NullString
+
+	if err := row.Scan(
+		&c.ID,
+		&c.GroupID,
+		&c.TransactionID,
+		&c.Kind,
+		&cycleNull,
+		&dueNull,
+		&c.Amount,
+		&c.SlotsTaken,
+		&c.CollectedFeePerSlot,
+		&c.OccurredAt,
+		&noteNull,
+		&c.CreatedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.ErrRotatingSavingsContributionNotFound
+		}
+		return nil, err
+	}
+
+	if cycleNull.Valid {
+		v := int(cycleNull.Int32)
+		c.CycleNo = &v
+	}
+	if dueNull.Valid {
+		c.DueDate = &dueNull.String
+	}
+	if noteNull.Valid {
+		c.Note = &noteNull.String
+	}
+
+	return &c, nil
+}
+
+func (r *RotatingSavingsRepo) DeleteContribution(ctx context.Context, userID string, id string) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = pool.Exec(ctx, `
+		DELETE FROM rotating_savings_contributions
+		WHERE id = $1 AND group_id IN (
+			SELECT id FROM rotating_savings_groups WHERE user_id = $2
+		)
+	`, id, userID)
+	return err
+}
+func (r *RotatingSavingsRepo) DeleteGroup(ctx context.Context, userID string, groupID string) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = pool.Exec(ctx, `
+		DELETE FROM rotating_savings_groups
+		WHERE id = $1 AND user_id = $2
+	`, groupID, userID)
+	return err
 }

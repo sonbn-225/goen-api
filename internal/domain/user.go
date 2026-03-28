@@ -22,12 +22,20 @@ type UserWithPassword struct {
 	PasswordHash string
 }
 
+type UpdateUserParams struct {
+	DisplayName  *string
+	Email        *string
+	Phone        *string
+	AvatarURL    *string
+	PasswordHash *string
+}
+
 type UserRepository interface {
 	CreateUser(ctx context.Context, user UserWithPassword) error
 	FindUserByEmail(ctx context.Context, email string) (*UserWithPassword, error)
 	FindUserByPhone(ctx context.Context, phone string) (*UserWithPassword, error)
 	FindUserByID(ctx context.Context, id string) (*User, error)
 	UpdateUserSettings(ctx context.Context, userID string, patch map[string]any) (*User, error)
-	UpdateUserProfile(ctx context.Context, userID string, displayName *string, avatarURL *string) (*User, error)
+	UpdateUserProfile(ctx context.Context, userID string, params UpdateUserParams) (*User, error)
 }
 

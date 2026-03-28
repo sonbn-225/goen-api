@@ -246,7 +246,9 @@ func (s *Service) UploadAvatar(ctx context.Context, userID string, file *multipa
 	// Build proxied URL pointing to our /media/... endpoint.
 	avatarURL := s.s3.AvatarURL(s.cfg.S3PublicBaseURL, objectKey)
 
-	updated, err := s.userRepo.UpdateUserProfile(ctx, userID, nil, &avatarURL)
+	updated, err := s.userRepo.UpdateUserProfile(ctx, userID, domain.UpdateUserParams{
+		AvatarURL: &avatarURL,
+	})
 	if err != nil {
 		if errors.Is(err, apperrors.ErrUserNotFound) {
 			return nil, apperrors.Wrap(apperrors.KindUnauthorized, "user not found", err)
@@ -256,16 +258,96 @@ func (s *Service) UploadAvatar(ctx context.Context, userID string, file *multipa
 	return updated, nil
 }
 
-// UpdateMyProfile patches display_name (avatar_url is handled by UploadAvatar).
-func (s *Service) UpdateMyProfile(ctx context.Context, userID string, displayName *string) (*domain.User, error) {
-	updated, err := s.userRepo.UpdateUserProfile(ctx, userID, displayName, nil)
+// UpdateMyProfile patches display_name, email, or phone.
+func (s *Service) UpdateMyProfile(ctx context.Context, userID string, displayName, email, phone *string) (*domain.User, error) {
+	params := domain.UpdateUserParams{}
+
+	if displayName != nil {
+		v := strings.TrimSpace(*displayName)
+		params.DisplayName = &v
+	}
+
+	if email != nil {
+		v := strings.ToLower(strings.TrimSpace(*email))
+		if v != "" && !strings.Contains(v, "@") {
+			return nil, apperrors.Validation("invalid email format", nil)
+		}
+		params.Email = &v
+	}
+
+	if phone != nil {
+		v := strings.TrimSpace(*phone)
+		params.Phone = &v
+	}
+
+	updated, err := s.userRepo.UpdateUserProfile(ctx, userID, params)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrUserNotFound) {
 			return nil, apperrors.Wrap(apperrors.KindUnauthorized, "user not found", err)
 		}
+		if errors.Is(err, apperrors.ErrUserAlreadyExists) {
+			return nil, apperrors.Wrap(apperrors.KindConflict, "email or phone already in use", err)
+		}
 		return nil, err
 	}
 	return updated, nil
+}
+
+// ChangePassword updates the user's password after verifying the current one.
+func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+	if len(newPassword) < 8 {
+		return apperrors.Validation("new password must be at least 8 characters", nil)
+	}
+	// Check password strength: at least 1 uppercase, 1 lowercase, 1 digit
+	hasUpper := false
+	hasLower := false
+	hasDigit := false
+	for _, char := range newPassword {
+		if char >= 'A' && char <= 'Z' {
+			hasUpper = true
+		} else if char >= 'a' && char <= 'z' {
+			hasLower = true
+		} else if char >= '0' && char <= '9' {
+			hasDigit = true
+		}
+	}
+	if !hasUpper || !hasLower || !hasDigit {
+		return apperrors.Validation("password must contain uppercase, lowercase, and digits", nil)
+	}
+
+	user, err := s.userRepo.FindUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// We need the hash, so find user with password
+	var uWithPass *domain.UserWithPassword
+	if user.Email != nil {
+		uWithPass, err = s.userRepo.FindUserByEmail(ctx, *user.Email)
+	} else if user.Phone != nil {
+		uWithPass, err = s.userRepo.FindUserByPhone(ctx, *user.Phone)
+	} else {
+		return errors.New("cannot identify user for password change")
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(uWithPass.PasswordHash), []byte(currentPassword)); err != nil {
+		return apperrors.Wrap(apperrors.KindUnauthorized, "invalid current password", apperrors.ErrInvalidCredentials)
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	hashStr := string(newHash)
+	_, err = s.userRepo.UpdateUserProfile(ctx, userID, domain.UpdateUserParams{
+		PasswordHash: &hashStr,
+	})
+	return err
 }
 
 func (s *Service) sanitizeSettings(patch map[string]any) {

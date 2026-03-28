@@ -184,9 +184,9 @@ func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID string, patch 
 	return &u, nil
 }
 
-// UpdateUserProfile updates display_name and/or avatar_url for a user.
-// Only non-nil pointers are applied.
-func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID string, displayName *string, avatarURL *string) (*domain.User, error) {
+// UpdateUserProfile updates user profile fields.
+// Only non-nil fields in params are applied.
+func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID string, params domain.UpdateUserParams) (*domain.User, error) {
 	if r.db == nil {
 		return nil, apperrors.ErrDatabaseNotReady
 	}
@@ -197,18 +197,25 @@ func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID string, display
 
 	row := pool.QueryRow(ctx, `
 		UPDATE users
-		SET display_name = COALESCE($1, display_name),
-		    avatar_url   = COALESCE($2, avatar_url),
-		    updated_at   = NOW()
-		WHERE id = $3
+		SET display_name  = COALESCE($1, display_name),
+		    avatar_url    = COALESCE($2, avatar_url),
+		    email         = COALESCE($3, email),
+		    phone         = COALESCE($4, phone),
+		    password_hash = COALESCE($5, password_hash),
+		    updated_at    = NOW()
+		WHERE id = $6
 		RETURNING id, email, phone, display_name, avatar_url, settings, status, created_at, updated_at
-	`, displayName, avatarURL, userID)
+	`, params.DisplayName, params.AvatarURL, params.Email, params.Phone, params.PasswordHash, userID)
 
 	var u domain.User
 	var settingsJSON []byte
 	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &u.AvatarURL, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.ErrUserNotFound
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
+			return nil, apperrors.ErrUserAlreadyExists
 		}
 		return nil, err
 	}

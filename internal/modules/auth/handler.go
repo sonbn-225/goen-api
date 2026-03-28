@@ -34,6 +34,7 @@ func (h *Handler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.With(httpx.AuthMiddleware(cfg)).Patch("/auth/me/settings", h.PatchMySettings)
 	r.With(httpx.AuthMiddleware(cfg)).Post("/auth/me/avatar", h.UploadAvatar)
 	r.With(httpx.AuthMiddleware(cfg)).Patch("/auth/me/profile", h.PatchMyProfile)
+	r.With(httpx.AuthMiddleware(cfg)).Post("/auth/me/change-password", h.ChangePassword)
 	// Public media proxy (no auth — object keys are UUIDs)
 	r.Get("/media/{bucket}/*", h.GetMedia)
 }
@@ -221,7 +222,7 @@ func (h *Handler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 }
 
 // PatchMyProfile handles PATCH /auth/me/profile
-// @Summary Update profile display name
+// @Summary Update profile (name, email, phone)
 // @Tags auth
 // @Accept json
 // @Produce json
@@ -237,18 +238,57 @@ func (h *Handler) PatchMyProfile(w http.ResponseWriter, r *http.Request) {
 
 	var body struct {
 		DisplayName *string `json:"display_name"`
+		Email       *string `json:"email"`
+		Phone       *string `json:"phone"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
 		return
 	}
 
-	user, err := h.svc.UpdateMyProfile(r.Context(), userID, body.DisplayName)
+	user, err := h.svc.UpdateMyProfile(r.Context(), userID, body.DisplayName, body.Email, body.Phone)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return
 	}
 	response.WriteJSON(w, http.StatusOK, user)
+}
+
+// ChangePassword handles POST /auth/me/change-password
+// @Summary Change password
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body object true "Password change request"
+// @Success 200 {object} response.Envelope
+// @Router /auth/me/change-password [post]
+func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpx.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteUnauthorized(w)
+		return
+	}
+
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		return
+	}
+
+	if req.CurrentPassword == "" || req.NewPassword == "" {
+		response.WriteError(w, http.StatusBadRequest, "validation_error", "required fields missing", nil)
+		return
+	}
+
+	if err := h.svc.ChangePassword(r.Context(), userID, req.CurrentPassword, req.NewPassword); err != nil {
+		httpx.WriteServiceError(w, err)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, response.Envelope{Message: "password updated successfully"})
 }
 
 // GetMedia handles GET /media/{bucket}/*

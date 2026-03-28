@@ -168,7 +168,11 @@ var ErrAuditForbidden = errors.New("audit forbidden")
 var ErrSavingsInstrumentNotFound = errors.New("savings instrument not found")
 
 // Rotating Savings
-var ErrRotatingSavingsGroupNotFound = errors.New("rotating savings group not found")
+var (
+	ErrRotatingSavingsGroupNotFound        = errors.New("rotating savings group not found")
+	ErrRotatingSavingsContributionNotFound = errors.New("rotating savings contribution not found")
+	ErrRotatingSavingsNameRequired         = errors.New("rotating savings name is required")
+)
 
 // Debt
 var ErrDebtNotFound = errors.New("debt not found")
