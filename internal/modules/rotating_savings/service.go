@@ -144,6 +144,7 @@ type ScheduleCycle struct {
 	PayoutSlots       int      `json:"payout_slots"`
 	GroupCollectedSlots int    `json:"group_collected_slots"`
 	UserCollectedSlots  int    `json:"user_collected_slots"`
+	AccruedInterest     float64 `json:"accrued_interest"`
 }
 
 type GroupSummary struct {
@@ -161,6 +162,7 @@ type GroupDetailResponse struct {
 	Schedule           []ScheduleCycle                       `json:"schedule"`
 	CollectedSlotsCount int                                  `json:"collected_slots_count"`
 	CurrentPayoutValue float64                               `json:"current_payout_value"`
+	CurrentAccruedInterest float64                          `json:"current_accrued_interest"`
 	Contributions      []domain.RotatingSavingsContribution `json:"contributions"`
 	TotalPaid          float64                               `json:"total_paid"`
 	TotalReceived      float64                               `json:"total_received"`
@@ -193,28 +195,43 @@ func (s *Service) GetGroupDetail(ctx context.Context, userID string, groupID str
 		interest = *g.FixedInterestAmount
 	}
 
-	// Calculate payout value for the NEXT payout based on historical dead slots
-	// Logic: payout at cycle N = Base * TotalSlots + (Dead slots from 1 to N-1) * Interest
-	var nextPayoutCycle int
-	lastPayoutCycle := 0
+	// Calculate payout value for the NEXT payout 
+	lastUserPayoutCycle := 0
 	for _, c := range contributions {
-		if c.Kind == "payout" && c.CycleNo != nil && *c.CycleNo > lastPayoutCycle {
-			lastPayoutCycle = *c.CycleNo
-		}
-	}
-	nextPayoutCycle = lastPayoutCycle + 1
-	if nextPayoutCycle > g.MemberCount {
-		nextPayoutCycle = g.MemberCount
-	}
-
-	deadSlotsBeforeNext := 0
-	for _, c := range contributions {
-		if c.Kind == "payout" && c.CycleNo != nil && *c.CycleNo < nextPayoutCycle {
-			deadSlotsBeforeNext += c.SlotsTaken
+		if c.Kind == "payout" && c.CycleNo != nil && *c.CycleNo > lastUserPayoutCycle {
+			lastUserPayoutCycle = *c.CycleNo
 		}
 	}
 
-	payoutValue := float64(g.MemberCount)*g.ContributionAmount + float64(deadSlotsBeforeNext)*interest
+	// For suggestion, use the current active cycle (first cycle without a contribution)
+	nextPayoutCycle := 1
+	confirmedCycles := make(map[int]bool)
+	for _, c := range contributions {
+		if c.Kind != "payout" && c.CycleNo != nil {
+			confirmedCycles[*c.CycleNo] = true
+		}
+	}
+	for i := 1; i <= g.MemberCount; i++ {
+		if !confirmedCycles[i] {
+			nextPayoutCycle = i
+			break
+		}
+	}
+
+	userLivingSlotsBeforeNext := g.UserSlots - collectedSlotsCount
+	numAccCycles := nextPayoutCycle - lastUserPayoutCycle
+	if lastUserPayoutCycle == 0 {
+		numAccCycles = nextPayoutCycle - 2
+	}
+	if numAccCycles < 0 {
+		numAccCycles = 0
+	}
+
+	// Accrued interest is collected for ALL living slots
+	accruedInterest := float64(userLivingSlotsBeforeNext) * float64(numAccCycles) * interest
+	
+	// Suggested payout amount (PRINCIPAL ONLY for one slot)
+	payoutValue := float64(g.MemberCount)*g.ContributionAmount
 
 	totalPaid := 0.0
 	totalReceived := 0.0
@@ -235,15 +252,16 @@ func (s *Service) GetGroupDetail(ctx context.Context, userID string, groupID str
 	}
 
 	return &GroupDetailResponse{
-		Group:              *g,
-		Schedule:           schedule,
+		Group:               *g,
+		Schedule:            schedule,
 		CollectedSlotsCount: collectedSlotsCount,
-		CurrentPayoutValue: payoutValue,
-		Contributions:      contributions,
-		TotalPaid:          totalPaid,
-		TotalReceived:      totalReceived,
-		NextPayment:        nextPayment,
-		NetPosition:        totalReceived - totalPaid,
+		CurrentPayoutValue:  payoutValue,
+		CurrentAccruedInterest: accruedInterest,
+		Contributions:       contributions,
+		TotalPaid:           totalPaid,
+		TotalReceived:       totalReceived,
+		NextPayment:         nextPayment,
+		NetPosition:         totalReceived - totalPaid,
 	}, nil
 }
 
@@ -257,22 +275,37 @@ func (s *Service) generateSchedule(g domain.RotatingSavingsGroup, history []doma
 	schedule := make([]ScheduleCycle, count)
 
 	// Build history map for quick lookup
-	histMap := make(map[int]domain.RotatingSavingsContribution)
+	type cycleHistory struct {
+		Payout       *domain.RotatingSavingsContribution
+		Contribution *domain.RotatingSavingsContribution
+	}
+	histMap := make(map[int]cycleHistory)
 	for _, c := range history {
 		if c.CycleNo != nil {
-			histMap[*c.CycleNo] = c
+			ch := histMap[*c.CycleNo]
+			if c.Kind == "payout" {
+				ch.Payout = &c
+			} else {
+				ch.Contribution = &c
+			}
+			histMap[*c.CycleNo] = ch
 		}
 	}
 
-	// Sort history by cycle number to calculate cumulative dead slots/fees
-	sortedHist := make([]domain.RotatingSavingsContribution, 0)
+	interest := 0.0
+	if g.FixedInterestAmount != nil {
+		interest = *g.FixedInterestAmount
+	}
+
+	// Sort payouts to track interest collection cycles
+	sortedUserPayouts := make([]domain.RotatingSavingsContribution, 0)
 	for _, c := range history {
-		if c.CycleNo != nil {
-			sortedHist = append(sortedHist, c)
+		if c.Kind == "payout" && c.CycleNo != nil {
+			sortedUserPayouts = append(sortedUserPayouts, c)
 		}
 	}
-	sort.Slice(sortedHist, func(i, j int) bool {
-		return *sortedHist[i].CycleNo < *sortedHist[j].CycleNo
+	sort.Slice(sortedUserPayouts, func(i, j int) bool {
+		return *sortedUserPayouts[i].CycleNo < *sortedUserPayouts[j].CycleNo
 	})
 
 	for i := 1; i <= count; i++ {
@@ -284,90 +317,74 @@ func (s *Service) generateSchedule(g domain.RotatingSavingsGroup, history []doma
 			dueDate = startDate.AddDate(0, (i-1), 0)
 		}
 
-		// Calculate cumulative collected slots up to this cycle
-		groupCollectedSlots := 0
-		for _, h := range sortedHist {
-			if h.CycleNo != nil && *h.CycleNo <= i && h.Kind == "payout" {
-				groupCollectedSlots += h.SlotsTaken
+		// 1. Calculate user's internal state strictly BEFORE i
+		userCollectedSlotsStrictlyBeforeI := 0
+		lastUserPayoutCycleBeforeI := 0
+		for _, c := range sortedUserPayouts {
+			if *c.CycleNo < i {
+				userCollectedSlotsStrictlyBeforeI += c.SlotsTaken
+				if *c.CycleNo > lastUserPayoutCycleBeforeI {
+					lastUserPayoutCycleBeforeI = *c.CycleNo
+				}
 			}
 		}
 
-		interest := 0.0
-		if g.FixedInterestAmount != nil {
-			interest = *g.FixedInterestAmount
-		}
+		userLivingSlotsBeforeI := g.UserSlots - userCollectedSlotsStrictlyBeforeI
 
-		kind := "uncollected"
-		// Logic: if user's slots taken in history includes this cycle, it's a payout.
-		// If user has collected slots from earlier cycles, they pay Base + Interest.
-		// If user is uncollected, they pay Base.
+		// 2. Suggested payout amount using clearance logic
+		numAccCycles := i - lastUserPayoutCycleBeforeI
+		if lastUserPayoutCycleBeforeI == 0 {
+			numAccCycles = i - 2
+		}
+		if numAccCycles < 0 {
+			numAccCycles = 0
+		}
 		
-		// Sửa lại cách tính số suất đã lĩnh: Số suất đã lĩnh cho kỳ i là tổng số suất đã lĩnh TRƯỚC kỳ i.
-		// (Nếu lĩnh ở kỳ i, suất đó vẫn được coi là chưa lĩnh khi CHƯA lĩnh xong kỳ đó).
-		userCollectedSlots := 0
-		for _, h := range sortedHist {
-			if h.CycleNo != nil && *h.CycleNo < i && h.Kind == "payout" {
-				userCollectedSlots += h.SlotsTaken
-			}
+		accruedInterestForAllLiving := float64(userLivingSlotsBeforeI) * float64(numAccCycles) * interest
+		suggestedPayoutAmount := float64(g.MemberCount)*g.ContributionAmount + accruedInterestForAllLiving
+
+		// 3. Expected Contribution amount
+		expectedContribution := float64(userCollectedSlotsStrictlyBeforeI)*(g.ContributionAmount+interest) +
+			float64(userLivingSlotsBeforeI)*g.ContributionAmount
+
+		ch := histMap[i]
+		
+		isPaid := ch.Contribution != nil
+		var contribID *string
+		kind := "uncollected"
+		if isPaid {
+			contribID = &ch.Contribution.ID
+			expectedContribution = ch.Contribution.Amount
+			kind = ch.Contribution.Kind
 		}
 
-		expectedAmount := float64(g.UserSlots-userCollectedSlots)*g.ContributionAmount + float64(userCollectedSlots)*(g.ContributionAmount+interest)
+		isPayout := ch.Payout != nil
+		var payoutID *string
+		payoutAmount := suggestedPayoutAmount
+		payoutSlots := 0
+		payoutAccruedInterest := accruedInterestForAllLiving
+		if isPayout {
+			payoutID = &ch.Payout.ID
+			payoutAmount = ch.Payout.Amount
+			payoutSlots = ch.Payout.SlotsTaken
+			// If already paid out, we don't have recorded accrued interest separately,
+			// but for planned cycles it's useful.
+		}
 
-		if userCollectedSlots > 0 {
-			if userCollectedSlots < g.UserSlots {
+		// 4. Update state for end of cycle (for Badge status)
+		userCollectedSlotsAtEndOfI := userCollectedSlotsStrictlyBeforeI + payoutSlots
+		if userCollectedSlotsAtEndOfI > 0 {
+			if userCollectedSlotsAtEndOfI < g.UserSlots {
 				kind = "partial_collected"
 			} else {
 				kind = "collected"
 			}
 		}
 
-		// Group history by kind for this cycle
-		var contrib *domain.RotatingSavingsContribution
-		var payout *domain.RotatingSavingsContribution
-		
-		for _, h := range history {
-			if h.CycleNo != nil && *h.CycleNo == i {
-				if h.Kind == "payout" {
-					payout = &h
-				} else {
-					// Lấy bản ghi xác nhận đóng hụi (living hoặc dead)
-					contrib = &h
-				}
-			}
-		}
-
-		isPaid := contrib != nil
-		var contribID *string
-		if isPaid {
-			id := contrib.ID
-			contribID = &id
-			expectedAmount = contrib.Amount
-			kind = contrib.Kind
-		}
-
-		isPayout := payout != nil
-		var payoutID *string
-		payoutAmount := 0.0
-		payoutSlots := 0
-		if isPayout {
-			id := payout.ID
-			payoutID = &id
-			payoutAmount = payout.Amount
-			payoutSlots = payout.SlotsTaken
-		}
-
-		// displayUserCollectedSlots includes payouts in the current cycle for audit/status display
-		displayUserCollectedSlots := 0
-		for _, h := range sortedHist {
-			if h.CycleNo != nil && *h.CycleNo <= i && h.Kind == "payout" {
-				displayUserCollectedSlots += h.SlotsTaken
-			}
-		}
-
 		schedule[i-1] = ScheduleCycle{
 			CycleNo:           i,
 			DueDate:           dueDate.Format("2006-01-02"),
-			ExpectedAmount:    expectedAmount,
+			ExpectedAmount:    expectedContribution,
 			Kind:              kind,
 			IsPaid:            isPaid,
 			ContributionID:    contribID,
@@ -375,10 +392,11 @@ func (s *Service) generateSchedule(g domain.RotatingSavingsGroup, history []doma
 			PayoutID:          payoutID,
 			PayoutAmount:      payoutAmount,
 			PayoutSlots:       payoutSlots,
-			GroupCollectedSlots: groupCollectedSlots,
-			UserCollectedSlots:  displayUserCollectedSlots,
+			UserCollectedSlots: userCollectedSlotsAtEndOfI,
+			AccruedInterest:    payoutAccruedInterest,
 		}
 	}
+
 	return schedule
 }
 

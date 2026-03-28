@@ -80,7 +80,8 @@ DO $$ BEGIN
   CREATE TYPE rotating_savings_contribution_kind AS ENUM (
   'uncollected',
   'payout',
-  'collected'
+  'collected',
+  'partial_collected'
 );
 EXCEPTION
   WHEN duplicate_object THEN NULL;
