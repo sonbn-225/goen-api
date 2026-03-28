@@ -736,7 +736,7 @@ const docTemplate = `{
         },
         "/categories": {
             "get": {
-                "description": "List categories accessible to current user.",
+                "description": "List categories accessible to current user. Optionally filter by transaction type.",
                 "produces": [
                     "application/json"
                 ],
@@ -744,6 +744,14 @@ const docTemplate = `{
                     "categories"
                 ],
                 "summary": "List categories",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by transaction type (income, expense, both)",
+                        "name": "type",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2464,6 +2472,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/transactions/batch": {
+            "patch": {
+                "description": "Apply patch payload to multiple transactions in one API call.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Batch patch transactions",
+                "parameters": [
+                    {
+                        "description": "Batch patch request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/transaction.BatchPatchBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/transaction.BatchPatchResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/transactions/{transactionId}": {
             "get": {
                 "description": "Get a single transaction.",
@@ -3042,9 +3102,6 @@ const docTemplate = `{
                 },
                 "is_active": {
                     "type": "boolean"
-                },
-                "name": {
-                    "type": "string"
                 },
                 "parent_category_id": {
                     "type": "string"
@@ -3766,6 +3823,49 @@ const docTemplate = `{
                 }
             }
         },
+        "transaction.BatchPatchBody": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string"
+                },
+                "patch": {
+                    "$ref": "#/definitions/transaction.PatchRequest"
+                },
+                "transaction_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "transaction.BatchPatchResult": {
+            "type": "object",
+            "properties": {
+                "failed_count": {
+                    "type": "integer"
+                },
+                "failed_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "updated_count": {
+                    "type": "integer"
+                },
+                "updated_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "transaction.CreateBody": {
             "type": "object",
             "properties": {
@@ -3879,8 +3979,20 @@ const docTemplate = `{
                         "$ref": "#/definitions/domain.Transaction"
                     }
                 },
+                "limit": {
+                    "type": "integer"
+                },
                 "next_cursor": {
                     "type": "string"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
                 }
             }
         },
@@ -3912,6 +4024,9 @@ const docTemplate = `{
                     }
                 },
                 "occurred_at": {
+                    "type": "string"
+                },
+                "status": {
                     "type": "string"
                 },
                 "tag_ids": {

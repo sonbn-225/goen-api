@@ -243,8 +243,6 @@ definitions:
         type: string
       is_active:
         type: boolean
-      name:
-        type: string
       parent_category_id:
         type: string
       sort_order:
@@ -718,6 +716,34 @@ definitions:
       name:
         type: string
     type: object
+  transaction.BatchPatchBody:
+    properties:
+      mode:
+        type: string
+      patch:
+        $ref: '#/definitions/transaction.PatchRequest'
+      transaction_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  transaction.BatchPatchResult:
+    properties:
+      failed_count:
+        type: integer
+      failed_ids:
+        items:
+          type: string
+        type: array
+      mode:
+        type: string
+      updated_count:
+        type: integer
+      updated_ids:
+        items:
+          type: string
+        type: array
+    type: object
   transaction.CreateBody:
     properties:
       account_id:
@@ -792,8 +818,16 @@ definitions:
         items:
           $ref: '#/definitions/domain.Transaction'
         type: array
+      limit:
+        type: integer
       next_cursor:
         type: string
+      page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
     type: object
   transaction.PatchRequest:
     properties:
@@ -814,6 +848,8 @@ definitions:
           $ref: '#/definitions/transaction.LineItemInput'
         type: array
       occurred_at:
+        type: string
+      status:
         type: string
       tag_ids:
         items:
@@ -1302,7 +1338,13 @@ paths:
       - budgets
   /categories:
     get:
-      description: List categories accessible to current user.
+      description: List categories accessible to current user. Optionally filter by
+        transaction type.
+      parameters:
+      - description: Filter by transaction type (income, expense, both)
+        in: query
+        name: type
+        type: string
       produces:
       - application/json
       responses:
@@ -2581,6 +2623,40 @@ paths:
       summary: List debt links for transaction
       tags:
       - debts
+  /transactions/batch:
+    patch:
+      consumes:
+      - application/json
+      description: Apply patch payload to multiple transactions in one API call.
+      parameters:
+      - description: Batch patch request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/transaction.BatchPatchBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/transaction.BatchPatchResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: Batch patch transactions
+      tags:
+      - transactions
 schemes:
 - http
 - https

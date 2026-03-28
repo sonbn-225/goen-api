@@ -53,7 +53,6 @@ VALUES
   -- ============ BILLS & HOUSING ============
   ('cat_def_bills', NULL, 'expense', 40, true, 'receipt', 'cyan', now(), now()),
   ('cat_def_bills_rent', 'cat_def_bills', 'expense', 41, true, 'home', 'cyan', now(), now()),
-  ('cat_def_bills_utilities', 'cat_def_bills', 'expense', 42, false, 'zap', 'cyan', now(), now()),
   ('cat_def_bills_internet', 'cat_def_bills', 'expense', 43, true, 'wifi', 'cyan', now(), now()),
   ('cat_def_bills_phone', 'cat_def_bills', 'expense', 44, true, 'phone', 'cyan', now(), now()),
   ('cat_def_bills_mortgage', 'cat_def_bills', 'expense', 45, true, 'building', 'cyan', now(), now()),
@@ -287,7 +286,10 @@ VALUES
   ('cat_def_goals_emergency_fund', 'cat_def_goals', 'expense', 251, true, 'shield', 'teal', now(), now()),
   ('cat_def_goals_home_goal', 'cat_def_goals', 'expense', 252, true, 'home', 'teal', now(), now()),
   ('cat_def_goals_education_goal', 'cat_def_goals', 'expense', 253, true, 'school', 'teal', now(), now()),
-  ('cat_def_goals_vehicle_goal', 'cat_def_goals', 'expense', 254, true, 'car', 'teal', now(), now())
+  ('cat_def_goals_vehicle_goal', 'cat_def_goals', 'expense', 254, true, 'car', 'teal', now(), now()),
+
+  ('cat_sys_rotating_savings_contribution', 'cat_sys_internal', 'expense', 10020, true, 'users', 'cyan', now(), now()),
+  ('cat_sys_rotating_savings_payout', 'cat_sys_internal', 'income', 10021, true, 'coins', 'cyan', now(), now())
 ON CONFLICT (id) DO NOTHING;
 
 -- +goose Down
