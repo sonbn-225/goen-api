@@ -192,7 +192,29 @@ func (s *Service) GetGroupDetail(ctx context.Context, userID string, groupID str
 	if g.FixedInterestAmount != nil {
 		interest = *g.FixedInterestAmount
 	}
-	payoutValue := float64(g.MemberCount)*g.ContributionAmount + float64(collectedSlotsCount)*interest
+
+	// Calculate payout value for the NEXT payout based on historical dead slots
+	// Logic: payout at cycle N = Base * TotalSlots + (Dead slots from 1 to N-1) * Interest
+	var nextPayoutCycle int
+	lastPayoutCycle := 0
+	for _, c := range contributions {
+		if c.Kind == "payout" && c.CycleNo != nil && *c.CycleNo > lastPayoutCycle {
+			lastPayoutCycle = *c.CycleNo
+		}
+	}
+	nextPayoutCycle = lastPayoutCycle + 1
+	if nextPayoutCycle > g.MemberCount {
+		nextPayoutCycle = g.MemberCount
+	}
+
+	deadSlotsBeforeNext := 0
+	for _, c := range contributions {
+		if c.Kind == "payout" && c.CycleNo != nil && *c.CycleNo < nextPayoutCycle {
+			deadSlotsBeforeNext += c.SlotsTaken
+		}
+	}
+
+	payoutValue := float64(g.MemberCount)*g.ContributionAmount + float64(deadSlotsBeforeNext)*interest
 
 	totalPaid := 0.0
 	totalReceived := 0.0
@@ -292,7 +314,11 @@ func (s *Service) generateSchedule(g domain.RotatingSavingsGroup, history []doma
 		expectedAmount := float64(g.UserSlots-userCollectedSlots)*g.ContributionAmount + float64(userCollectedSlots)*(g.ContributionAmount+interest)
 
 		if userCollectedSlots > 0 {
-			kind = "collected"
+			if userCollectedSlots < g.UserSlots {
+				kind = "partial_collected"
+			} else {
+				kind = "collected"
+			}
 		}
 
 		// Group history by kind for this cycle
