@@ -2951,6 +2951,9 @@
                 "client_id": {
                     "type": "string"
                 },
+                "contact_id": {
+                    "type": "string"
+                },
                 "direction": {
                     "type": "string"
                 },
@@ -3160,6 +3163,15 @@
                     "type": "string"
                 },
                 "closed_at": {
+                    "type": "string"
+                },
+                "contact_avatar_url": {
+                    "type": "string"
+                },
+                "contact_id": {
+                    "type": "string"
+                },
+                "contact_name": {
                     "type": "string"
                 },
                 "created_at": {
@@ -3405,7 +3417,10 @@
                 "id": {
                     "type": "string"
                 },
-                "name": {
+                "name_en": {
+                    "type": "string"
+                },
+                "name_vi": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -3524,6 +3539,12 @@
                 },
                 "note": {
                     "type": "string"
+                },
+                "tag_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -3807,11 +3828,11 @@
                 "group": {
                     "$ref": "#/definitions/domain.RotatingSavingsGroup"
                 },
-                "net_position": {
-                    "type": "number"
-                },
                 "next_due_date": {
                     "type": "string"
+                },
+                "remaining_amount": {
+                    "type": "number"
                 },
                 "total_cycles": {
                     "type": "integer"
@@ -3897,7 +3918,10 @@
                 "color": {
                     "type": "string"
                 },
-                "name": {
+                "name_en": {
+                    "type": "string"
+                },
+                "name_vi": {
                     "type": "string"
                 }
             }
@@ -3975,6 +3999,9 @@
                 "from_amount": {
                     "type": "string"
                 },
+                "lang": {
+                    "type": "string"
+                },
                 "line_items": {
                     "type": "array",
                     "items": {
@@ -4018,6 +4045,12 @@
                 },
                 "note": {
                     "type": "string"
+                },
+                "tag_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -4046,6 +4079,12 @@
                 },
                 "note": {
                     "type": "string"
+                },
+                "tag_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -4095,6 +4134,9 @@
                     "items": {
                         "$ref": "#/definitions/transaction.GroupParticipantInput"
                     }
+                },
+                "lang": {
+                    "type": "string"
                 },
                 "line_items": {
                     "type": "array",

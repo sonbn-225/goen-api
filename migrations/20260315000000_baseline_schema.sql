@@ -71,7 +71,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE rotating_savings_group_status AS ENUM ('active','completed','closed');
+  CREATE TYPE rotating_savings_group_status AS ENUM ('active','completed');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
@@ -173,6 +173,28 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_uq ON users (lower(email)) WHERE email IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS users_phone_uq ON users (phone) WHERE phone IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS contacts (
+  id text PRIMARY KEY,
+  user_id text NOT NULL,
+  name text NOT NULL,
+  email text,
+  phone text,
+  avatar_url text, -- Local override or synced from linked user
+  linked_user_id text,
+  notes text,
+  created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
+
+  CONSTRAINT fk_contacts_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_contacts_linked_user_id FOREIGN KEY (linked_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_contacts_user_id ON contacts(user_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(lower(email));
+CREATE INDEX IF NOT EXISTS idx_contacts_phone ON contacts(phone);
+CREATE INDEX IF NOT EXISTS idx_contacts_linked_user_id ON contacts(linked_user_id);
 
 CREATE TABLE IF NOT EXISTS accounts (
   id text PRIMARY KEY,
@@ -411,16 +433,18 @@ END $$;
 CREATE TABLE IF NOT EXISTS tags (
   id text PRIMARY KEY,
   user_id text NOT NULL,
-  name text NOT NULL,
+  name_vi text,
+  name_en text,
   color text,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
 
-  CONSTRAINT fk_tags_user_id FOREIGN KEY (user_id) REFERENCES users(id)
+  CONSTRAINT fk_tags_user_id FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT ck_tags_names_present CHECK (name_vi IS NOT NULL OR name_en IS NOT NULL)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_tags_user_name
-  ON tags(user_id, lower(name));
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tags_user_name_vi ON tags(user_id, lower(name_vi)) WHERE name_vi IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tags_user_name_en ON tags(user_id, lower(name_en)) WHERE name_en IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_tags_user_id ON tags(user_id);
 
@@ -436,6 +460,19 @@ CREATE TABLE IF NOT EXISTS transaction_tags (
 
 CREATE INDEX IF NOT EXISTS idx_transaction_tags_transaction_id ON transaction_tags(transaction_id);
 CREATE INDEX IF NOT EXISTS idx_transaction_tags_tag_id ON transaction_tags(tag_id);
+
+CREATE TABLE IF NOT EXISTS transaction_line_item_tags (
+  line_item_id text NOT NULL,
+  tag_id text NOT NULL,
+  created_at timestamptz NOT NULL,
+
+  CONSTRAINT pk_transaction_line_item_tags PRIMARY KEY (line_item_id, tag_id),
+  CONSTRAINT fk_tlit_line_item FOREIGN KEY (line_item_id) REFERENCES transaction_line_items(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tlit_tag FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_transaction_line_item_tags_line_item_id ON transaction_line_item_tags(line_item_id);
+CREATE INDEX IF NOT EXISTS idx_transaction_line_item_tags_tag_id ON transaction_line_item_tags(tag_id);
 
 CREATE TABLE IF NOT EXISTS budgets (
   id text PRIMARY KEY,
@@ -531,6 +568,21 @@ CREATE INDEX IF NOT EXISTS idx_rotating_savings_contributions_group_occurred_at
 CREATE INDEX IF NOT EXISTS idx_rotating_savings_contributions_group_cycle_no
   ON rotating_savings_contributions(group_id, cycle_no);
 
+CREATE TABLE IF NOT EXISTS rotating_savings_audit_logs (
+  id text PRIMARY KEY,
+  user_id text NOT NULL,
+  group_id text,
+  action text NOT NULL,
+  details jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL,
+
+  CONSTRAINT fk_rotating_savings_audit_logs_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_rotating_savings_audit_logs_group_id FOREIGN KEY (group_id) REFERENCES rotating_savings_groups(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_rotating_savings_audit_logs_group_id ON rotating_savings_audit_logs(group_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_rotating_savings_audit_logs_user_id ON rotating_savings_audit_logs(user_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS debts (
   id text PRIMARY KEY,
   client_id text,
@@ -546,12 +598,14 @@ CREATE TABLE IF NOT EXISTS debts (
   outstanding_principal numeric(18,2) NOT NULL,
   accrued_interest numeric(18,2) NOT NULL DEFAULT 0,
   status debt_status NOT NULL DEFAULT 'active',
+  contact_id text,
   closed_at timestamptz,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
 
   CONSTRAINT fk_debts_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_debts_account_id FOREIGN KEY (account_id) REFERENCES accounts(id),
+  CONSTRAINT fk_debts_contact_id FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE SET NULL,
   CONSTRAINT ck_debts_due_after_start CHECK (due_date >= start_date),
   CONSTRAINT ck_debts_outstanding_nonneg CHECK (outstanding_principal >= 0),
   CONSTRAINT ck_debts_accrued_nonneg CHECK (accrued_interest >= 0)

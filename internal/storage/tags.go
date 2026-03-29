@@ -36,9 +36,9 @@ func (r *TagRepo) CreateTag(ctx context.Context, userID string, t domain.Tag) er
 	}
 
 	_, err = pool.Exec(ctx, `
-		INSERT INTO tags (id, user_id, name, color, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6)
-	`, t.ID, t.UserID, t.Name, t.Color, t.CreatedAt, t.UpdatedAt)
+		INSERT INTO tags (id, user_id, name_vi, name_en, color, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
+	`, t.ID, t.UserID, t.NameVI, t.NameEN, t.Color, t.CreatedAt, t.UpdatedAt)
 	return err
 }
 
@@ -52,18 +52,24 @@ func (r *TagRepo) GetTag(ctx context.Context, userID string, tagID string) (*dom
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, user_id, name, color, created_at, updated_at
+		SELECT id, user_id, name_vi, name_en, color, created_at, updated_at
 		FROM tags
 		WHERE id = $1 AND user_id = $2
 	`, tagID, userID)
 
 	var t domain.Tag
-	var colorNull sql.NullString
-	if err := row.Scan(&t.ID, &t.UserID, &t.Name, &colorNull, &t.CreatedAt, &t.UpdatedAt); err != nil {
+	var nameVINull, nameENNull, colorNull sql.NullString
+	if err := row.Scan(&t.ID, &t.UserID, &nameVINull, &nameENNull, &colorNull, &t.CreatedAt, &t.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.ErrTagNotFound
 		}
 		return nil, err
+	}
+	if nameVINull.Valid {
+		t.NameVI = &nameVINull.String
+	}
+	if nameENNull.Valid {
+		t.NameEN = &nameENNull.String
 	}
 	if colorNull.Valid {
 		t.Color = &colorNull.String
@@ -81,10 +87,10 @@ func (r *TagRepo) ListTags(ctx context.Context, userID string) ([]domain.Tag, er
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT id, user_id, name, color, created_at, updated_at
+		SELECT id, user_id, name_vi, name_en, color, created_at, updated_at
 		FROM tags
 		WHERE user_id = $1
-		ORDER BY name ASC
+		ORDER BY COALESCE(name_vi, name_en) ASC
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -94,9 +100,15 @@ func (r *TagRepo) ListTags(ctx context.Context, userID string) ([]domain.Tag, er
 	out := make([]domain.Tag, 0)
 	for rows.Next() {
 		var t domain.Tag
-		var colorNull sql.NullString
-		if err := rows.Scan(&t.ID, &t.UserID, &t.Name, &colorNull, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		var nameVINull, nameENNull, colorNull sql.NullString
+		if err := rows.Scan(&t.ID, &t.UserID, &nameVINull, &nameENNull, &colorNull, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
+		}
+		if nameVINull.Valid {
+			t.NameVI = &nameVINull.String
+		}
+		if nameENNull.Valid {
+			t.NameEN = &nameENNull.String
 		}
 		if colorNull.Valid {
 			t.Color = &colorNull.String

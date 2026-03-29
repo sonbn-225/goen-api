@@ -32,16 +32,16 @@ func (r *DebtRepo) CreateDebt(ctx context.Context, debt domain.Debt) error {
 
 	tag, err := pool.Exec(ctx, `
 		INSERT INTO debts (
-			id, client_id, user_id, account_id, direction, name, principal,
+			id, client_id, user_id, account_id, direction, name, contact_id, principal,
 			start_date, due_date, interest_rate, interest_rule,
 			outstanding_principal, accrued_interest, status, closed_at,
 			created_at, updated_at
 		)
 		SELECT
-			$1,$2,$3,$4,$5,$6,$7::numeric,
-			$8::date,$9::date,$10::numeric,$11,
-			$12::numeric,$13::numeric,$14,$15,
-			$16,$17
+			$1,$2,$3,$4,$5,$6,$7,$8::numeric,
+			$9::date,$10::date,$11::numeric,$12,
+			$13::numeric,$14::numeric,$15,$16,
+			$17,$18
 		WHERE EXISTS (
 			SELECT 1
 			FROM user_accounts ua
@@ -54,6 +54,7 @@ func (r *DebtRepo) CreateDebt(ctx context.Context, debt domain.Debt) error {
 		debt.AccountID,
 		debt.Direction,
 		debt.Name,
+		debt.ContactID,
 		debt.Principal,
 		debt.StartDate,
 		debt.DueDate,
@@ -100,6 +101,9 @@ func (r *DebtRepo) GetDebt(ctx context.Context, userID string, debtID string) (*
 			d.account_id,
 			d.direction,
 			d.name,
+			d.contact_id,
+			COALESCE(u.display_name, c.name) AS contact_name,
+			COALESCE(u.avatar_url, c.avatar_url) AS contact_avatar_url,
 			d.principal::text,
 			a.currency,
 			to_char(d.start_date, 'YYYY-MM-DD'),
@@ -114,6 +118,8 @@ func (r *DebtRepo) GetDebt(ctx context.Context, userID string, debtID string) (*
 			d.updated_at
 		FROM debts d
 		LEFT JOIN accounts a ON a.id = d.account_id
+		LEFT JOIN contacts c ON d.contact_id = c.id
+		LEFT JOIN users u ON c.linked_user_id = u.id
 		WHERE d.id = $1 AND d.user_id = $2
 	`, debtID, userID)
 
@@ -125,6 +131,9 @@ func (r *DebtRepo) GetDebt(ctx context.Context, userID string, debtID string) (*
 		&d.AccountID,
 		&d.Direction,
 		&d.Name,
+		&d.ContactID,
+		&d.ContactName,
+		&d.ContactAvatarURL,
 		&d.Principal,
 		&d.Currency,
 		&d.StartDate,
@@ -163,6 +172,9 @@ func (r *DebtRepo) ListDebts(ctx context.Context, userID string) ([]domain.Debt,
 			d.account_id,
 			d.direction,
 			d.name,
+			d.contact_id,
+			COALESCE(u.display_name, c.name) AS contact_name,
+			COALESCE(u.avatar_url, c.avatar_url) AS contact_avatar_url,
 			d.principal::text,
 			a.currency,
 			to_char(d.start_date, 'YYYY-MM-DD'),
@@ -177,6 +189,8 @@ func (r *DebtRepo) ListDebts(ctx context.Context, userID string) ([]domain.Debt,
 			d.updated_at
 		FROM debts d
 		LEFT JOIN accounts a ON a.id = d.account_id
+		LEFT JOIN contacts c ON d.contact_id = c.id
+		LEFT JOIN users u ON c.linked_user_id = u.id
 		WHERE d.user_id = $1
 		ORDER BY d.due_date ASC, d.id ASC
 	`, userID)
@@ -195,7 +209,10 @@ func (r *DebtRepo) ListDebts(ctx context.Context, userID string) ([]domain.Debt,
 			&d.AccountID,
 			&d.Direction,
 			&d.Name,
-			&d.Principal,
+			&d.ContactID,
+		&d.ContactName,
+		&d.ContactAvatarURL,
+		&d.Principal,
 			&d.Currency,
 			&d.StartDate,
 			&d.DueDate,
@@ -218,7 +235,7 @@ func (r *DebtRepo) ListDebts(ctx context.Context, userID string) ([]domain.Debt,
 	return items, nil
 }
 
-func (r *DebtRepo) CreatePaymentLink(ctx context.Context, userID string, link domain.DebtPaymentLink, newOutstandingPrincipal string, newAccruedInterest string, newStatus string, closedAt *time.Time) error {
+func (r *DebtRepo) CreatePaymentLink(ctx context.Context, userID string, link domain.DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus string, closedAt *time.Time) error {
 	if r.db == nil {
 		return apperrors.ErrDatabaseNotReady
 	}
@@ -247,13 +264,14 @@ func (r *DebtRepo) CreatePaymentLink(ctx context.Context, userID string, link do
 
 		_, err = dbtx.Exec(ctx, `
 			UPDATE debts
-			SET outstanding_principal = $1::numeric,
-				accrued_interest = $2::numeric,
-				status = $3,
-				closed_at = $4,
-				updated_at = $5
-			WHERE id = $6 AND user_id = $7
-		`, newOutstandingPrincipal, newAccruedInterest, newStatus, closedAt, link.CreatedAt, link.DebtID, userID)
+			SET principal = $1::numeric,
+				outstanding_principal = $2::numeric,
+				accrued_interest = $3::numeric,
+				status = $4,
+				closed_at = $5,
+				updated_at = $6
+			WHERE id = $7 AND user_id = $8
+		`, newPrincipal, newOutstandingPrincipal, newAccruedInterest, newStatus, closedAt, link.CreatedAt, link.DebtID, userID)
 		return err
 	})
 }

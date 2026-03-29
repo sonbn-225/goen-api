@@ -167,6 +167,7 @@ type CreateBody struct {
 	CategoryID    *string                 `json:"category_id,omitempty"`
 	TagIDs        []string                `json:"tag_ids,omitempty"`
 	LineItems     []CreateLineItemRequest `json:"line_items,omitempty"`
+	Lang          string                  `json:"lang,omitempty"`
 }
 
 type BatchPatchBody struct {
@@ -367,6 +368,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		CategoryID:    body.CategoryID,
 		TagIDs:        body.TagIDs,
 		LineItems:     body.LineItems,
+		Lang:          body.Lang,
 	}
 
 	tx, err := h.svc.Create(r.Context(), userID, req)

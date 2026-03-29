@@ -339,28 +339,30 @@ func toString(s *string) string {
 }
 
 func normalizeAccountColor(in *string) (*string, error) {
-	v := strings.ToLower(strings.TrimSpace(toString(in)))
+	v := strings.TrimSpace(toString(in))
 	if v == "" {
 		return nil, nil
 	}
-	allowed := map[string]struct{}{
-		"gray":   {},
-		"red":    {},
-		"pink":   {},
-		"grape":  {},
-		"violet": {},
-		"indigo": {},
-		"blue":   {},
-		"cyan":   {},
-		"teal":   {},
-		"green":  {},
-		"lime":   {},
-		"yellow": {},
-		"orange": {},
-	}
-	if _, ok := allowed[v]; !ok {
+	// Accept #rgb or #rrggbb (case-insensitive)
+	if !isHexColor(v) {
 		return nil, apperrors.Validation("color is invalid", map[string]any{"field": "color"})
 	}
-	return &v, nil
+	lower := strings.ToLower(v)
+	return &lower, nil
 }
 
+func isHexColor(s string) bool {
+	if len(s) == 0 || s[0] != '#' {
+		return false
+	}
+	rest := s[1:]
+	if len(rest) != 3 && len(rest) != 6 {
+		return false
+	}
+	for _, c := range rest {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
+}

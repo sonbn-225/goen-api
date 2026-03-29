@@ -27,7 +27,7 @@ type GroupSummary struct {
 	Group           RotatingSavingsGroup `json:"group"`
 	TotalPaid       float64              `json:"total_paid"`
 	TotalReceived   float64              `json:"total_received"`
-	NetPosition     float64              `json:"net_position"`
+	RemainingAmount float64              `json:"remaining_amount"`
 	CompletedCycles int                  `json:"completed_cycles"`
 	TotalCycles     int                  `json:"total_cycles"`
 	NextDueDate     *string              `json:"next_due_date"`
@@ -48,6 +48,15 @@ type RotatingSavingsContribution struct {
 	CreatedAt        time.Time `db:"created_at" json:"created_at"`
 }
 
+type RotatingSavingsAuditLog struct {
+	ID        string         `db:"id" json:"id"`
+	UserID    string         `db:"user_id" json:"user_id"`
+	GroupID   *string        `db:"group_id" json:"group_id"`
+	Action    string         `db:"action" json:"action"`
+	Details   map[string]any `db:"details" json:"details"`
+	CreatedAt time.Time      `db:"created_at" json:"created_at"`
+}
+
 type RotatingSavingsRepository interface {
 	CreateGroup(ctx context.Context, g RotatingSavingsGroup) error
 	GetGroup(ctx context.Context, userID string, groupID string) (*RotatingSavingsGroup, error)
@@ -59,4 +68,7 @@ type RotatingSavingsRepository interface {
 	GetContribution(ctx context.Context, userID string, id string) (*RotatingSavingsContribution, error)
 	ListContributions(ctx context.Context, userID string, groupID string) ([]RotatingSavingsContribution, error)
 	DeleteContribution(ctx context.Context, userID string, id string) error
+
+	CreateAuditLog(ctx context.Context, log RotatingSavingsAuditLog) error
+	ListAuditLogs(ctx context.Context, userID string, groupID string) ([]RotatingSavingsAuditLog, error)
 }

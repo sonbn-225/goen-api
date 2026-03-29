@@ -418,3 +418,65 @@ func (r *RotatingSavingsRepo) DeleteGroup(ctx context.Context, userID string, gr
 	`, groupID, userID)
 	return err
 }
+
+func (r *RotatingSavingsRepo) CreateAuditLog(ctx context.Context, log domain.RotatingSavingsAuditLog) error {
+	if r.db == nil {
+		return apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = pool.Exec(ctx, `
+		INSERT INTO rotating_savings_audit_logs (
+			id, user_id, group_id, action, details, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6)
+	`,
+		log.ID,
+		log.UserID,
+		log.GroupID,
+		log.Action,
+		log.Details,
+		log.CreatedAt,
+	)
+	return err
+}
+
+func (r *RotatingSavingsRepo) ListAuditLogs(ctx context.Context, userID string, groupID string) ([]domain.RotatingSavingsAuditLog, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT id, user_id, group_id, action, details, created_at
+		FROM rotating_savings_audit_logs
+		WHERE group_id = $1 AND user_id = $2
+		ORDER BY created_at DESC, id DESC
+	`, groupID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]domain.RotatingSavingsAuditLog, 0)
+	for rows.Next() {
+		var l domain.RotatingSavingsAuditLog
+		if err := rows.Scan(
+			&l.ID,
+			&l.UserID,
+			&l.GroupID,
+			&l.Action,
+			&l.Details,
+			&l.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, nil
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/modules/contact"
 )
 
 // CreateRequest contains debt create parameters.
@@ -18,6 +19,7 @@ type CreateRequest struct {
 	AccountID    string  `json:"account_id"`
 	Direction    string  `json:"direction"`
 	Name         *string `json:"name,omitempty"`
+	ContactID    *string `json:"contact_id,omitempty"`
 	Principal    string  `json:"principal"`
 	StartDate    string  `json:"start_date"`
 	DueDate      string  `json:"due_date"`
@@ -44,13 +46,14 @@ type CreateInstallmentRequest struct {
 
 // Service handles debt business logic.
 type Service struct {
-	txSvc TransactionServiceInterface
-	repo  domain.DebtRepository
+	txSvc      TransactionServiceInterface
+	contactSvc *contact.Service
+	repo       domain.DebtRepository
 }
 
 // NewService creates a new debt service.
-func NewService(txSvc TransactionServiceInterface, repo domain.DebtRepository) *Service {
-	return &Service{txSvc: txSvc, repo: repo}
+func NewService(txSvc TransactionServiceInterface, repo domain.DebtRepository, contactSvc *contact.Service) *Service {
+	return &Service{txSvc: txSvc, repo: repo, contactSvc: contactSvc}
 }
 
 // Create creates a new debt.
@@ -129,6 +132,38 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 
 	now := time.Now().UTC()
 	name := normalizeOptionalString(req.Name)
+	contactID := normalizeOptionalString(req.ContactID)
+
+	// Auto-create contact if name exists but contactID is missing
+	if contactID == nil && name != nil {
+		// 1. Try to find existing contact by name for this user
+		contacts, err := s.contactSvc.List(ctx, userID)
+		if err == nil {
+			for _, c := range contacts {
+				if strings.EqualFold(c.Name, *name) {
+					id := c.ID
+					contactID = &id
+					break
+				}
+			}
+		}
+
+		// 2. If still not found, create new contact
+		if contactID == nil {
+			newContact, err := s.contactSvc.Create(ctx, userID, contact.CreateRequest{
+				Name: *name,
+			})
+			if err == nil {
+				contactID = &newContact.ID
+			} else {
+				// Log error but continue with raw name if needed? 
+				// Actually, we should probably return error if we want strict contact linking.
+				// But user said "hệ thống sẽ tạo danh bạ tương ứng".
+				return nil, err
+			}
+		}
+	}
+
 	clientID := normalizeOptionalString(req.ClientID)
 
 	debt := domain.Debt{
@@ -138,6 +173,7 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 		AccountID:            &accountID,
 		Direction:            direction,
 		Name:                 name,
+		ContactID:            contactID,
 		Principal:            principal,
 		StartDate:            startDate,
 		DueDate:              dueDate,
@@ -199,16 +235,14 @@ func (s *Service) CreatePayment(ctx context.Context, userID, debtID string, req 
 		return nil, err
 	}
 
-	if debt.Direction == "borrowed" && tx.Type != "expense" {
-		return nil, apperrors.Validation("transaction.type must be expense for borrowed debt payment", nil)
-	}
-	if debt.Direction == "lent" && tx.Type != "income" {
-		return nil, apperrors.Validation("transaction.type must be income for lent debt collection", nil)
-	}
-
 	amountRat, ok := new(big.Rat).SetString(tx.Amount)
 	if !ok {
 		return nil, apperrors.Validation("transaction amount is invalid", nil)
+	}
+
+	principalRat, ok := new(big.Rat).SetString(debt.Principal)
+	if !ok {
+		return nil, apperrors.Validation("principal is invalid", nil)
 	}
 
 	outstandingRat, ok := new(big.Rat).SetString(debt.OutstandingPrincipal)
@@ -221,91 +255,127 @@ func (s *Service) CreatePayment(ctx context.Context, userID, debtID string, req 
 		return nil, apperrors.Validation("accrued_interest is invalid", nil)
 	}
 
+	// Determine if this is a repayment or a top-up
+	isTopUp := false
+	if debt.Direction == "borrowed" && tx.Type == "income" {
+		isTopUp = true
+	} else if debt.Direction == "lent" && tx.Type == "expense" {
+		isTopUp = true
+	}
+
 	var principalPaidRat *big.Rat
 	var interestPaidRat *big.Rat
-
-	if req.PrincipalPaid != nil || req.InterestPaid != nil {
-		if req.PrincipalPaid != nil {
-			v := strings.TrimSpace(*req.PrincipalPaid)
-			if v != "" {
-				if !isValidDecimal(v) {
-					return nil, apperrors.Validation("principal_paid must be a decimal string", nil)
-				}
-				p, ok := new(big.Rat).SetString(v)
-				if !ok {
-					return nil, apperrors.Validation("principal_paid must be a decimal string", nil)
-				}
-				principalPaidRat = p
-			}
-		}
-		if req.InterestPaid != nil {
-			v := strings.TrimSpace(*req.InterestPaid)
-			if v != "" {
-				if !isValidDecimal(v) {
-					return nil, apperrors.Validation("interest_paid must be a decimal string", nil)
-				}
-				i, ok := new(big.Rat).SetString(v)
-				if !ok {
-					return nil, apperrors.Validation("interest_paid must be a decimal string", nil)
-				}
-				interestPaidRat = i
-			}
-		}
-
-		if principalPaidRat == nil {
-			principalPaidRat = big.NewRat(0, 1)
-		}
-		if interestPaidRat == nil {
-			interestPaidRat = big.NewRat(0, 1)
-		}
-
-		sum := new(big.Rat).Add(principalPaidRat, interestPaidRat)
-		if sum.Cmp(amountRat) != 0 {
-			return nil, apperrors.Validation("principal_paid + interest_paid must equal transaction.amount", nil)
-		}
-	} else {
-		interestFirst := true
-		if debt.InterestRule != nil && *debt.InterestRule == "principal_first" {
-			interestFirst = false
-		}
-
-		remaining := new(big.Rat).Set(amountRat)
-		var principalPaidLocal, interestPaidLocal *big.Rat
-
-		if interestFirst {
-			interestPaidLocal = minRat(remaining, accruedRat)
-			remaining.Sub(remaining, interestPaidLocal)
-			principalPaidLocal = minRat(remaining, outstandingRat)
-		} else {
-			principalPaidLocal = minRat(remaining, outstandingRat)
-			remaining.Sub(remaining, principalPaidLocal)
-			interestPaidLocal = minRat(remaining, accruedRat)
-		}
-		principalPaidRat = principalPaidLocal
-		interestPaidRat = interestPaidLocal
-
-		totalDue := new(big.Rat).Add(outstandingRat, accruedRat)
-		if amountRat.Cmp(totalDue) > 0 {
-			return nil, apperrors.Validation("payment exceeds total due", nil)
-		}
-	}
-
-	newOutstanding := new(big.Rat).Sub(outstandingRat, principalPaidRat)
-	newAccrued := new(big.Rat).Sub(accruedRat, interestPaidRat)
-	if newOutstanding.Sign() < 0 || newAccrued.Sign() < 0 {
-		return nil, apperrors.Validation("outstanding cannot become negative", nil)
-	}
-
+	var newPrincipal, newOutstanding, newAccrued *big.Rat
 	status := debt.Status
-	var closedAt *time.Time
-	if newOutstanding.Sign() == 0 && newAccrued.Sign() == 0 {
-		status = "closed"
-		t := time.Now().UTC()
-		closedAt = &t
+
+	if isTopUp {
+		// Logic for borrowing/lending more
+		newPrincipal = new(big.Rat).Add(principalRat, amountRat)
+		newOutstanding = new(big.Rat).Add(outstandingRat, amountRat)
+		newAccrued = accruedRat
+		principalPaidRat = big.NewRat(0, 1)
+		interestPaidRat = big.NewRat(0, 1)
+	} else {
+		// Logic for repayment (original logic)
+		if debt.Direction == "borrowed" && tx.Type != "expense" {
+			return nil, apperrors.Validation("transaction.type must be expense for borrowed debt payment", nil)
+		}
+		if debt.Direction == "lent" && tx.Type != "income" {
+			return nil, apperrors.Validation("transaction.type must be income for lent debt collection", nil)
+		}
+
+		if req.PrincipalPaid != nil || req.InterestPaid != nil {
+			if req.PrincipalPaid != nil {
+				v := strings.TrimSpace(*req.PrincipalPaid)
+				if v != "" {
+					if !isValidDecimal(v) {
+						return nil, apperrors.Validation("principal_paid must be a decimal string", nil)
+					}
+					p, ok := new(big.Rat).SetString(v)
+					if !ok {
+						return nil, apperrors.Validation("principal_paid must be a decimal string", nil)
+					}
+					principalPaidRat = p
+				}
+			}
+			if req.InterestPaid != nil {
+				v := strings.TrimSpace(*req.InterestPaid)
+				if v != "" {
+					if !isValidDecimal(v) {
+						return nil, apperrors.Validation("interest_paid must be a decimal string", nil)
+					}
+					i, ok := new(big.Rat).SetString(v)
+					if !ok {
+						return nil, apperrors.Validation("interest_paid must be a decimal string", nil)
+					}
+					interestPaidRat = i
+				}
+			}
+
+			if principalPaidRat == nil {
+				principalPaidRat = big.NewRat(0, 1)
+			}
+			if interestPaidRat == nil {
+				interestPaidRat = big.NewRat(0, 1)
+			}
+
+			sum := new(big.Rat).Add(principalPaidRat, interestPaidRat)
+			if sum.Cmp(amountRat) != 0 {
+				return nil, apperrors.Validation("principal_paid + interest_paid must equal transaction.amount", nil)
+			}
+		} else {
+			// Auto-allocate logic
+			interestFirst := true
+			if debt.InterestRule != nil && *debt.InterestRule == "principal_first" {
+				interestFirst = false
+			}
+
+			remaining := new(big.Rat).Set(amountRat)
+			var principalPaidLocal, interestPaidLocal *big.Rat
+
+			if interestFirst {
+				interestPaidLocal = minRat(remaining, accruedRat)
+				remaining.Sub(remaining, interestPaidLocal)
+				principalPaidLocal = minRat(remaining, outstandingRat)
+			} else {
+				principalPaidLocal = minRat(remaining, outstandingRat)
+				remaining.Sub(remaining, principalPaidLocal)
+				interestPaidLocal = minRat(remaining, accruedRat)
+			}
+			principalPaidRat = principalPaidLocal
+			interestPaidRat = interestPaidLocal
+
+			totalDue := new(big.Rat).Add(outstandingRat, accruedRat)
+			if amountRat.Cmp(totalDue) > 0 {
+				return nil, apperrors.Validation("payment exceeds total due", nil)
+			}
+		}
+
+		newPrincipal = principalRat
+		newOutstanding = new(big.Rat).Sub(outstandingRat, principalPaidRat)
+		newAccrued = new(big.Rat).Sub(accruedRat, interestPaidRat)
+
+		if newOutstanding.Sign() < 0 || newAccrued.Sign() < 0 {
+			return nil, apperrors.Validation("outstanding cannot become negative", nil)
+		}
+
+		if newOutstanding.Sign() == 0 && newAccrued.Sign() == 0 {
+			status = "closed"
+		}
 	}
 
 	pStr := ratToDecimalString(principalPaidRat)
 	iStr := ratToDecimalString(interestPaidRat)
+
+	now := time.Now().UTC()
+	var closedAt *time.Time
+	if status == "closed" {
+		if debt.Status == "closed" {
+			closedAt = debt.ClosedAt
+		} else {
+			closedAt = &now
+		}
+	}
 
 	link := domain.DebtPaymentLink{
 		ID:            uuid.NewString(),
@@ -313,10 +383,10 @@ func (s *Service) CreatePayment(ctx context.Context, userID, debtID string, req 
 		TransactionID: transactionID,
 		PrincipalPaid: &pStr,
 		InterestPaid:  &iStr,
-		CreatedAt:     time.Now().UTC(),
+		CreatedAt:     now,
 	}
 
-	if err := s.repo.CreatePaymentLink(ctx, userID, link, ratToDecimalString(newOutstanding), ratToDecimalString(newAccrued), status, closedAt); err != nil {
+	if err := s.repo.CreatePaymentLink(ctx, userID, link, ratToDecimalString(newPrincipal), ratToDecimalString(newOutstanding), ratToDecimalString(newAccrued), status, closedAt); err != nil {
 		if errors.Is(err, apperrors.ErrDebtNotFound) {
 			return nil, apperrors.Wrap(apperrors.KindNotFound, "debt not found", err)
 		}

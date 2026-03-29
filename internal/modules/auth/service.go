@@ -62,6 +62,7 @@ func defaultUserSettings() map[string]any {
 		"month_start_day":  1,
 		"week_start_day":   1,
 		"timezone":         "Asia/Ho_Chi_Minh",
+		"rotating_savings_term": "hui",
 	}
 }
 
@@ -401,6 +402,18 @@ func (s *Service) sanitizeSettings(patch map[string]any) {
 			}
 		} else {
 			delete(patch, "week_start_day")
+		}
+	}
+	if v, ok := patch["rotating_savings_term"]; ok {
+		if str, ok := v.(string); ok {
+			val := strings.ToLower(strings.TrimSpace(str))
+			if val == "hui" || val == "ho" || val == "phuong" {
+				patch["rotating_savings_term"] = val
+			} else {
+				delete(patch, "rotating_savings_term")
+			}
+		} else {
+			delete(patch, "rotating_savings_term")
 		}
 	}
 }

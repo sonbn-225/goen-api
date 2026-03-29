@@ -12,6 +12,9 @@ type Debt struct {
 	AccountID            *string    `json:"account_id,omitempty"`
 	Direction            string     `json:"direction"`
 	Name                 *string    `json:"name,omitempty"`
+	ContactID            *string    `json:"contact_id,omitempty"`
+	ContactName          *string    `json:"contact_name,omitempty"`
+	ContactAvatarURL     *string    `json:"contact_avatar_url,omitempty"`
 	Principal            string     `json:"principal"`
 	Currency             *string    `json:"currency,omitempty"`
 	StartDate            string     `json:"start_date"`
@@ -50,7 +53,7 @@ type DebtRepository interface {
 	GetDebt(ctx context.Context, userID string, debtID string) (*Debt, error)
 	ListDebts(ctx context.Context, userID string) ([]Debt, error)
 
-	CreatePaymentLink(ctx context.Context, userID string, link DebtPaymentLink, newOutstandingPrincipal string, newAccruedInterest string, newStatus string, closedAt *time.Time) error
+	CreatePaymentLink(ctx context.Context, userID string, link DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus string, closedAt *time.Time) error
 	ListPaymentLinks(ctx context.Context, userID string, debtID string) ([]DebtPaymentLink, error)
 	ListPaymentLinksByTransaction(ctx context.Context, userID string, transactionID string) ([]DebtPaymentLink, error)
 

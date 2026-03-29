@@ -12,6 +12,7 @@ import (
 	authMod "github.com/sonbn-225/goen-api/internal/modules/auth"
 	"github.com/sonbn-225/goen-api/internal/modules/budget"
 	"github.com/sonbn-225/goen-api/internal/modules/category"
+	"github.com/sonbn-225/goen-api/internal/modules/contact"
 	"github.com/sonbn-225/goen-api/internal/modules/debt"
 	"github.com/sonbn-225/goen-api/internal/modules/diagnostics"
 	groupExpense "github.com/sonbn-225/goen-api/internal/modules/group_expense"
@@ -58,6 +59,7 @@ func New(cfg *config.Config) *App {
 	rotatingSavingsRepo := storage.NewRotatingSavingsRepo(db)
 	debtRepo := storage.NewDebtRepo(db)
 	investmentRepo := storage.NewInvestmentRepo(db)
+	contactRepo := storage.NewContactRepo(db)
 	groupExpenseRepo := storage.NewGroupExpenseRepo(db)
 	reportRepo := storage.NewReportRepo(db)
 
@@ -91,12 +93,17 @@ func New(cfg *config.Config) *App {
 	tagMod := tag.NewModule(tag.ModuleDeps{
 		Repo: tagRepo,
 	})
+	
+	contactMod := contact.NewModule(contact.ModuleDeps{
+		Repo: contactRepo,
+	})
 
 	// Transaction module
 	txMod := transaction.NewModule(transaction.ModuleDeps{
 		Repo:         txRepo,
 		CategoryRepo: categoryRepo,
 		AccountRepo:  accountRepo,
+		TagService:   tagMod.Service,
 	})
 
 	// Budget module (depends on category repo)
@@ -120,16 +127,18 @@ func New(cfg *config.Config) *App {
 		TxSvc:      txMod.Service,
 	})
 
-	// Debt module (depends on transaction service)
+	// Debt module (depends on transaction and contact services)
 	debtMod := debt.NewModule(debt.ModuleDeps{
-		Repo:  debtRepo,
-		TxSvc: txMod.Service,
+		Repo:       debtRepo,
+		TxSvc:      txMod.Service,
+		ContactSvc: contactMod.Service,
 	})
 
-	// Group expense module (depends on transaction service)
+	// Group expense module (depends on transaction service and debt service for auto-debt creation)
 	groupExpenseMod := groupExpense.NewModule(groupExpense.ModuleDeps{
-		Repo:  groupExpenseRepo,
-		TxSvc: txMod.Service,
+		Repo:    groupExpenseRepo,
+		TxSvc:   txMod.Service,
+		DebtSvc: debtMod.Service,
 	})
 
 	// Rotating Savings module (depends on account repo and transaction service)
@@ -180,6 +189,7 @@ func New(cfg *config.Config) *App {
 		investment:      investMod,
 		marketData:      marketDataMod,
 		report:          reportMod,
+		contact:         contactMod,
 	})
 
 	return &App{
@@ -211,6 +221,7 @@ type modules struct {
 	investment      *investment.Module
 	marketData      *marketdata.Module
 	report          *report.Module
+	contact         *contact.Module
 }
 
 func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
@@ -275,6 +286,9 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 
 		// Report
 		mods.report.Handler.RegisterRoutes(r, authMiddleware)
+		
+		// Contact
+		mods.contact.Handler.RegisterRoutes(r, authMiddleware)
 	}
 
 	r.Route("/api/v1", registerV1Routes)
