@@ -31,38 +31,8 @@ func (r *GroupExpenseRepo) CreateGroupExpense(ctx context.Context, userID string
 	}
 
 	return withTx(ctx, pool, func(dbtx pgx.Tx) error {
-		if err := createTransactionTx(ctx, dbtx, userID, tx, lineItems, tagIDs); err != nil {
+		if err := createTransactionTx(ctx, dbtx, userID, tx, lineItems, tagIDs, participants); err != nil {
 			return err
-		}
-
-		for _, p := range participants {
-			name := strings.TrimSpace(p.ParticipantName)
-			if name == "" {
-				return apperrors.Validation("participant_name is required", map[string]any{"field": "participant_name"})
-			}
-
-			_, err := dbtx.Exec(ctx, `
-        INSERT INTO group_expense_participants (
-          id, user_id, transaction_id, participant_name,
-          original_amount, share_amount,
-          is_settled, settlement_transaction_id,
-          created_at, updated_at
-        ) VALUES ($1,$2,$3,$4,$5::numeric,$6::numeric,$7,$8,$9,$10)
-      `,
-				p.ID,
-				userID,
-				tx.ID,
-				name,
-				p.OriginalAmount,
-				p.ShareAmount,
-				p.IsSettled,
-				p.SettlementTransactionID,
-				p.CreatedAt,
-				p.UpdatedAt,
-			)
-			if err != nil {
-				return err
-			}
 		}
 
 		return nil
@@ -81,7 +51,7 @@ func (r *GroupExpenseRepo) ListParticipantsByTransaction(ctx context.Context, us
 	rows, err := pool.Query(ctx, `
     SELECT
       id,
-      user_id,
+	user_id,
       transaction_id,
       participant_name,
       original_amount::text,
@@ -91,7 +61,7 @@ func (r *GroupExpenseRepo) ListParticipantsByTransaction(ctx context.Context, us
       created_at,
       updated_at
     FROM group_expense_participants
-    WHERE user_id = $1 AND transaction_id = $2
+	WHERE user_id = $1 AND transaction_id = $2
     ORDER BY created_at ASC, id ASC
   `, userID, transactionID)
 	if err != nil {
@@ -145,7 +115,7 @@ func (r *GroupExpenseRepo) SettleParticipant(ctx context.Context, userID, partic
 		err := dbtx.QueryRow(ctx, `
       SELECT is_settled, transaction_id, share_amount::text, participant_name
       FROM group_expense_participants
-      WHERE id = $1 AND user_id = $2
+		WHERE id = $1 AND user_id = $2
       FOR UPDATE
     `, participantID, userID).Scan(&isSettled, &txID, &shareAmt, &name)
 		if err != nil {
@@ -186,7 +156,7 @@ func (r *GroupExpenseRepo) SettleParticipant(ctx context.Context, userID, partic
 		}
 
 		// Create settlement income transaction.
-		if err := createTransactionTx(ctx, dbtx, userID, settlementTx, settlementLineItems, settlementTagIDs); err != nil {
+		if err := createTransactionTx(ctx, dbtx, userID, settlementTx, settlementLineItems, settlementTagIDs, nil); err != nil {
 			return err
 		}
 		createdID = settlementTx.ID
@@ -197,7 +167,7 @@ func (r *GroupExpenseRepo) SettleParticipant(ctx context.Context, userID, partic
       SET is_settled = true,
           settlement_transaction_id = $1,
           updated_at = $2
-      WHERE id = $3 AND user_id = $4
+		WHERE id = $3 AND user_id = $4
     `, settlementTx.ID, time.Now().UTC(), participantID, userID)
 		if err != nil {
 			return err
@@ -230,7 +200,7 @@ func (r *GroupExpenseRepo) ListUniqueParticipantNames(ctx context.Context, userI
 	rows, err := pool.Query(ctx, `
     SELECT DISTINCT participant_name
     FROM group_expense_participants
-    WHERE user_id = $1
+	WHERE user_id = $1
     ORDER BY participant_name ASC
     LIMIT $2
   `, userID, limit)
@@ -256,3 +226,57 @@ func (r *GroupExpenseRepo) ListUniqueParticipantNames(ctx context.Context, userI
 	return out, nil
 }
 
+func (r *GroupExpenseRepo) ListUnsettledParticipantsByName(ctx context.Context, userID string, name string) ([]domain.GroupExpenseParticipant, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT
+			id,
+			user_id,
+			transaction_id,
+			participant_name,
+			original_amount::text,
+			share_amount::text,
+			is_settled,
+			settlement_transaction_id,
+			created_at,
+			updated_at
+		FROM group_expense_participants
+		WHERE user_id = $1 AND LOWER(participant_name) = LOWER($2) AND is_settled = false
+		ORDER BY created_at DESC
+	`, userID, strings.TrimSpace(name))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []domain.GroupExpenseParticipant{}
+	for rows.Next() {
+		var it domain.GroupExpenseParticipant
+		if err := rows.Scan(
+			&it.ID,
+			&it.UserID,
+			&it.TransactionID,
+			&it.ParticipantName,
+			&it.OriginalAmount,
+			&it.ShareAmount,
+			&it.IsSettled,
+			&it.SettlementTransactionID,
+			&it.CreatedAt,
+			&it.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, it)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}

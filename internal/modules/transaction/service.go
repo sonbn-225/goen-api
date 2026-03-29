@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/modules/debt"
 )
 
 // CreateLineItemRequest contains line item create parameters.
@@ -38,9 +39,11 @@ type CreateRequest struct {
 	ToAccountID   *string                 `json:"to_account_id,omitempty"`
 	ExchangeRate  *string                 `json:"exchange_rate,omitempty"`
 	CategoryID    *string                 `json:"category_id,omitempty"`
-	TagIDs        []string                `json:"tag_ids,omitempty"`
-	LineItems     []CreateLineItemRequest `json:"line_items,omitempty"`
-	Lang          string                  `json:"lang,omitempty"`
+	TagIDs              []string                `json:"tag_ids,omitempty"`
+	LineItems           []CreateLineItemRequest `json:"line_items,omitempty"`
+	GroupParticipants   []GroupParticipantInput `json:"group_participants,omitempty"`
+	OwnerOriginalAmount *string                 `json:"owner_original_amount,omitempty"`
+	Lang                string                  `json:"lang,omitempty"`
 }
 
 // ListRequest contains transaction list filters.
@@ -99,12 +102,20 @@ type GroupParticipantInput struct {
 	ShareAmount     string `json:"share_amount"`
 }
 
-// Service handles transaction business logic.
 type Service struct {
 	repo         domain.TransactionRepository
 	categoryRepo domain.CategoryRepository
 	accountRepo  domain.AccountRepository
 	tagService   TagService
+	debtService  DebtService
+}
+
+func (s *Service) SetDebtService(ds DebtService) {
+	s.debtService = ds
+}
+
+type DebtService interface {
+	Create(ctx context.Context, userID string, req debt.CreateRequest) (*domain.Debt, error)
 }
 
 type TagService interface {
@@ -354,7 +365,90 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 		}
 	}
 
-	if err := s.repo.CreateTransaction(ctx, userID, tx, lineItems, tagIDs); err != nil {
+	participants := []domain.GroupExpenseParticipant{}
+	if len(req.GroupParticipants) > 0 {
+		totalPaid, ok := new(big.Rat).SetString(tx.Amount)
+		if ok {
+			type person struct {
+				name        string
+				original    *big.Rat
+				originalStr string
+			}
+			involved := []person{}
+			if req.OwnerOriginalAmount != nil && *req.OwnerOriginalAmount != "" {
+				r, ok := new(big.Rat).SetString(*req.OwnerOriginalAmount)
+				if ok && r.Sign() > 0 {
+					involved = append(involved, person{name: "owner", original: r, originalStr: *req.OwnerOriginalAmount})
+				}
+			}
+			for _, p := range req.GroupParticipants {
+				r, ok := new(big.Rat).SetString(p.OriginalAmount)
+				if ok && r.Sign() > 0 {
+					involved = append(involved, person{name: p.ParticipantName, original: r, originalStr: p.OriginalAmount})
+				}
+			}
+
+			if len(involved) > 0 {
+				sumOriginal := new(big.Rat)
+				for _, p := range involved {
+					sumOriginal.Add(sumOriginal, p.original)
+				}
+				shares := make([]*big.Rat, 0, len(involved))
+				allocated := new(big.Rat)
+				for i, p := range involved {
+					if i < len(involved)-1 {
+						raw := new(big.Rat).Mul(totalPaid, p.original)
+						raw.Quo(raw, sumOriginal)
+						rounded := roundRat(raw, 2)
+						shares = append(shares, rounded)
+						allocated.Add(allocated, rounded)
+					} else {
+						last := new(big.Rat).Sub(totalPaid, allocated)
+						shares = append(shares, roundRat(last, 2))
+					}
+				}
+				now := time.Now().UTC()
+				for i, p := range involved {
+					if p.name == "owner" {
+						continue
+					}
+					share := shares[i]
+					part := domain.GroupExpenseParticipant{
+						ID:              uuid.NewString(),
+						UserID:          userID,
+						TransactionID:   id,
+						ParticipantName: p.name,
+						OriginalAmount:  p.originalStr,
+						ShareAmount:     formatRatDecimalScale(share, 2),
+						IsSettled:       false,
+						CreatedAt:       now,
+						UpdatedAt:       now,
+					}
+					participants = append(participants, part)
+
+					// Create debt
+					if s.debtService != nil && tx.AccountID != nil {
+						debtName := p.name
+						if tx.Description != nil && *tx.Description != "" {
+							debtName = *tx.Description + " (" + p.name + ")"
+						}
+						_, _ = s.debtService.Create(ctx, userID, debt.CreateRequest{
+							AccountID:    *tx.AccountID,
+							Direction:    "lent",
+							Name:         &debtName,
+							Principal:    part.ShareAmount,
+							StartDate:    tx.OccurredDate,
+							DueDate:      "2099-12-31",
+							Status:       pointer("active"),
+							InterestRate: pointer("0"),
+						})
+					}
+				}
+			}
+		}
+	}
+
+	if err := s.repo.CreateTransaction(ctx, userID, tx, lineItems, tagIDs, participants); err != nil {
 		if errors.Is(err, apperrors.ErrTransactionForbidden) {
 			return nil, apperrors.Wrap(apperrors.KindForbidden, "forbidden", err)
 		}
@@ -790,326 +884,12 @@ func (s *Service) ImportGoenV1(ctx context.Context, userID, accountID string, it
 	return result, nil
 }
 
-func (s *Service) StageImportedGoenV1(ctx context.Context, userID string, items []ImportedGoenV1StageItem) ([]domain.ImportedTransaction, error) {
+func (s *Service) StageImported(ctx context.Context, userID string, source string, items []StageImportedItem) ([]domain.ImportedTransaction, error) {
 	if len(items) == 0 {
-		return nil, apperrors.Validation("items is required", map[string]any{"field": "items"})
+		return []domain.ImportedTransaction{}, nil
 	}
 
-	prepared := make([]domain.ImportedTransactionCreate, 0, len(items))
-	for i, item := range items {
-		linePrefix := fmt.Sprintf("item[%d]", i)
-		dateStr := strings.TrimSpace(item.TransactionDate)
-		if dateStr == "" {
-			return nil, apperrors.Validation(linePrefix+": transaction_date is required", map[string]any{"field": "transaction_date"})
-		}
-		normalizedDate, err := normalizeImportDate(dateStr)
-		if err != nil {
-			return nil, apperrors.Validation(linePrefix+": transaction_date must be YYYY-MM-DD", map[string]any{"field": "transaction_date"})
-		}
-
-		amountRaw := strings.TrimSpace(item.Amount)
-		if !isValidDecimal(amountRaw) {
-			return nil, apperrors.Validation(linePrefix+": amount must be decimal string", map[string]any{"field": "amount"})
-		}
-		r, ok := new(big.Rat).SetString(amountRaw)
-		if !ok {
-			return nil, apperrors.Validation(linePrefix+": amount must be decimal string", map[string]any{"field": "amount"})
-		}
-
-		var txType *string
-		if item.TransactionType != nil {
-			t := strings.ToLower(strings.TrimSpace(*item.TransactionType))
-			if t != "" {
-				txType = &t
-			}
-		}
-		if txType == nil {
-			if r.Sign() < 0 {
-				v := "expense"
-				txType = &v
-			} else {
-				v := "income"
-				txType = &v
-			}
-		}
-
-		prepared = append(prepared, domain.ImportedTransactionCreate{
-			Source:               "goen-v1",
-			TransactionDate:      normalizedDate,
-			Amount:               amountRaw,
-			Description:          normalizeOptionalString(item.Description),
-			TransactionType:      txType,
-			ImportedAccountName:  normalizeOptionalString(item.AccountName),
-			ImportedCategoryName: normalizeOptionalString(item.CategoryName),
-			RawPayload:           item.Raw,
-		})
-	}
-
-	return s.repo.CreateImportedTransactions(ctx, userID, prepared)
-}
-
-func (s *Service) ListImportedGoenV1(ctx context.Context, userID string) ([]domain.ImportedTransaction, error) {
-	return s.repo.ListImportedTransactions(ctx, userID)
-}
-
-func (s *Service) MapImportedGoenV1(ctx context.Context, userID, importID string, accountID, categoryID *string) (*domain.ImportedTransaction, error) {
-	if strings.TrimSpace(importID) == "" {
-		return nil, apperrors.Validation("importId is required", map[string]any{"field": "importId"})
-	}
-	return s.repo.PatchImportedTransaction(ctx, userID, importID, domain.ImportedTransactionPatch{
-		MappedAccountID:  accountID,
-		MappedCategoryID: categoryID,
-	})
-}
-
-func (s *Service) CreateFromImportedGoenV1(ctx context.Context, userID, importID string) (*domain.Transaction, error) {
-	if strings.TrimSpace(importID) == "" {
-		return nil, apperrors.Validation("importId is required", map[string]any{"field": "importId"})
-	}
-
-	items, err := s.repo.ListImportedTransactions(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	var selected *domain.ImportedTransaction
-	for i := range items {
-		if items[i].ID == importID {
-			selected = &items[i]
-			break
-		}
-	}
-	if selected == nil {
-		return nil, apperrors.Wrap(apperrors.KindNotFound, "imported transaction not found", nil)
-	}
-	if selected.MappedAccountID == nil || strings.TrimSpace(*selected.MappedAccountID) == "" {
-		return nil, apperrors.Validation("mapped_account_id is required", map[string]any{"field": "mapped_account_id"})
-	}
-	if selected.MappedCategoryID == nil || strings.TrimSpace(*selected.MappedCategoryID) == "" {
-		return nil, apperrors.Validation("mapped_category_id is required", map[string]any{"field": "mapped_category_id"})
-	}
-
-	r, ok := new(big.Rat).SetString(strings.TrimSpace(selected.Amount))
-	if !ok {
-		return nil, apperrors.Validation("amount is invalid", map[string]any{"field": "amount"})
-	}
-
-	if selected.TransactionType != nil && strings.EqualFold(strings.TrimSpace(*selected.TransactionType), "transfer") {
-		if selected.MappedAccountID == nil || strings.TrimSpace(*selected.MappedAccountID) == "" {
-			return nil, apperrors.Validation("mapped_account_id is required", map[string]any{"field": "mapped_account_id"})
-		}
-
-		toAccountName := rawPayloadString(selected.RawPayload, "to_account_name", "toAccountName")
-		if toAccountName == nil || strings.TrimSpace(*toAccountName) == "" {
-			return nil, apperrors.Validation("to_account_name is required for transfer import", map[string]any{"field": "to_account_name"})
-		}
-
-		toAccountID, err := s.resolveUserAccountIDByName(ctx, userID, *toAccountName)
-		if err != nil {
-			return nil, err
-		}
-		if toAccountID == nil {
-			return nil, apperrors.Validation("cannot map to_account_name to active account", map[string]any{"field": "to_account_name"})
-		}
-		if *toAccountID == strings.TrimSpace(*selected.MappedAccountID) {
-			return nil, apperrors.Validation("from_account_id and to_account_id must be different", map[string]any{"field": "to_account_name"})
-		}
-
-		amountAbsRat := new(big.Rat).Set(r)
-		if amountAbsRat.Sign() < 0 {
-			amountAbsRat.Neg(amountAbsRat)
-		}
-		amountAbs := amountAbsRat.FloatString(2)
-
-		created, err := s.Create(ctx, userID, CreateRequest{
-			Type:          "transfer",
-			OccurredDate:  &selected.TransactionDate,
-			Amount:        amountAbs,
-			Description:   selected.Description,
-			FromAccountID: selected.MappedAccountID,
-			ToAccountID:   toAccountID,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		if err := s.repo.DeleteImportedTransaction(ctx, userID, importID); err != nil {
-			return nil, err
-		}
-		return created, nil
-	}
-
-	kind := "income"
-	if selected.TransactionType != nil {
-		t := strings.ToLower(strings.TrimSpace(*selected.TransactionType))
-		if t == "expense" || t == "income" {
-			kind = t
-		}
-	}
-	if kind != "expense" && kind != "income" {
-		if r.Sign() < 0 {
-			kind = "expense"
-		} else {
-			kind = "income"
-		}
-	}
-	if r.Sign() < 0 {
-		r.Neg(r)
-	}
-	amountAbs := r.FloatString(2)
-
-	created, err := s.Create(ctx, userID, CreateRequest{
-		Type:         kind,
-		OccurredDate: &selected.TransactionDate,
-		Amount:       amountAbs,
-		Description:  selected.Description,
-		AccountID:    selected.MappedAccountID,
-		LineItems: []CreateLineItemRequest{{
-			CategoryID: selected.MappedCategoryID,
-			Amount:     amountAbs,
-		}},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.repo.DeleteImportedTransaction(ctx, userID, importID); err != nil {
-		return nil, err
-	}
-	return created, nil
-}
-
-func (s *Service) CreateManyFromImportedGoenV1(ctx context.Context, userID string, importIDs []string) (*CreateImportedGoenV1BatchResult, error) {
-	if len(importIDs) == 0 {
-		return nil, apperrors.Validation("import_ids is required", map[string]any{"field": "import_ids"})
-	}
-
-	result := &CreateImportedGoenV1BatchResult{Errors: make([]string, 0)}
-	for _, id := range importIDs {
-		trimmed := strings.TrimSpace(id)
-		if trimmed == "" {
-			result.Skipped++
-			result.Errors = append(result.Errors, "empty import_id")
-			continue
-		}
-		if _, err := s.CreateFromImportedGoenV1(ctx, userID, trimmed); err != nil {
-			result.Skipped++
-			result.Errors = append(result.Errors, trimmed+": "+err.Error())
-			continue
-		}
-		result.Created++
-	}
-	return result, nil
-}
-
-func (s *Service) DeleteImportedGoenV1(ctx context.Context, userID, importID string) error {
-	if strings.TrimSpace(importID) == "" {
-		return apperrors.Validation("importId is required", map[string]any{"field": "importId"})
-	}
-	return s.repo.DeleteImportedTransaction(ctx, userID, importID)
-}
-
-// ============================================================================
-// Generic Import/Export (source-agnostic) - supports v1, v2, or other sources
-// ============================================================================
-
-// ExportTransactions exports transactions in a portable CSV format (goen-v2 compatible)
-func (s *Service) ExportTransactions(ctx context.Context, userID string, filter ExportTransactionsFilter) ([]domain.ExportTransactionRow, error) {
-	txFilter := domain.TransactionListFilter{
-		AccountID: normalizeOptionalString(filter.AccountID),
-		From:      filter.From,
-		To:        filter.To,
-		Limit:     1000, // reasonable export limit
-	}
-
-	txs, _, _, err := s.repo.ListTransactions(ctx, userID, txFilter)
-	if err != nil {
-		return nil, err
-	}
-
-	accountNameByID := map[string]string{}
-	if s.accountRepo != nil {
-		accounts, err := s.accountRepo.ListAccountsForUser(ctx, userID)
-		if err != nil {
-			return nil, err
-		}
-		for _, acc := range accounts {
-			accountNameByID[acc.ID] = acc.Name
-		}
-	}
-
-	resolveAccountName := func(accountID *string) *string {
-		if accountID == nil {
-			return nil
-		}
-		if name, ok := accountNameByID[*accountID]; ok && strings.TrimSpace(name) != "" {
-			v := name
-			return &v
-		}
-		return nil
-	}
-
-	rows := make([]domain.ExportTransactionRow, 0, len(txs))
-	for _, tx := range txs {
-		row := domain.ExportTransactionRow{
-			TransactionID:   tx.ID,
-			TransactionDate: tx.OccurredDate,
-			Amount:          tx.Amount,
-			Description:     tx.Description,
-			TransactionType: tx.Type,
-		}
-
-		// For expense/income, include account and categories from line items
-		if tx.Type == "expense" || tx.Type == "income" {
-			if tx.AccountID != nil {
-				row.AccountID = *tx.AccountID
-			}
-			if name := resolveAccountName(tx.AccountID); name != nil {
-				row.AccountName = *name
-			}
-			if len(tx.LineItems) > 0 {
-				// For now, export primary category (first line item)
-				if tx.LineItems[0].CategoryID != nil {
-					row.CategoryID = tx.LineItems[0].CategoryID
-				}
-			}
-		} else if tx.Type == "transfer" {
-			if tx.FromAccountID != nil {
-				row.AccountID = *tx.FromAccountID
-			}
-			row.FromAccountID = tx.FromAccountID
-			row.ToAccountID = tx.ToAccountID
-			row.FromAccountName = resolveAccountName(tx.FromAccountID)
-			row.ToAccountName = resolveAccountName(tx.ToAccountID)
-			if row.FromAccountName != nil {
-				row.AccountName = *row.FromAccountName
-			}
-		}
-
-		if row.AccountName == "" {
-			if name := resolveAccountName(tx.AccountID); name != nil {
-				row.AccountName = *name
-			}
-		}
-
-		rows = append(rows, row)
-	}
-
-	return rows, nil
-}
-
-// StageImported stages imported transactions with auto-detection of source from headers or explicit source param
-func (s *Service) StageImported(ctx context.Context, userID, source string, items []StageImportedItem) ([]domain.ImportedTransaction, error) {
-	if len(items) == 0 {
-		return nil, apperrors.Validation("items is required", map[string]any{"field": "items"})
-	}
-
-	// If source not provided, default to generic
-	if source == "" {
-		source = "generic"
-	}
-
-	prepared := make([]domain.ImportedTransactionCreate, 0, len(items))
+	creates := make([]domain.ImportedTransactionCreate, 0, len(items))
 	for i, item := range items {
 		linePrefix := fmt.Sprintf("item[%d]", i)
 		dateStr := strings.TrimSpace(item.TransactionDate)
@@ -1152,7 +932,7 @@ func (s *Service) StageImported(ctx context.Context, userID, source string, item
 			categoryName = normalizeOptionalString(item.Category)
 		}
 
-		prepared = append(prepared, domain.ImportedTransactionCreate{
+		creates = append(creates, domain.ImportedTransactionCreate{
 			Source:               source,
 			TransactionDate:      normalizedDate,
 			Amount:               amountRaw,
@@ -1163,82 +943,109 @@ func (s *Service) StageImported(ctx context.Context, userID, source string, item
 			RawPayload:           item.Raw,
 		})
 	}
-
-	return s.repo.CreateImportedTransactions(ctx, userID, prepared)
+	return s.repo.CreateImportedTransactions(ctx, userID, creates)
 }
 
-// ListImported lists staged imported transactions (optionally filtered by source)
-func (s *Service) ListImported(ctx context.Context, userID string, source *string) ([]domain.ImportedTransaction, error) {
+func (s *Service) StageImportedGoenV1(ctx context.Context, userID string, items []ImportedGoenV1StageItem) ([]domain.ImportedTransaction, error) {
+	if len(items) == 0 {
+		return nil, apperrors.Validation("items is required", map[string]any{"field": "items"})
+	}
+
+	genericItems := make([]StageImportedItem, len(items))
+	for i, item := range items {
+		genericItems[i] = StageImportedItem{
+			TransactionDate: item.TransactionDate,
+			Amount:          item.Amount,
+			Description:     item.Description,
+			TransactionType: item.TransactionType,
+			AccountName:     item.AccountName,
+			CategoryName:    item.CategoryName,
+			Raw:             item.Raw,
+		}
+	}
+
+	return s.StageImported(ctx, userID, "goen_v1", genericItems)
+}
+
+func (s *Service) ListImportedGoenV1(ctx context.Context, userID string) ([]domain.ImportedTransaction, error) {
 	items, err := s.repo.ListImportedTransactions(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-
-	// Filter by source if provided
-	if source != nil && strings.TrimSpace(*source) != "" {
-		filtered := make([]domain.ImportedTransaction, 0)
-		sourceVal := strings.TrimSpace(*source)
-		for _, item := range items {
-			if item.Source == sourceVal {
-				filtered = append(filtered, item)
-			}
+	out := make([]domain.ImportedTransaction, 0)
+	for _, it := range items {
+		if it.Source == "goen_v1" {
+			out = append(out, it)
 		}
-		return filtered, nil
 	}
-
-	return items, nil
+	return out, nil
 }
 
-// MapImported updates mapping for a staged imported transaction
-func (s *Service) MapImported(ctx context.Context, userID, importID string, accountID, categoryID *string) (*domain.ImportedTransaction, error) {
-	if strings.TrimSpace(importID) == "" {
-		return nil, apperrors.Validation("importId is required", map[string]any{"field": "importId"})
-	}
+func (s *Service) MapImportedGoenV1(ctx context.Context, userID, importID string, accountID, categoryID *string) (*domain.ImportedTransaction, error) {
 	return s.repo.PatchImportedTransaction(ctx, userID, importID, domain.ImportedTransactionPatch{
 		MappedAccountID:  accountID,
 		MappedCategoryID: categoryID,
 	})
 }
 
-// CreateFromImported creates a transaction from a single staged import and deletes the import
-func (s *Service) CreateFromImported(ctx context.Context, userID, importID string) (*domain.Transaction, error) {
-	if strings.TrimSpace(importID) == "" {
-		return nil, apperrors.Validation("importId is required", map[string]any{"field": "importId"})
-	}
-
-	items, err := s.repo.ListImportedTransactions(ctx, userID)
+func (s *Service) CreateFromImportedGoenV1(ctx context.Context, userID, importID string) (*domain.Transaction, error) {
+	it, err := s.repo.GetImportedTransaction(ctx, userID, importID)
 	if err != nil {
 		return nil, err
 	}
 
-	var selected *domain.ImportedTransaction
-	for i := range items {
-		if items[i].ID == importID {
-			selected = &items[i]
-			break
+	req, err := s.buildCreateRequestFromImported(ctx, userID, *it)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := s.Create(ctx, userID, *req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.DeleteImportedTransaction(ctx, userID, importID); err != nil {
+		return nil, err
+	}
+
+	return tx, nil
+}
+
+func (s *Service) CreateManyFromImportedGoenV1(ctx context.Context, userID string, importIDs []string) (*CreateImportedGoenV1BatchResult, error) {
+	result := &CreateImportedGoenV1BatchResult{Errors: []string{}}
+	for _, id := range importIDs {
+		tx, err := s.CreateFromImportedGoenV1(ctx, userID, id)
+		if err != nil {
+			result.Skipped++
+			result.Errors = append(result.Errors, fmt.Sprintf("Import %s: %v", id, err))
+			continue
+		}
+		if tx != nil {
+			result.Created++
 		}
 	}
-	if selected == nil {
-		return nil, apperrors.Wrap(apperrors.KindNotFound, "imported transaction not found", nil)
-	}
-	if selected.MappedAccountID == nil || strings.TrimSpace(*selected.MappedAccountID) == "" {
+	return result, nil
+}
+
+func (s *Service) DeleteImportedGoenV1(ctx context.Context, userID, importID string) error {
+	return s.repo.DeleteImportedTransaction(ctx, userID, importID)
+}
+
+func (s *Service) buildCreateRequestFromImported(ctx context.Context, userID string, it domain.ImportedTransaction) (*CreateRequest, error) {
+	if it.MappedAccountID == nil || strings.TrimSpace(*it.MappedAccountID) == "" {
 		return nil, apperrors.Validation("mapped_account_id is required", map[string]any{"field": "mapped_account_id"})
 	}
-	if selected.MappedCategoryID == nil || strings.TrimSpace(*selected.MappedCategoryID) == "" {
+	if it.MappedCategoryID == nil || strings.TrimSpace(*it.MappedCategoryID) == "" {
 		return nil, apperrors.Validation("mapped_category_id is required", map[string]any{"field": "mapped_category_id"})
 	}
 
-	r, ok := new(big.Rat).SetString(strings.TrimSpace(selected.Amount))
+	r, ok := new(big.Rat).SetString(strings.TrimSpace(it.Amount))
 	if !ok {
 		return nil, apperrors.Validation("amount is invalid", map[string]any{"field": "amount"})
 	}
 
-	if selected.TransactionType != nil && strings.EqualFold(strings.TrimSpace(*selected.TransactionType), "transfer") {
-		if selected.MappedAccountID == nil || strings.TrimSpace(*selected.MappedAccountID) == "" {
-			return nil, apperrors.Validation("mapped_account_id is required", map[string]any{"field": "mapped_account_id"})
-		}
-
-		toAccountName := rawPayloadString(selected.RawPayload, "to_account_name", "toAccountName")
+	if it.TransactionType != nil && strings.EqualFold(strings.TrimSpace(*it.TransactionType), "transfer") {
+		toAccountName := rawPayloadString(it.RawPayload, "to_account_name", "toAccountName")
 		if toAccountName == nil || strings.TrimSpace(*toAccountName) == "" {
 			return nil, apperrors.Validation("to_account_name is required for transfer import", map[string]any{"field": "to_account_name"})
 		}
@@ -1250,7 +1057,7 @@ func (s *Service) CreateFromImported(ctx context.Context, userID, importID strin
 		if toAccountID == nil {
 			return nil, apperrors.Validation("cannot map to_account_name to active account", map[string]any{"field": "to_account_name"})
 		}
-		if *toAccountID == strings.TrimSpace(*selected.MappedAccountID) {
+		if *toAccountID == strings.TrimSpace(*it.MappedAccountID) {
 			return nil, apperrors.Validation("from_account_id and to_account_id must be different", map[string]any{"field": "to_account_name"})
 		}
 
@@ -1260,27 +1067,19 @@ func (s *Service) CreateFromImported(ctx context.Context, userID, importID strin
 		}
 		amountAbs := amountAbsRat.FloatString(2)
 
-		created, err := s.Create(ctx, userID, CreateRequest{
+		return &CreateRequest{
 			Type:          "transfer",
-			OccurredDate:  &selected.TransactionDate,
+			OccurredDate:  &it.TransactionDate,
 			Amount:        amountAbs,
-			Description:   selected.Description,
-			FromAccountID: selected.MappedAccountID,
+			Description:   it.Description,
+			FromAccountID: it.MappedAccountID,
 			ToAccountID:   toAccountID,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		if err := s.repo.DeleteImportedTransaction(ctx, userID, importID); err != nil {
-			return nil, err
-		}
-		return created, nil
+		}, nil
 	}
 
 	kind := "income"
-	if selected.TransactionType != nil {
-		t := strings.ToLower(strings.TrimSpace(*selected.TransactionType))
+	if it.TransactionType != nil {
+		t := strings.ToLower(strings.TrimSpace(*it.TransactionType))
 		if t == "expense" || t == "income" {
 			kind = t
 		}
@@ -1297,17 +1096,145 @@ func (s *Service) CreateFromImported(ctx context.Context, userID, importID strin
 	}
 	amountAbs := r.FloatString(2)
 
-	created, err := s.Create(ctx, userID, CreateRequest{
+	return &CreateRequest{
 		Type:         kind,
-		OccurredDate: &selected.TransactionDate,
+		OccurredDate: &it.TransactionDate,
 		Amount:       amountAbs,
-		Description:  selected.Description,
-		AccountID:    selected.MappedAccountID,
+		Description:  it.Description,
+		AccountID:    it.MappedAccountID,
 		LineItems: []CreateLineItemRequest{{
-			CategoryID: selected.MappedCategoryID,
+			CategoryID: it.MappedCategoryID,
 			Amount:     amountAbs,
 		}},
+	}, nil
+}
+
+// ============================================================================
+// Generic Import/Export (source-agnostic) - supports v1, v2, or other sources
+// ============================================================================
+
+// ExportTransactions exports transactions in a portable CSV format (goen-v2 compatible)
+func (s *Service) ExportTransactions(ctx context.Context, userID string, filter ExportTransactionsFilter) ([]domain.ExportTransactionRow, error) {
+	transactions, _, _, err := s.repo.ListTransactions(ctx, userID, domain.TransactionListFilter{
+		AccountID: filter.AccountID,
+		From:      filter.From,
+		To:        filter.To,
+		Limit:     10000, // Export limit
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	accounts, err := s.accountRepo.ListAccountsForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	accIDToName := make(map[string]string)
+	for _, a := range accounts {
+		accIDToName[a.ID] = a.Name
+	}
+
+	/*
+	categories, err := s.categoryRepo.ListCategories(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	*/
+	catIDToName := make(map[string]string)
+	// Categories don't have a simple name field anymore, but for export we'll leave it empty 
+	// or you can implement label resolution here if needed.
+	/*
+	for _, c := range categories {
+		catIDToName[c.ID] = c.Name
+	}
+	*/
+
+
+	rows := make([]domain.ExportTransactionRow, 0, len(transactions))
+	for _, tx := range transactions {
+		row := domain.ExportTransactionRow{
+			TransactionID:   tx.ID,
+			TransactionDate: tx.OccurredDate,
+			Amount:          tx.Amount,
+			Description:     tx.Description,
+			TransactionType: tx.Type,
+		}
+
+		if tx.Type == "expense" || tx.Type == "income" {
+			if tx.AccountID != nil {
+				row.AccountID = *tx.AccountID
+				row.AccountName = accIDToName[*tx.AccountID]
+			}
+			if len(tx.LineItems) > 0 {
+				if tx.LineItems[0].CategoryID != nil {
+					catID := *tx.LineItems[0].CategoryID
+					row.CategoryID = &catID
+					if name, ok := catIDToName[catID]; ok {
+						row.CategoryName = &name
+					}
+				}
+			}
+		} else if tx.Type == "transfer" {
+			if tx.FromAccountID != nil {
+				accID := *tx.FromAccountID
+				row.FromAccountID = &accID
+				name := accIDToName[accID]
+				row.FromAccountName = &name
+			}
+			if tx.ToAccountID != nil {
+				accID := *tx.ToAccountID
+				row.ToAccountID = &accID
+				name := accIDToName[accID]
+				row.ToAccountName = &name
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	return rows, nil
+}
+
+// ListImported lists staged imported transactions (optionally filtered by source)
+func (s *Service) ListImported(ctx context.Context, userID string, source *string) ([]domain.ImportedTransaction, error) {
+	items, err := s.repo.ListImportedTransactions(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if source == nil {
+		return items, nil
+	}
+
+	filtered := make([]domain.ImportedTransaction, 0)
+	for _, it := range items {
+		if it.Source == *source {
+			filtered = append(filtered, it)
+		}
+	}
+	return filtered, nil
+}
+
+// MapImported updates mapping for a staged imported transaction
+func (s *Service) MapImported(ctx context.Context, userID, importID string, accountID, categoryID *string) (*domain.ImportedTransaction, error) {
+	return s.repo.PatchImportedTransaction(ctx, userID, importID, domain.ImportedTransactionPatch{
+		MappedAccountID:  accountID,
+		MappedCategoryID: categoryID,
+	})
+}
+
+// CreateFromImported creates a transaction from a single staged import and deletes the import
+func (s *Service) CreateFromImported(ctx context.Context, userID, importID string) (*domain.Transaction, error) {
+	it, err := s.repo.GetImportedTransaction(ctx, userID, importID)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := s.buildCreateRequestFromImported(ctx, userID, *it)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := s.Create(ctx, userID, *req)
 	if err != nil {
 		return nil, err
 	}
@@ -1315,93 +1242,63 @@ func (s *Service) CreateFromImported(ctx context.Context, userID, importID strin
 	if err := s.repo.DeleteImportedTransaction(ctx, userID, importID); err != nil {
 		return nil, err
 	}
-	return created, nil
+
+	return tx, nil
 }
 
 // CreateManyFromImported creates transactions from multiple staged imports
 func (s *Service) CreateManyFromImported(ctx context.Context, userID string, importIDs []string) (*StagedImportResult, error) {
-	if len(importIDs) == 0 {
-		return nil, apperrors.Validation("import_ids is required", map[string]any{"field": "import_ids"})
-	}
-
-	result := &StagedImportResult{Errors: make([]string, 0)}
+	result := &StagedImportResult{Errors: []string{}}
 	for _, id := range importIDs {
-		trimmed := strings.TrimSpace(id)
-		if trimmed == "" {
+		tx, err := s.CreateFromImported(ctx, userID, id)
+		if err != nil {
 			result.Skipped++
-			result.Errors = append(result.Errors, "empty import_id")
+			result.Errors = append(result.Errors, fmt.Sprintf("Import %s: %v", id, err))
 			continue
 		}
-		if _, err := s.CreateFromImported(ctx, userID, trimmed); err != nil {
-			result.Skipped++
-			result.Errors = append(result.Errors, trimmed+": "+err.Error())
-			continue
+		if tx != nil {
+			result.Created++
 		}
-		result.Created++
 	}
 	return result, nil
 }
 
 // DeleteImported deletes a staged imported transaction
 func (s *Service) DeleteImported(ctx context.Context, userID, importID string) error {
-	if strings.TrimSpace(importID) == "" {
-		return apperrors.Validation("importId is required", map[string]any{"field": "importId"})
-	}
 	return s.repo.DeleteImportedTransaction(ctx, userID, importID)
 }
 
 func (s *Service) DeleteAllImported(ctx context.Context, userID string) (int64, error) {
-	if strings.TrimSpace(userID) == "" {
-		return 0, apperrors.Validation("userId is required", map[string]any{"field": "userId"})
-	}
 	return s.repo.DeleteAllImportedTransactions(ctx, userID)
 }
 
-func (s *Service) UpsertImportMappingRules(ctx context.Context, userID string, rules []MappingRuleInput) ([]domain.ImportMappingRule, error) {
-	if len(rules) == 0 {
-		return nil, apperrors.Validation("rules is required", map[string]any{"field": "rules"})
-	}
-
-	payload := make([]domain.ImportMappingRuleUpsert, 0, len(rules))
-	for i, rule := range rules {
-		kind := strings.ToLower(strings.TrimSpace(rule.Kind))
-		sourceName := strings.TrimSpace(rule.SourceName)
-		mappedID := strings.TrimSpace(rule.MappedID)
-		if sourceName == "" {
-			return nil, apperrors.Validation(fmt.Sprintf("rules[%d].source_name is required", i), map[string]any{"field": "source_name"})
-		}
-		if mappedID == "" {
-			return nil, apperrors.Validation(fmt.Sprintf("rules[%d].mapped_id is required", i), map[string]any{"field": "mapped_id"})
-		}
-		if kind != "account" && kind != "category" {
-			return nil, apperrors.Validation(fmt.Sprintf("rules[%d].kind is invalid", i), map[string]any{"field": "kind"})
-		}
-		payload = append(payload, domain.ImportMappingRuleUpsert{
-			Kind:       kind,
-			SourceName: sourceName,
-			MappedID:   mappedID,
-		})
-	}
-
-	return s.repo.UpsertImportMappingRules(ctx, userID, payload)
-}
-
-func (s *Service) ListImportMappingRules(ctx context.Context, userID string) ([]domain.ImportMappingRule, error) {
+func (s *Service) ListImportRules(ctx context.Context, userID string) ([]domain.ImportMappingRule, error) {
 	return s.repo.ListImportMappingRules(ctx, userID)
 }
 
-func (s *Service) DeleteImportMappingRule(ctx context.Context, userID, ruleID string) error {
-	if strings.TrimSpace(ruleID) == "" {
-		return apperrors.Validation("ruleId is required", map[string]any{"field": "ruleId"})
+func (s *Service) UpsertImportRules(ctx context.Context, userID string, inputs []MappingRuleInput) ([]domain.ImportMappingRule, error) {
+	upserts := make([]domain.ImportMappingRuleUpsert, 0, len(inputs))
+	for _, input := range inputs {
+		upserts = append(upserts, domain.ImportMappingRuleUpsert{
+			Kind:       input.Kind,
+			SourceName: input.SourceName,
+			MappedID:   input.MappedID,
+		})
 	}
-	return s.repo.DeleteImportMappingRule(ctx, userID, strings.TrimSpace(ruleID))
+
+	return s.repo.UpsertImportMappingRules(ctx, userID, upserts)
 }
 
-func (s *Service) ApplyRulesAndCreateImported(ctx context.Context, userID string) (*ApplyImportRulesResult, error) {
+func (s *Service) DeleteImportRule(ctx context.Context, userID, ruleID string) error {
+	return s.repo.DeleteImportMappingRule(ctx, userID, ruleID)
+}
+
+func (s *Service) ApplyImportRulesAndCreate(ctx context.Context, userID string) (*ApplyImportRulesResult, error) {
 	rules, err := s.repo.ListImportMappingRules(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
+
 	items, err := s.repo.ListImportedTransactions(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -1716,3 +1613,35 @@ func isValidDecimal(s string) bool {
 	_, ok := new(big.Rat).SetString(s)
 	return ok
 }
+
+func roundRat(r *big.Rat, scale int) *big.Rat {
+	if r == nil {
+		return big.NewRat(0, 1)
+	}
+	if scale < 0 {
+		scale = 0
+	}
+	factor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(scale)), nil)
+	num := new(big.Int).Mul(r.Num(), factor)
+	den := new(big.Int).Set(r.Denom())
+	q, rem := new(big.Int).QuoRem(num, den, new(big.Int))
+	if rem.Sign() >= 0 {
+		twoRem := new(big.Int).Mul(rem, big.NewInt(2))
+		if twoRem.Cmp(den) >= 0 {
+			q.Add(q, big.NewInt(1))
+		}
+	}
+	return new(big.Rat).SetFrac(q, factor)
+}
+
+func formatRatDecimalScale(r *big.Rat, scale int) string {
+	rr := roundRat(r, scale)
+	return rr.FloatString(scale)
+}
+
+func pointer[T any](v T) *T {
+	return &v
+}
+
+
+

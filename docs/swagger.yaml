@@ -43,6 +43,8 @@ definitions:
         type: string
       phone:
         type: string
+      username:
+        type: string
     type: object
   budget.CreateRequest:
     properties:
@@ -531,10 +533,14 @@ definitions:
         type: string
       phone:
         type: string
+      public_share_url:
+        type: string
       settings: {}
       status:
         type: string
       updated_at:
+        type: string
+      username:
         type: string
     type: object
   marketdata.GlobalStatus:
@@ -812,6 +818,10 @@ definitions:
         type: string
       from_amount:
         type: string
+      group_participants:
+        items:
+          $ref: '#/definitions/transaction.GroupParticipantInput'
+        type: array
       lang:
         type: string
       line_items:
@@ -823,6 +833,8 @@ definitions:
       occurred_date:
         type: string
       occurred_time:
+        type: string
+      owner_original_amount:
         type: string
       tag_ids:
         items:
@@ -1189,7 +1201,7 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Profile patch
+      - description: Profile patch (display_name, email, phone, username)
         in: body
         name: body
         required: true

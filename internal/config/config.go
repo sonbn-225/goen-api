@@ -30,6 +30,7 @@ type Config struct {
 	S3Bucket        string
 	S3UseSSL        bool
 	S3PublicBaseURL string
+	PublicBaseURL   string
 }
 
 func Load() (*Config, error) {
@@ -69,6 +70,7 @@ func Load() (*Config, error) {
 	cfg.S3Bucket = getenvDefault("SEAWEEDFS_BUCKET", "goen")
 	cfg.S3UseSSL = os.Getenv("SEAWEEDFS_USE_SSL") == "true"
 	cfg.S3PublicBaseURL = os.Getenv("SEAWEEDFS_PUBLIC_BASE_URL")
+	cfg.PublicBaseURL = getenvDefault("PUBLIC_BASE_URL", "https://goen.io")
 
 	cfg.JWTSecret = os.Getenv("JWT_SECRET")
 	if cfg.JWTSecret == "" {

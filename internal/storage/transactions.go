@@ -20,7 +20,7 @@ type TransactionRepo struct {
 
 // createTransactionTx inserts a transaction and its children using an existing dbtx.
 // It mirrors CreateTransaction but does not begin/commit.
-func createTransactionTx(ctx context.Context, dbtx pgx.Tx, userID string, tx domain.Transaction, lineItems []domain.TransactionLineItem, tagIDs []string) error {
+func createTransactionTx(ctx context.Context, dbtx pgx.Tx, userID string, tx domain.Transaction, lineItems []domain.TransactionLineItem, tagIDs []string, participants []domain.GroupExpenseParticipant) error {
 	auditAt := time.Now().UTC()
 	auditDiff := map[string]any{
 		"type":        tx.Type,
@@ -206,6 +206,29 @@ func createTransactionTx(ctx context.Context, dbtx pgx.Tx, userID string, tx dom
 		_ = insertAuditEvent(ctx, dbtx, *tx.ToAccountID, userID, "transaction.create", "transaction", tx.ID, auditAt, auditDiff)
 	}
 
+	// Handle GroupParticipants
+	for _, p := range participants {
+		if p.ID == "" {
+			p.ID = uuid.NewString()
+		}
+		_, err = dbtx.Exec(ctx, `
+			INSERT INTO group_expense_participants (
+				id, user_id, transaction_id, participant_name,
+				original_amount, share_amount,
+				is_settled, settlement_transaction_id,
+				created_at, updated_at
+			) VALUES ($1,$2,$3,$4,$5::numeric,$6::numeric,$7,$8,$9,$10)
+		`,
+			p.ID, userID, tx.ID, p.ParticipantName,
+			p.OriginalAmount, p.ShareAmount,
+			p.IsSettled, p.SettlementTransactionID,
+			p.CreatedAt, p.UpdatedAt,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -213,7 +236,7 @@ func NewTransactionRepo(db *Postgres) *TransactionRepo {
 	return &TransactionRepo{db: db}
 }
 
-func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, tx domain.Transaction, lineItems []domain.TransactionLineItem, tagIDs []string) error {
+func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, tx domain.Transaction, lineItems []domain.TransactionLineItem, tagIDs []string, participants []domain.GroupExpenseParticipant) error {
 	if r.db == nil {
 		return apperrors.ErrDatabaseNotReady
 	}
@@ -223,7 +246,7 @@ func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, 
 	}
 
 	return withTx(ctx, pool, func(dbtx pgx.Tx) error {
-		return createTransactionTx(ctx, dbtx, userID, tx, lineItems, tagIDs)
+		return createTransactionTx(ctx, dbtx, userID, tx, lineItems, tagIDs, participants)
 	})
 }
 
@@ -1058,6 +1081,48 @@ func (r *TransactionRepo) CreateImportedTransactions(ctx context.Context, userID
 	}
 
 	return created, nil
+}
+
+func (r *TransactionRepo) GetImportedTransaction(ctx context.Context, userID string, importID string) (*domain.ImportedTransaction, error) {
+	if r.db == nil {
+		return nil, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	row := pool.QueryRow(ctx, `
+		SELECT id, user_id, source, transaction_date, amount::text, description, transaction_type,
+		       imported_account_name, imported_category_name, mapped_account_id, mapped_category_id,
+		       raw_payload, created_at, updated_at
+		FROM imported_transactions
+		WHERE id = $1 AND user_id = $2
+	`, importID, userID)
+
+	var it domain.ImportedTransaction
+	if err := row.Scan(
+		&it.ID,
+		&it.UserID,
+		&it.Source,
+		&it.TransactionDate,
+		&it.Amount,
+		&it.Description,
+		&it.TransactionType,
+		&it.ImportedAccountName,
+		&it.ImportedCategoryName,
+		&it.MappedAccountID,
+		&it.MappedCategoryID,
+		&it.RawPayload,
+		&it.CreatedAt,
+		&it.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.Wrap(apperrors.KindNotFound, "imported transaction not found", nil)
+		}
+		return nil, err
+	}
+	return &it, nil
 }
 
 func (r *TransactionRepo) ListImportedTransactions(ctx context.Context, userID string) ([]domain.ImportedTransaction, error) {

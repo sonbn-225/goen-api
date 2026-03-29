@@ -15,21 +15,21 @@ type MockRepo struct {
 	mock.Mock
 }
 
-func (m *MockRepo) CreateInvestmentAccount(ctx context.Context, userID string, ia domain.InvestmentAccount) error {
-	args := m.Called(ctx, userID, ia)
+func (m *MockRepo) CreateInvestmentAccount(ctx context.Context, username string, ia domain.InvestmentAccount) error {
+	args := m.Called(ctx, username, ia)
 	return args.Error(0)
 }
 
-func (m *MockRepo) GetInvestmentAccount(ctx context.Context, userID, id string) (*domain.InvestmentAccount, error) {
-	args := m.Called(ctx, userID, id)
+func (m *MockRepo) GetInvestmentAccount(ctx context.Context, username, id string) (*domain.InvestmentAccount, error) {
+	args := m.Called(ctx, username, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.InvestmentAccount), args.Error(1)
 }
 
-func (m *MockRepo) ListInvestmentAccounts(ctx context.Context, userID string) ([]domain.InvestmentAccount, error) {
-	args := m.Called(ctx, userID)
+func (m *MockRepo) ListInvestmentAccounts(ctx context.Context, username string) ([]domain.InvestmentAccount, error) {
+	args := m.Called(ctx, username)
 	return args.Get(0).([]domain.InvestmentAccount), args.Error(1)
 }
 
@@ -46,44 +46,44 @@ func (m *MockRepo) ListSecurities(ctx context.Context) ([]domain.Security, error
 	return args.Get(0).([]domain.Security), args.Error(1)
 }
 
-func (m *MockRepo) ListTrades(ctx context.Context, userID, brokerAccountID string) ([]domain.Trade, error) {
-	args := m.Called(ctx, userID, brokerAccountID)
+func (m *MockRepo) ListTrades(ctx context.Context, username, brokerAccountID string) ([]domain.Trade, error) {
+	args := m.Called(ctx, username, brokerAccountID)
 	return args.Get(0).([]domain.Trade), args.Error(1)
 }
 
-func (m *MockRepo) GetTrade(ctx context.Context, userID, tradeID string) (*domain.Trade, error) {
-	args := m.Called(ctx, userID, tradeID)
+func (m *MockRepo) GetTrade(ctx context.Context, username, tradeID string) (*domain.Trade, error) {
+	args := m.Called(ctx, username, tradeID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.Trade), args.Error(1)
 }
 
-func (m *MockRepo) CreateTrade(ctx context.Context, userID string, tr domain.Trade) error {
-	args := m.Called(ctx, userID, tr)
+func (m *MockRepo) CreateTrade(ctx context.Context, username string, tr domain.Trade) error {
+	args := m.Called(ctx, username, tr)
 	return args.Error(0)
 }
 
-func (m *MockRepo) DeleteTrade(ctx context.Context, userID, tradeID string) error {
-	args := m.Called(ctx, userID, tradeID)
+func (m *MockRepo) DeleteTrade(ctx context.Context, username, tradeID string) error {
+	args := m.Called(ctx, username, tradeID)
 	return args.Error(0)
 }
 
-func (m *MockRepo) ListHoldings(ctx context.Context, userID, brokerAccountID string) ([]domain.Holding, error) {
-	args := m.Called(ctx, userID, brokerAccountID)
+func (m *MockRepo) ListHoldings(ctx context.Context, username, brokerAccountID string) ([]domain.Holding, error) {
+	args := m.Called(ctx, username, brokerAccountID)
 	return args.Get(0).([]domain.Holding), args.Error(1)
 }
 
-func (m *MockRepo) GetHolding(ctx context.Context, userID, brokerAccountID, securityID string) (*domain.Holding, error) {
-	args := m.Called(ctx, userID, brokerAccountID, securityID)
+func (m *MockRepo) GetHolding(ctx context.Context, username, brokerAccountID, securityID string) (*domain.Holding, error) {
+	args := m.Called(ctx, username, brokerAccountID, securityID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.Holding), args.Error(1)
 }
 
-func (m *MockRepo) UpsertHolding(ctx context.Context, userID string, h domain.Holding) (*domain.Holding, error) {
-	args := m.Called(ctx, userID, h)
+func (m *MockRepo) UpsertHolding(ctx context.Context, username string, h domain.Holding) (*domain.Holding, error) {
+	args := m.Called(ctx, username, h)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -108,80 +108,80 @@ func (m *MockRepo) GetSecurityEvent(ctx context.Context, id string) (*domain.Sec
 	return args.Get(0).(*domain.SecurityEvent), args.Error(1)
 }
 
-func (m *MockRepo) ListSecurityEventElections(ctx context.Context, userID, brokerAccountID string, status *string) ([]domain.SecurityEventElection, error) {
-	args := m.Called(ctx, userID, brokerAccountID, status)
+func (m *MockRepo) ListSecurityEventElections(ctx context.Context, username, brokerAccountID string, status *string) ([]domain.SecurityEventElection, error) {
+	args := m.Called(ctx, username, brokerAccountID, status)
 	return args.Get(0).([]domain.SecurityEventElection), args.Error(1)
 }
 
-func (m *MockRepo) UpsertSecurityEventElection(ctx context.Context, userID string, el domain.SecurityEventElection) (*domain.SecurityEventElection, error) {
-	args := m.Called(ctx, userID, el)
+func (m *MockRepo) UpsertSecurityEventElection(ctx context.Context, username string, el domain.SecurityEventElection) (*domain.SecurityEventElection, error) {
+	args := m.Called(ctx, username, el)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.SecurityEventElection), args.Error(1)
 }
 
-func (m *MockRepo) ListShareLots(ctx context.Context, userID, brokerAccountID, securityID string) ([]domain.ShareLot, error) {
-	args := m.Called(ctx, userID, brokerAccountID, securityID)
+func (m *MockRepo) ListShareLots(ctx context.Context, username, brokerAccountID, securityID string) ([]domain.ShareLot, error) {
+	args := m.Called(ctx, username, brokerAccountID, securityID)
 	return args.Get(0).([]domain.ShareLot), args.Error(1)
 }
 
-func (m *MockRepo) CreateShareLot(ctx context.Context, userID string, lot domain.ShareLot) error {
-	args := m.Called(ctx, userID, lot)
+func (m *MockRepo) CreateShareLot(ctx context.Context, username string, lot domain.ShareLot) error {
+	args := m.Called(ctx, username, lot)
 	return args.Error(0)
 }
 
-func (m *MockRepo) UpdateShareLotQuantity(ctx context.Context, userID, lotID, quantity string) error {
-	args := m.Called(ctx, userID, lotID, quantity)
+func (m *MockRepo) UpdateShareLotQuantity(ctx context.Context, username, lotID, quantity string) error {
+	args := m.Called(ctx, username, lotID, quantity)
 	return args.Error(0)
 }
 
-func (m *MockRepo) DeleteShareLotsByTradeID(ctx context.Context, userID, tradeID string) error {
-	args := m.Called(ctx, userID, tradeID)
+func (m *MockRepo) DeleteShareLotsByTradeID(ctx context.Context, username, tradeID string) error {
+	args := m.Called(ctx, username, tradeID)
 	return args.Error(0)
 }
 
-func (m *MockRepo) ListRealizedLogsByTradeID(ctx context.Context, userID, tradeID string) ([]domain.RealizedTradeLog, error) {
-	args := m.Called(ctx, userID, tradeID)
+func (m *MockRepo) ListRealizedLogsByTradeID(ctx context.Context, username, tradeID string) ([]domain.RealizedTradeLog, error) {
+	args := m.Called(ctx, username, tradeID)
 	return args.Get(0).([]domain.RealizedTradeLog), args.Error(1)
 }
 
-func (m *MockRepo) CreateRealizedTradeLog(ctx context.Context, userID string, log domain.RealizedTradeLog) error {
-	args := m.Called(ctx, userID, log)
+func (m *MockRepo) CreateRealizedTradeLog(ctx context.Context, username string, log domain.RealizedTradeLog) error {
+	args := m.Called(ctx, username, log)
 	return args.Error(0)
 }
 
-func (m *MockRepo) DeleteRealizedLogsByTradeID(ctx context.Context, userID, tradeID string) error {
-	args := m.Called(ctx, userID, tradeID)
+func (m *MockRepo) DeleteRealizedLogsByTradeID(ctx context.Context, username, tradeID string) error {
+	args := m.Called(ctx, username, tradeID)
 	return args.Error(0)
 }
 
-func (m *MockRepo) ListRealizedLogs(ctx context.Context, userID string, brokerAccountID string) ([]domain.RealizedTradeLog, error) {
-	args := m.Called(ctx, userID, brokerAccountID)
+func (m *MockRepo) ListRealizedLogs(ctx context.Context, username string, brokerAccountID string) ([]domain.RealizedTradeLog, error) {
+	args := m.Called(ctx, username, brokerAccountID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]domain.RealizedTradeLog), args.Error(1)
 }
 
-func (m *MockRepo) ListDividends(ctx context.Context, userID string, brokerAccountID string) ([]domain.Transaction, error) {
-	args := m.Called(ctx, userID, brokerAccountID)
+func (m *MockRepo) ListDividends(ctx context.Context, username string, brokerAccountID string) ([]domain.Transaction, error) {
+	args := m.Called(ctx, username, brokerAccountID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]domain.Transaction), args.Error(1)
 }
 
-func (m *MockRepo) UpdateInvestmentAccountSettings(ctx context.Context, userID, id string, feeSettings, taxSettings any) (*domain.InvestmentAccount, error) {
-	args := m.Called(ctx, userID, id, feeSettings, taxSettings)
+func (m *MockRepo) UpdateInvestmentAccountSettings(ctx context.Context, username, id string, feeSettings, taxSettings any) (*domain.InvestmentAccount, error) {
+	args := m.Called(ctx, username, id, feeSettings, taxSettings)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.InvestmentAccount), args.Error(1)
 }
 
-func (m *MockRepo) ListEligibleSecuritiesForEvents(ctx context.Context, userID, brokerAccountID string) ([]domain.Security, error) {
-	args := m.Called(ctx, userID, brokerAccountID)
+func (m *MockRepo) ListEligibleSecuritiesForEvents(ctx context.Context, username, brokerAccountID string) ([]domain.Security, error) {
+	args := m.Called(ctx, username, brokerAccountID)
 	return args.Get(0).([]domain.Security), args.Error(1)
 }
 
@@ -189,13 +189,13 @@ type MockTxService struct {
 	mock.Mock
 }
 
-func (m *MockTxService) Create(ctx context.Context, userID string, req transaction.CreateRequest) (*domain.Transaction, error) {
-	args := m.Called(ctx, userID, req)
+func (m *MockTxService) Create(ctx context.Context, username string, req transaction.CreateRequest) (*domain.Transaction, error) {
+	args := m.Called(ctx, username, req)
 	return args.Get(0).(*domain.Transaction), args.Error(1)
 }
 
-func (m *MockTxService) Delete(ctx context.Context, userID, transactionID string) error {
-	args := m.Called(ctx, userID, transactionID)
+func (m *MockTxService) Delete(ctx context.Context, username, transactionID string) error {
+	args := m.Called(ctx, username, transactionID)
 	return args.Error(0)
 }
 
@@ -203,8 +203,8 @@ type MockAccountService struct {
 	mock.Mock
 }
 
-func (m *MockAccountService) GetAccountByID(ctx context.Context, userID, accountID string) (*domain.Account, error) {
-	args := m.Called(ctx, userID, accountID)
+func (m *MockAccountService) GetAccountByID(ctx context.Context, username, accountID string) (*domain.Account, error) {
+	args := m.Called(ctx, username, accountID)
 	return args.Get(0).(*domain.Account), args.Error(1)
 }
 
@@ -215,7 +215,7 @@ func TestClaimCorporateAction_Residuals(t *testing.T) {
 	svc := NewService(repo, accSvc, txSvc, nil, nil)
 
 	ctx := context.Background()
-	userID := "user1"
+	username := "user1"
 	bid := "account1"
 	evID := "event1"
 	secID := "VNM"
@@ -237,39 +237,39 @@ func TestClaimCorporateAction_Residuals(t *testing.T) {
 
 	repo.On("GetSecurityEvent", ctx, evID).Return(ev, nil)
 	repo.On("GetSecurity", ctx, secID).Return(&domain.Security{ID: secID, Symbol: secID}, nil)
-	repo.On("GetHolding", ctx, userID, bid, secID).Return(h, nil).Once() // First call for entitlement
-	repo.On("ListSecurityEventElections", ctx, userID, bid, mock.Anything).Return([]domain.SecurityEventElection{}, nil)
-	repo.On("UpsertSecurityEventElection", ctx, userID, mock.Anything).Return(&domain.SecurityEventElection{}, nil)
+	repo.On("GetHolding", ctx, username, bid, secID).Return(h, nil).Once() // First call for entitlement
+	repo.On("ListSecurityEventElections", ctx, username, bid, mock.Anything).Return([]domain.SecurityEventElection{}, nil)
+	repo.On("UpsertSecurityEventElection", ctx, username, mock.Anything).Return(&domain.SecurityEventElection{}, nil)
 
 	// Expectations for CreateTrade (service method) -> repo.CreateTrade
-	repo.On("CreateTrade", ctx, userID, mock.MatchedBy(func(tr domain.Trade) bool {
+	repo.On("CreateTrade", ctx, username, mock.MatchedBy(func(tr domain.Trade) bool {
 		return tr.Quantity == "12.00000000" && tr.Price == "0"
 	})).Return(nil)
 
 	// Expectations for CreateTrade (service method) -> repo.CreateShareLot
-	repo.On("CreateShareLot", ctx, userID, mock.Anything).Return(nil)
+	repo.On("CreateShareLot", ctx, username, mock.Anything).Return(nil)
 
 	// Expectations for upsertHoldingFromLots
-	repo.On("ListShareLots", ctx, userID, bid, secID).Return([]domain.ShareLot{
+	repo.On("ListShareLots", ctx, username, bid, secID).Return([]domain.ShareLot{
 		{
 			Quantity:     "12.00000000",
 			CostBasisPer: "0",
 			Status:       "active",
 		},
 	}, nil)
-	repo.On("GetHolding", ctx, userID, bid, secID).Return(h, nil).Once() // Second call inside upsertHoldingFromLots
-	repo.On("UpsertHolding", ctx, userID, mock.Anything).Return(&domain.Holding{}, nil)
+	repo.On("GetHolding", ctx, username, bid, secID).Return(h, nil).Once() // Second call inside upsertHoldingFromLots
+	repo.On("UpsertHolding", ctx, username, mock.Anything).Return(&domain.Holding{}, nil)
 
 	ia := &domain.InvestmentAccount{ID: bid, AccountID: "cash_acc"}
-	repo.On("GetInvestmentAccount", ctx, userID, bid).Return(ia, nil)
+	repo.On("GetInvestmentAccount", ctx, username, bid).Return(ia, nil)
 
 	// Expect Income transaction for 0.3 * 10000 = 3000 VND residual
-	txSvc.On("Create", ctx, userID, mock.MatchedBy(func(req transaction.CreateRequest) bool {
+	txSvc.On("Create", ctx, username, mock.MatchedBy(func(req transaction.CreateRequest) bool {
 		// We expect "3000.00" because formatRatDecimalScale(big.NewRat(3000, 1), 2) is "3000.00"
 		return req.Type == "income" && req.Amount == "3000.00"
 	})).Return(&domain.Transaction{}, nil)
 
-	_, err := svc.ClaimCorporateAction(ctx, userID, bid, evID, ClaimCorporateActionRequest{})
+	_, err := svc.ClaimCorporateAction(ctx, username, bid, evID, ClaimCorporateActionRequest{})
 	assert.NoError(t, err)
 
 	repo.AssertExpectations(t)
@@ -283,7 +283,7 @@ func TestClaimCorporateAction_Split_Residuals(t *testing.T) {
 	svc := NewService(repo, accSvc, txSvc, nil, nil)
 
 	ctx := context.Background()
-	userID := "user1"
+	username := "user1"
 	bid := "account1"
 	evID := "event1"
 	secID := "VNM"
@@ -305,29 +305,29 @@ func TestClaimCorporateAction_Split_Residuals(t *testing.T) {
 
 	repo.On("GetSecurityEvent", ctx, evID).Return(ev, nil)
 	repo.On("GetSecurity", ctx, secID).Return(&domain.Security{ID: secID, Symbol: secID}, nil)
-	repo.On("GetHolding", ctx, userID, bid, secID).Return(h, nil).Once() // First call for entitlement
-	repo.On("ListSecurityEventElections", ctx, userID, bid, mock.Anything).Return([]domain.SecurityEventElection{}, nil)
-	repo.On("UpsertSecurityEventElection", ctx, userID, mock.Anything).Return(&domain.SecurityEventElection{}, nil)
+	repo.On("GetHolding", ctx, username, bid, secID).Return(h, nil).Once() // First call for entitlement
+	repo.On("ListSecurityEventElections", ctx, username, bid, mock.Anything).Return([]domain.SecurityEventElection{}, nil)
+	repo.On("UpsertSecurityEventElection", ctx, username, mock.Anything).Return(&domain.SecurityEventElection{}, nil)
 
 	// Expect Trade for 151 shares
-	repo.On("CreateTrade", ctx, userID, mock.MatchedBy(func(tr domain.Trade) bool {
+	repo.On("CreateTrade", ctx, username, mock.MatchedBy(func(tr domain.Trade) bool {
 		return tr.Quantity == "151.00000000" && tr.Price == "0"
 	})).Return(nil)
 
-	repo.On("CreateShareLot", ctx, userID, mock.Anything).Return(nil)
-	repo.On("ListShareLots", ctx, userID, bid, secID).Return([]domain.ShareLot{{Quantity: "151", Status: "active"}}, nil)
-	repo.On("GetHolding", ctx, userID, bid, secID).Return(h, nil).Once()
-	repo.On("UpsertHolding", ctx, userID, mock.Anything).Return(&domain.Holding{}, nil)
+	repo.On("CreateShareLot", ctx, username, mock.Anything).Return(nil)
+	repo.On("ListShareLots", ctx, username, bid, secID).Return([]domain.ShareLot{{Quantity: "151", Status: "active"}}, nil)
+	repo.On("GetHolding", ctx, username, bid, secID).Return(h, nil).Once()
+	repo.On("UpsertHolding", ctx, username, mock.Anything).Return(&domain.Holding{}, nil)
 
 	ia := &domain.InvestmentAccount{ID: bid, AccountID: "cash_acc"}
-	repo.On("GetInvestmentAccount", ctx, userID, bid).Return(ia, nil)
+	repo.On("GetInvestmentAccount", ctx, username, bid).Return(ia, nil)
 
 	// Expect Income transaction for 0.5 * 10000 = 5000 VND residual
-	txSvc.On("Create", ctx, userID, mock.MatchedBy(func(req transaction.CreateRequest) bool {
+	txSvc.On("Create", ctx, username, mock.MatchedBy(func(req transaction.CreateRequest) bool {
 		return req.Type == "income" && req.Amount == "5000.00"
 	})).Return(&domain.Transaction{}, nil)
 
-	_, err := svc.ClaimCorporateAction(ctx, userID, bid, evID, ClaimCorporateActionRequest{})
+	_, err := svc.ClaimCorporateAction(ctx, username, bid, evID, ClaimCorporateActionRequest{})
 	assert.NoError(t, err)
 
 	repo.AssertExpectations(t)
@@ -341,20 +341,20 @@ func TestListEligibleCorporateActions_UsesPointInTimeHoldings(t *testing.T) {
 	svc := NewService(repo, accSvc, txSvc, nil, nil)
 
 	ctx := context.Background()
-	userID := "user1"
+	username := "user1"
 	bid := "account1"
 	secID := "VNM"
 
-	repo.On("ListHoldings", ctx, userID, bid).Return([]domain.Holding{{
+	repo.On("ListHoldings", ctx, username, bid).Return([]domain.Holding{{
 		SecurityID: secID,
 		Quantity:   "999",
 	}}, nil)
-	repo.On("ListTrades", ctx, userID, bid).Return([]domain.Trade{
+	repo.On("ListTrades", ctx, username, bid).Return([]domain.Trade{
 		{SecurityID: secID, Side: "buy", Quantity: "100", OccurredAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
 		{SecurityID: secID, Side: "sell", Quantity: "30", OccurredAt: time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)},
 		{SecurityID: secID, Side: "buy", Quantity: "20", OccurredAt: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)},
 	}, nil)
-	repo.On("ListSecurityEventElections", ctx, userID, bid, mock.Anything).Return([]domain.SecurityEventElection{}, nil)
+	repo.On("ListSecurityEventElections", ctx, username, bid, mock.Anything).Return([]domain.SecurityEventElection{}, nil)
 	repo.On("ListSecurityEvents", ctx, secID, (*string)(nil), (*string)(nil)).Return([]domain.SecurityEvent{
 		{
 			ID:                 "ev-ex-dividend",
@@ -386,7 +386,7 @@ func TestListEligibleCorporateActions_UsesPointInTimeHoldings(t *testing.T) {
 		},
 	}, nil)
 
-	out, err := svc.ListEligibleCorporateActions(ctx, userID, bid)
+	out, err := svc.ListEligibleCorporateActions(ctx, username, bid)
 	assert.NoError(t, err)
 	assert.Len(t, out, 3)
 
@@ -438,3 +438,4 @@ func TestFilterSellableLotsAsOf_TPlus2(t *testing.T) {
 	assert.False(t, hasEmptyDate)
 	assert.False(t, hasInvalidDate)
 }
+

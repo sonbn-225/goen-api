@@ -23,5 +23,6 @@ type GroupExpenseRepository interface {
 	ListParticipantsByTransaction(ctx context.Context, userID, transactionID string) ([]GroupExpenseParticipant, error)
 	SettleParticipant(ctx context.Context, userID, participantID string, settlementTx Transaction, settlementLineItems []TransactionLineItem, settlementTagIDs []string) (settlementTransactionID string, err error)
 	ListUniqueParticipantNames(ctx context.Context, userID string, limit int) ([]string, error)
+	ListUnsettledParticipantsByName(ctx context.Context, userID string, name string) ([]GroupExpenseParticipant, error)
 }
 

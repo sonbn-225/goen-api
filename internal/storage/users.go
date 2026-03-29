@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
@@ -37,11 +39,67 @@ func (r *UserRepo) CreateUser(ctx context.Context, u domain.UserWithPassword) er
 		return err
 	}
 
-	_, err = pool.Exec(ctx, `
-		INSERT INTO users (id, email, phone, display_name, settings, status, password_hash, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9)
-	`, u.ID, u.Email, u.Phone, u.DisplayName, settingsJSON, u.Status, u.PasswordHash, u.CreatedAt, u.UpdatedAt)
+	defaultCurrency := "VND"
+	cashAccountName := "cash_account_name" // i18n key, will be translated on frontend
+	if settings, ok := u.Settings.(map[string]any); ok {
+		if raw, ok := settings["default_currency"]; ok {
+			if cur, ok := raw.(string); ok {
+				normalized := strings.ToUpper(strings.TrimSpace(cur))
+				if len(normalized) == 3 {
+					defaultCurrency = normalized
+				}
+			}
+		}
+	}
 
+	err = withTx(ctx, pool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `
+			INSERT INTO users (id, email, phone, display_name, avatar_url, username, settings, status, password_hash, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		`, u.ID, u.Email, u.Phone, u.DisplayName, u.AvatarURL, u.Username, settingsJSON, u.Status, u.PasswordHash, u.CreatedAt, u.UpdatedAt)
+		if err != nil {
+			return err
+		}
+
+		cashAccountID := uuid.NewString()
+		_, err = tx.Exec(ctx, `
+			INSERT INTO accounts (
+				id, name, account_type, currency, status,
+				created_at, updated_at, created_by, updated_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		`,
+			cashAccountID,
+			cashAccountName,
+			"cash",
+			defaultCurrency,
+			"active",
+			u.CreatedAt,
+			u.UpdatedAt,
+			u.ID,
+			u.ID,
+		)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Exec(ctx, `
+			INSERT INTO user_accounts (
+				id, account_id, user_id, permission, status,
+				created_at, updated_at, created_by, updated_by
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		`,
+			uuid.NewString(),
+			cashAccountID,
+			u.ID,
+			"owner",
+			"active",
+			u.CreatedAt,
+			u.UpdatedAt,
+			u.ID,
+			u.ID,
+		)
+		return err
+	})
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
@@ -49,6 +107,7 @@ func (r *UserRepo) CreateUser(ctx context.Context, u domain.UserWithPassword) er
 		}
 		return err
 	}
+
 	return nil
 }
 
@@ -58,6 +117,10 @@ func (r *UserRepo) FindUserByEmail(ctx context.Context, email string) (*domain.U
 
 func (r *UserRepo) FindUserByPhone(ctx context.Context, phone string) (*domain.UserWithPassword, error) {
 	return r.findOneUser(ctx, "phone = $1", phone)
+}
+
+func (r *UserRepo) FindUserByUsername(ctx context.Context, username string) (*domain.UserWithPassword, error) {
+	return r.findOneUser(ctx, "username = $1", username)
 }
 
 func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*domain.User, error) {
@@ -70,7 +133,7 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*domain.User, e
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, email, phone, display_name, avatar_url, settings, status, created_at, updated_at
+		SELECT id, email, phone, display_name, avatar_url, username, settings, status, created_at, updated_at
 		FROM users
 		WHERE id = $1`, id)
 
@@ -82,6 +145,7 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*domain.User, e
 		&u.Phone,
 		&u.DisplayName,
 		&u.AvatarURL,
+		&u.Username,
 		&settingsJSON,
 		&u.Status,
 		&u.CreatedAt,
@@ -102,6 +166,8 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*domain.User, e
 	return &u, nil
 }
 
+// FindUserByUsername and FindUserWithPasswordByUsername removed.
+
 func (r *UserRepo) findOneUser(ctx context.Context, whereClause string, args ...any) (*domain.UserWithPassword, error) {
 	if r.db == nil {
 		return nil, apperrors.ErrDatabaseNotReady
@@ -112,7 +178,7 @@ func (r *UserRepo) findOneUser(ctx context.Context, whereClause string, args ...
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, email, phone, display_name, avatar_url, settings, status, password_hash, created_at, updated_at
+		SELECT id, email, phone, display_name, avatar_url, username, settings, status, password_hash, created_at, updated_at
 		FROM users
 		WHERE `+whereClause, args...)
 
@@ -124,6 +190,7 @@ func (r *UserRepo) findOneUser(ctx context.Context, whereClause string, args ...
 		&u.Phone,
 		&u.DisplayName,
 		&u.AvatarURL,
+		&u.Username,
 		&settingsJSON,
 		&u.Status,
 		&u.PasswordHash,
@@ -164,12 +231,12 @@ func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID string, patch 
 		SET settings = COALESCE(settings, '{}'::jsonb) || $1::jsonb,
 		    updated_at = NOW()
 		WHERE id = $2
-		RETURNING id, email, phone, display_name, avatar_url, settings, status, created_at, updated_at
+		RETURNING id, email, phone, display_name, avatar_url, username, settings, status, created_at, updated_at
 	`, patchJSON, userID)
 
 	var u domain.User
 	var settingsJSON []byte
-	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &u.AvatarURL, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &u.AvatarURL, &u.Username, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.ErrUserNotFound
 		}
@@ -201,15 +268,16 @@ func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID string, params 
 		    avatar_url    = COALESCE($2, avatar_url),
 		    email         = COALESCE($3, email),
 		    phone         = COALESCE($4, phone),
-		    password_hash = COALESCE($5, password_hash),
+		    username      = COALESCE($5, username),
+		    password_hash = COALESCE($6, password_hash),
 		    updated_at    = NOW()
-		WHERE id = $6
-		RETURNING id, email, phone, display_name, avatar_url, settings, status, created_at, updated_at
-	`, params.DisplayName, params.AvatarURL, params.Email, params.Phone, params.PasswordHash, userID)
+		WHERE id = $7
+		RETURNING id, email, phone, display_name, avatar_url, username, settings, status, created_at, updated_at
+	`, params.DisplayName, params.AvatarURL, params.Email, params.Phone, params.Username, params.PasswordHash, userID)
 
 	var u domain.User
 	var settingsJSON []byte
-	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &u.AvatarURL, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &u.AvatarURL, &u.Username, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.ErrUserNotFound
 		}
@@ -234,4 +302,3 @@ func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID string, params 
 func EnsureUsersSchema(ctx context.Context, db *Postgres) error {
 	return nil
 }
-

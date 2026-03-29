@@ -425,7 +425,7 @@ const docTemplate = `{
                 "summary": "Update profile (name, email, phone)",
                 "parameters": [
                     {
-                        "description": "Profile patch",
+                        "description": "Profile patch (display_name, email, phone, username)",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -2829,6 +2829,9 @@ const docTemplate = `{
                 },
                 "phone": {
                     "type": "string"
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         },
@@ -3572,11 +3575,17 @@ const docTemplate = `{
                 "phone": {
                     "type": "string"
                 },
+                "public_share_url": {
+                    "type": "string"
+                },
                 "settings": {},
                 "status": {
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }
@@ -4002,6 +4011,12 @@ const docTemplate = `{
                 "from_amount": {
                     "type": "string"
                 },
+                "group_participants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/transaction.GroupParticipantInput"
+                    }
+                },
                 "lang": {
                     "type": "string"
                 },
@@ -4018,6 +4033,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "occurred_time": {
+                    "type": "string"
+                },
+                "owner_original_amount": {
                     "type": "string"
                 },
                 "tag_ids": {

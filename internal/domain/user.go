@@ -10,8 +10,10 @@ type User struct {
 	Email       *string   `json:"email,omitempty"`
 	Phone       *string   `json:"phone,omitempty"`
 	DisplayName *string   `json:"display_name,omitempty"`
-	AvatarURL   *string   `json:"avatar_url,omitempty"`
-	Settings    any       `json:"settings,omitempty"`
+	AvatarURL      *string   `json:"avatar_url,omitempty"`
+	Username       string    `json:"username"`
+	PublicShareURL *string   `json:"public_share_url,omitempty"`
+	Settings       any       `json:"settings,omitempty"`
 	Status      string    `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -27,6 +29,7 @@ type UpdateUserParams struct {
 	Email        *string
 	Phone        *string
 	AvatarURL    *string
+	Username     *string
 	PasswordHash *string
 }
 
@@ -34,6 +37,7 @@ type UserRepository interface {
 	CreateUser(ctx context.Context, user UserWithPassword) error
 	FindUserByEmail(ctx context.Context, email string) (*UserWithPassword, error)
 	FindUserByPhone(ctx context.Context, phone string) (*UserWithPassword, error)
+	FindUserByUsername(ctx context.Context, username string) (*UserWithPassword, error)
 	FindUserByID(ctx context.Context, id string) (*User, error)
 	UpdateUserSettings(ctx context.Context, userID string, patch map[string]any) (*User, error)
 	UpdateUserProfile(ctx context.Context, userID string, params UpdateUserParams) (*User, error)

@@ -168,7 +168,29 @@ func (s *Service) Delete(ctx context.Context, userID, accountID string) error {
 		return apperrors.Validation("accountId is required", map[string]any{"field": "accountId"})
 	}
 
-	err := s.repo.DeleteAccount(ctx, userID, accountID)
+	acc, err := s.repo.GetAccountForUser(ctx, userID, accountID)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrAccountForbidden) {
+			return apperrors.Wrap(apperrors.KindForbidden, "forbidden", err)
+		}
+		if errors.Is(err, apperrors.ErrAccountNotFound) {
+			return apperrors.Wrap(apperrors.KindNotFound, "account not found", err)
+		}
+		return err
+	}
+	if acc.AccountType == "cash" {
+		return apperrors.Validation("cash account cannot be deleted; close it to archive", map[string]any{"field": "accountId"})
+	}
+
+	hasTransfers, err := s.repo.HasRelatedTransferTransactionsForAccount(ctx, accountID)
+	if err != nil {
+		return err
+	}
+	if hasTransfers {
+		return apperrors.Validation("account has related transfer transactions and cannot be deleted; close it to archive", map[string]any{"field": "accountId"})
+	}
+
+	err = s.repo.DeleteAccount(ctx, userID, accountID)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrAccountForbidden) {
 			return apperrors.Wrap(apperrors.KindForbidden, "forbidden", err)
@@ -256,8 +278,9 @@ func (s *Service) UpsertShare(ctx context.Context, userID, accountID, login, per
 
 // RevokeShare removes a share.
 func (s *Service) RevokeShare(ctx context.Context, userID, accountID, targetUserID string) error {
-	if strings.TrimSpace(targetUserID) == "" {
-		return apperrors.Validation("userId is required", map[string]any{"field": "userId"})
+	targetUserID = strings.TrimSpace(targetUserID)
+	if targetUserID == "" {
+		return apperrors.Validation("targetUserID is required", map[string]any{"field": "targetUserID"})
 	}
 
 	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {

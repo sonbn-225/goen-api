@@ -41,9 +41,9 @@ type AccountRepository interface {
 	GetAccountForUser(ctx context.Context, userID string, accountID string) (*Account, error)
 	PatchAccount(ctx context.Context, actorUserID string, accountID string, patch AccountPatch) (*Account, error)
 	DeleteAccount(ctx context.Context, actorUserID string, accountID string) error
+	HasRelatedTransferTransactionsForAccount(ctx context.Context, accountID string) (bool, error)
 	ListAccountBalancesForUser(ctx context.Context, userID string) ([]AccountBalance, error)
 
 	// UC-007 Shared Account
 	AccountShareRepository
 }
-
