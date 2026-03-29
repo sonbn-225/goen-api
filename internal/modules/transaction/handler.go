@@ -165,9 +165,11 @@ type CreateBody struct {
 	ToAccountID   *string                 `json:"to_account_id,omitempty"`
 	ExchangeRate  *string                 `json:"exchange_rate,omitempty"`
 	CategoryID    *string                 `json:"category_id,omitempty"`
-	TagIDs        []string                `json:"tag_ids,omitempty"`
-	LineItems     []CreateLineItemRequest `json:"line_items,omitempty"`
-	Lang          string                  `json:"lang,omitempty"`
+	TagIDs                []string                `json:"tag_ids,omitempty"`
+	LineItems             []CreateLineItemRequest `json:"line_items,omitempty"`
+	GroupParticipants     []GroupParticipantInput `json:"group_participants,omitempty"`
+	OwnerOriginalAmount   *string                 `json:"owner_original_amount,omitempty"`
+	Lang                  string                  `json:"lang,omitempty"`
 }
 
 type BatchPatchBody struct {
@@ -366,9 +368,11 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		ToAccountID:   body.ToAccountID,
 		ExchangeRate:  body.ExchangeRate,
 		CategoryID:    body.CategoryID,
-		TagIDs:        body.TagIDs,
-		LineItems:     body.LineItems,
-		Lang:          body.Lang,
+		TagIDs:              body.TagIDs,
+		LineItems:           body.LineItems,
+		GroupParticipants:   body.GroupParticipants,
+		OwnerOriginalAmount: body.OwnerOriginalAmount,
+		Lang:                body.Lang,
 	}
 
 	tx, err := h.svc.Create(r.Context(), userID, req)
@@ -873,13 +877,13 @@ func (h *Handler) ListImportRules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rules, err := h.svc.ListImportMappingRules(r.Context(), userID)
+	items, err := h.svc.ListImportRules(r.Context(), userID)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, ImportRulesResponse{Data: rules})
+	response.WriteJSON(w, http.StatusOK, ImportRulesResponse{Data: items})
 }
 
 // UpsertImportRules handles POST /transactions/import/rules
@@ -896,13 +900,13 @@ func (h *Handler) UpsertImportRules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rules, err := h.svc.UpsertImportMappingRules(r.Context(), userID, body.Rules)
+	items, err := h.svc.UpsertImportRules(r.Context(), userID, body.Rules)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, ImportRulesResponse{Data: rules})
+	response.WriteJSON(w, http.StatusOK, ImportRulesResponse{Data: items})
 }
 
 // DeleteImportRule handles DELETE /transactions/import/rules/{ruleId}
@@ -919,7 +923,7 @@ func (h *Handler) DeleteImportRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.DeleteImportMappingRule(r.Context(), userID, ruleID); err != nil {
+	if err := h.svc.DeleteImportRule(r.Context(), userID, ruleID); err != nil {
 		httpx.WriteServiceError(w, err)
 		return
 	}
@@ -935,7 +939,7 @@ func (h *Handler) ApplyImportRulesAndCreate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	result, err := h.svc.ApplyRulesAndCreateImported(r.Context(), userID)
+	result, err := h.svc.ApplyImportRulesAndCreate(r.Context(), userID)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return
@@ -990,3 +994,6 @@ func parseTimeOrDateHandler(v string) (time.Time, error) {
 	}
 	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC), nil
 }
+
+
+

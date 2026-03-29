@@ -321,6 +321,32 @@ func (r *AccountRepo) DeleteAccount(ctx context.Context, actorUserID string, acc
 	})
 }
 
+func (r *AccountRepo) HasRelatedTransferTransactionsForAccount(ctx context.Context, accountID string) (bool, error) {
+	if r.db == nil {
+		return false, apperrors.ErrDatabaseNotReady
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	var exists bool
+	err = pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM transactions t
+			WHERE t.deleted_at IS NULL
+			  AND t.type = 'transfer'
+			  AND (t.from_account_id = $1 OR t.to_account_id = $1)
+		)
+	`, accountID).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
+}
+
 func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID string) ([]domain.AccountBalance, error) {
 	if r.db == nil {
 		return nil, apperrors.ErrDatabaseNotReady
@@ -600,4 +626,3 @@ func requireAccountOwner(ctx context.Context, tx pgx.Tx, actorUserID string, acc
 	}
 	return nil
 }
-

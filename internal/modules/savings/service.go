@@ -56,7 +56,7 @@ func NewService(accounts AccountServiceInterface, tx TransactionServiceInterface
 }
 
 // Create creates a new savings instrument.
-func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) (*domain.SavingsInstrument, error) {
+func (s *Service) Create(ctx context.Context, username string, req CreateRequest) (*domain.SavingsInstrument, error) {
 	var savingsAccountID string
 	parentAccountID := normalizeOptionalString(req.ParentAccountID)
 	name := normalizeOptionalString(req.Name)
@@ -117,7 +117,7 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 	autoCreatedAccount := false
 	lang := httpx.LangFromContext(ctx)
 	if savingsAccountID == "" {
-		parent, err := s.accounts.Get(ctx, userID, *parentAccountID)
+		parent, err := s.accounts.Get(ctx, username, *parentAccountID)
 		if err != nil {
 			return nil, err
 		}
@@ -136,7 +136,7 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 			Currency:        parent.Currency,
 			ParentAccountID: parentAccountID,
 		}
-		createdAcc, err := s.accounts.Create(ctx, userID, createReq)
+		createdAcc, err := s.accounts.Create(ctx, username, createReq)
 		if err != nil {
 			return nil, err
 		}
@@ -144,7 +144,7 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 		acc = createdAcc
 		autoCreatedAccount = true
 	} else {
-		cur, err := s.accounts.Get(ctx, userID, savingsAccountID)
+		cur, err := s.accounts.Get(ctx, username, savingsAccountID)
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +182,7 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 		UpdatedAt:        now,
 	}
 
-	if err := s.repo.CreateSavingsInstrument(ctx, userID, item); err != nil {
+	if err := s.repo.CreateSavingsInstrument(ctx, username, item); err != nil {
 		return nil, err
 	}
 
@@ -211,15 +211,15 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 				FromAccountID: &fromID,
 				ToAccountID:   &toID,
 			}
-			if _, err := s.tx.Create(ctx, userID, txReq); err != nil {
-				_ = s.repo.DeleteSavingsInstrument(ctx, userID, id)
-				_ = s.accounts.Delete(ctx, userID, acc.ID)
+			if _, err := s.tx.Create(ctx, username, txReq); err != nil {
+				_ = s.repo.DeleteSavingsInstrument(ctx, username, id)
+				_ = s.accounts.Delete(ctx, username, acc.ID)
 				return nil, err
 			}
 		}
 	}
 
-	created, err := s.repo.GetSavingsInstrument(ctx, userID, id)
+	created, err := s.repo.GetSavingsInstrument(ctx, username, id)
 	if err != nil {
 		return nil, err
 	}
@@ -227,8 +227,8 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 }
 
 // Get retrieves a savings instrument by ID.
-func (s *Service) Get(ctx context.Context, userID, savingsInstrumentID string) (*domain.SavingsInstrument, error) {
-	item, err := s.repo.GetSavingsInstrument(ctx, userID, savingsInstrumentID)
+func (s *Service) Get(ctx context.Context, username, savingsInstrumentID string) (*domain.SavingsInstrument, error) {
+	item, err := s.repo.GetSavingsInstrument(ctx, username, savingsInstrumentID)
 	if err != nil {
 		if strings.TrimSpace(savingsInstrumentID) == "" {
 			return nil, apperrors.Validation("instrumentId is required", map[string]any{"field": "instrumentId"})
@@ -242,13 +242,13 @@ func (s *Service) Get(ctx context.Context, userID, savingsInstrumentID string) (
 }
 
 // List returns all savings instruments for a user.
-func (s *Service) List(ctx context.Context, userID string) ([]domain.SavingsInstrument, error) {
-	return s.repo.ListSavingsInstruments(ctx, userID)
+func (s *Service) List(ctx context.Context, username string) ([]domain.SavingsInstrument, error) {
+	return s.repo.ListSavingsInstruments(ctx, username)
 }
 
 // Patch updates a savings instrument.
-func (s *Service) Patch(ctx context.Context, userID, savingsInstrumentID string, req PatchRequest) (*domain.SavingsInstrument, error) {
-	cur, err := s.repo.GetSavingsInstrument(ctx, userID, savingsInstrumentID)
+func (s *Service) Patch(ctx context.Context, username, savingsInstrumentID string, req PatchRequest) (*domain.SavingsInstrument, error) {
+	cur, err := s.repo.GetSavingsInstrument(ctx, username, savingsInstrumentID)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrSavingsInstrumentNotFound) {
 			return nil, apperrors.Wrap(apperrors.KindNotFound, "savings instrument not found", err)
@@ -348,14 +348,14 @@ func (s *Service) Patch(ctx context.Context, userID, savingsInstrumentID string,
 	}
 
 	cur.UpdatedAt = time.Now().UTC()
-	if err := s.repo.UpdateSavingsInstrument(ctx, userID, *cur); err != nil {
+	if err := s.repo.UpdateSavingsInstrument(ctx, username, *cur); err != nil {
 		if errors.Is(err, apperrors.ErrSavingsInstrumentNotFound) {
 			return nil, apperrors.Wrap(apperrors.KindNotFound, "savings instrument not found", err)
 		}
 		return nil, err
 	}
 
-	item, err := s.repo.GetSavingsInstrument(ctx, userID, savingsInstrumentID)
+	item, err := s.repo.GetSavingsInstrument(ctx, username, savingsInstrumentID)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrSavingsInstrumentNotFound) {
 			return nil, apperrors.Wrap(apperrors.KindNotFound, "savings instrument not found", err)
@@ -366,8 +366,8 @@ func (s *Service) Patch(ctx context.Context, userID, savingsInstrumentID string,
 }
 
 // Delete deletes a savings instrument.
-func (s *Service) Delete(ctx context.Context, userID, savingsInstrumentID string) error {
-	err := s.repo.DeleteSavingsInstrument(ctx, userID, savingsInstrumentID)
+func (s *Service) Delete(ctx context.Context, username, savingsInstrumentID string) error {
+	err := s.repo.DeleteSavingsInstrument(ctx, username, savingsInstrumentID)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrSavingsInstrumentNotFound) {
 			return apperrors.Wrap(apperrors.KindNotFound, "savings instrument not found", err)
@@ -403,4 +403,5 @@ func isValidDecimal(s string) bool {
 	_, ok := new(big.Rat).SetString(s)
 	return ok
 }
+
 

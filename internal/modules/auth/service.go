@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"mime/multipart"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/config"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/platform/httpx"
 	"github.com/sonbn-225/goen-api/internal/storage"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -21,6 +23,7 @@ type SignupRequest struct {
 	Email       string `json:"email"`
 	Phone       string `json:"phone"`
 	DisplayName string `json:"display_name"`
+	Username    string `json:"username"`
 	Password    string `json:"password"`
 }
 
@@ -54,14 +57,22 @@ func NewService(userRepo domain.UserRepository, cfg *config.Config, s3 *storage.
 	}
 }
 
-func defaultUserSettings() map[string]any {
+func defaultUserSettings(lang string) map[string]any {
+	normalizedLang := strings.ToLower(strings.TrimSpace(lang))
+	locale := "en-US"
+	numberFormat := "en-US"
+	if strings.HasPrefix(normalizedLang, "vi") {
+		locale = "vi-VN"
+		numberFormat = "vi-VN"
+	}
+
 	return map[string]any{
-		"locale":           "vi-VN",
-		"default_currency": "VND",
-		"number_format":    "vi-VN",
-		"month_start_day":  1,
-		"week_start_day":   1,
-		"timezone":         "Asia/Ho_Chi_Minh",
+		"locale":                locale,
+		"default_currency":      "VND",
+		"number_format":         numberFormat,
+		"month_start_day":       1,
+		"week_start_day":        1,
+		"timezone":              "Asia/Ho_Chi_Minh",
 		"rotating_savings_term": "hui",
 	}
 }
@@ -71,12 +82,16 @@ func (s *Service) Signup(ctx context.Context, req SignupRequest) (*AuthResponse,
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	phone := strings.TrimSpace(req.Phone)
 	password := req.Password
+	username := strings.ToLower(strings.TrimSpace(req.Username))
 
 	if email == "" && phone == "" {
 		return nil, apperrors.Validation("email or phone is required", nil)
 	}
 	if len(password) < 8 {
 		return nil, apperrors.Validation("password must be at least 8 characters", nil)
+	}
+	if username == "" {
+		return nil, apperrors.Validation("username is required", nil)
 	}
 
 	now := time.Now().UTC()
@@ -101,14 +116,16 @@ func (s *Service) Signup(ctx context.Context, req SignupRequest) (*AuthResponse,
 
 	newUser := domain.UserWithPassword{
 		User: domain.User{
-			ID:          userID,
-			Email:       emailPtr,
-			Phone:       phonePtr,
-			DisplayName: displayNamePtr,
-			Settings:    defaultUserSettings(),
-			Status:      "active",
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			ID:             userID,
+			Email:          emailPtr,
+			Phone:          phonePtr,
+			DisplayName:    displayNamePtr,
+			Username:       username,
+			PublicShareURL: s.generatePublicShareURL(username),
+			Settings:       defaultUserSettings(httpx.LangFromContext(ctx)),
+			Status:         "active",
+			CreatedAt:      now,
+			UpdatedAt:      now,
 		},
 		PasswordHash: string(hashBytes),
 	}
@@ -147,6 +164,8 @@ func (s *Service) Signin(ctx context.Context, req SigninRequest) (*AuthResponse,
 
 	if strings.Contains(login, "@") {
 		user, err = s.userRepo.FindUserByEmail(ctx, strings.ToLower(login))
+	} else if len(login) > 0 && login[0] != '+' && !isNumeric(login) {
+		user, err = s.userRepo.FindUserByUsername(ctx, strings.ToLower(login))
 	} else {
 		user, err = s.userRepo.FindUserByPhone(ctx, login)
 	}
@@ -190,6 +209,8 @@ func (s *Service) Refresh(ctx context.Context, userID string) (*AuthResponse, er
 		return nil, err
 	}
 
+	s.addComputedFields(user)
+
 	return &AuthResponse{
 		AccessToken: token,
 		TokenType:   "Bearer",
@@ -207,6 +228,7 @@ func (s *Service) GetMe(ctx context.Context, userID string) (*domain.User, error
 		}
 		return nil, err
 	}
+	s.addComputedFields(user)
 	return user, nil
 }
 
@@ -228,8 +250,9 @@ func (s *Service) UpdateMySettings(ctx context.Context, userID string, patch map
 	}
 
 	if updated.Settings == nil {
-		updated.Settings = defaultUserSettings()
+		updated.Settings = defaultUserSettings(httpx.LangFromContext(ctx))
 	}
+	s.addComputedFields(updated)
 	return updated, nil
 }
 
@@ -256,11 +279,12 @@ func (s *Service) UploadAvatar(ctx context.Context, userID string, file *multipa
 		}
 		return nil, err
 	}
+	s.addComputedFields(updated)
 	return updated, nil
 }
 
-// UpdateMyProfile patches display_name, email, or phone.
-func (s *Service) UpdateMyProfile(ctx context.Context, userID string, displayName, email, phone *string) (*domain.User, error) {
+// UpdateMyProfile patches display_name, email, phone, or username.
+func (s *Service) UpdateMyProfile(ctx context.Context, userID string, displayName, email, phone, username *string) (*domain.User, error) {
 	params := domain.UpdateUserParams{}
 
 	if displayName != nil {
@@ -279,6 +303,13 @@ func (s *Service) UpdateMyProfile(ctx context.Context, userID string, displayNam
 	if phone != nil {
 		v := strings.TrimSpace(*phone)
 		params.Phone = &v
+	}
+	if username != nil {
+		v := strings.ToLower(strings.TrimSpace(*username))
+		if v == "" {
+			return nil, apperrors.Validation("username cannot be empty", nil)
+		}
+		params.Username = &v
 	}
 
 	updated, err := s.userRepo.UpdateUserProfile(ctx, userID, params)
@@ -441,3 +472,26 @@ func (s *Service) generateToken(user domain.User) (string, int, error) {
 	return signedToken, expiresIn, nil
 }
 
+func (s *Service) generatePublicShareURL(username string) *string {
+	if username == "" {
+		return nil
+	}
+	url := fmt.Sprintf("%s/u/%s", s.cfg.PublicBaseURL, username)
+	return &url
+}
+
+func (s *Service) addComputedFields(u *domain.User) {
+	if u == nil {
+		return
+	}
+	u.PublicShareURL = s.generatePublicShareURL(u.Username)
+}
+
+func isNumeric(s string) bool {
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}

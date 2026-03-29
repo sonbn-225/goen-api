@@ -159,6 +159,7 @@ END $$;
 -- Tables
 CREATE TABLE IF NOT EXISTS users (
   id text PRIMARY KEY,
+  username text NOT NULL UNIQUE,
   email text NULL,
   phone text NULL,
   display_name text NULL,
@@ -214,8 +215,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   deleted_at timestamptz,
 
   CONSTRAINT fk_accounts_parent FOREIGN KEY (parent_account_id) REFERENCES accounts(id),
-  CONSTRAINT fk_accounts_created_by FOREIGN KEY (created_by) REFERENCES users(id),
-  CONSTRAINT fk_accounts_updated_by FOREIGN KEY (updated_by) REFERENCES users(id)
+  CONSTRAINT fk_accounts_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE,
+  CONSTRAINT fk_accounts_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON UPDATE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_accounts_parent_account_id ON accounts(parent_account_id);
@@ -236,9 +237,9 @@ CREATE TABLE IF NOT EXISTS user_accounts (
   updated_by text,
 
   CONSTRAINT fk_user_accounts_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-  CONSTRAINT fk_user_accounts_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_user_accounts_created_by FOREIGN KEY (created_by) REFERENCES users(id),
-  CONSTRAINT fk_user_accounts_updated_by FOREIGN KEY (updated_by) REFERENCES users(id),
+  CONSTRAINT fk_user_accounts_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_user_accounts_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE,
+  CONSTRAINT fk_user_accounts_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON UPDATE CASCADE,
   CONSTRAINT uq_user_accounts_account_user UNIQUE (account_id, user_id)
 );
 
@@ -275,8 +276,8 @@ CREATE TABLE IF NOT EXISTS transactions (
   CONSTRAINT fk_transactions_account_id FOREIGN KEY (account_id) REFERENCES accounts(id),
   CONSTRAINT fk_transactions_from_account_id FOREIGN KEY (from_account_id) REFERENCES accounts(id),
   CONSTRAINT fk_transactions_to_account_id FOREIGN KEY (to_account_id) REFERENCES accounts(id),
-  CONSTRAINT fk_transactions_created_by FOREIGN KEY (created_by) REFERENCES users(id),
-  CONSTRAINT fk_transactions_updated_by FOREIGN KEY (updated_by) REFERENCES users(id),
+  CONSTRAINT fk_transactions_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE,
+  CONSTRAINT fk_transactions_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON UPDATE CASCADE,
   CONSTRAINT ck_transactions_amount_positive CHECK (amount > 0),
   CONSTRAINT ck_transactions_from_amount_positive CHECK (from_amount IS NULL OR from_amount > 0),
   CONSTRAINT ck_transactions_to_amount_positive CHECK (to_amount IS NULL OR to_amount > 0),
@@ -384,13 +385,13 @@ CREATE TABLE IF NOT EXISTS group_expense_participants (
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
 
-  CONSTRAINT fk_gep_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_gep_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_gep_transaction_id FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
   CONSTRAINT fk_gep_settlement_transaction_id FOREIGN KEY (settlement_transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
   CONSTRAINT ck_gep_amounts_positive CHECK (original_amount > 0 AND share_amount > 0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_gep_user_id ON group_expense_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_gep_username ON group_expense_participants(user_id);
 CREATE INDEX IF NOT EXISTS idx_gep_transaction_id ON group_expense_participants(transaction_id);
 CREATE INDEX IF NOT EXISTS idx_gep_user_settled ON group_expense_participants(user_id, is_settled);
 CREATE INDEX IF NOT EXISTS idx_gep_user_participant_name ON group_expense_participants(user_id, lower(participant_name));
@@ -439,7 +440,7 @@ CREATE TABLE IF NOT EXISTS tags (
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
 
-  CONSTRAINT fk_tags_user_id FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT fk_tags_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE,
   CONSTRAINT ck_tags_names_present CHECK (name_vi IS NOT NULL OR name_en IS NOT NULL)
 );
 
@@ -488,7 +489,7 @@ CREATE TABLE IF NOT EXISTS budgets (
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
 
-  CONSTRAINT fk_budgets_user_id FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT fk_budgets_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE,
   CONSTRAINT fk_budgets_category_id FOREIGN KEY (category_id) REFERENCES categories(id),
   CONSTRAINT chk_budgets_alert_threshold CHECK (alert_threshold_percent IS NULL OR (alert_threshold_percent >= 0 AND alert_threshold_percent <= 100))
 );
@@ -535,7 +536,7 @@ CREATE TABLE IF NOT EXISTS rotating_savings_groups (
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
 
-  CONSTRAINT fk_rotating_savings_groups_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_rotating_savings_groups_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_rotating_savings_groups_account_id FOREIGN KEY (account_id) REFERENCES accounts(id)
 );
 
@@ -576,7 +577,7 @@ CREATE TABLE IF NOT EXISTS rotating_savings_audit_logs (
   details jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL,
 
-  CONSTRAINT fk_rotating_savings_audit_logs_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_rotating_savings_audit_logs_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_rotating_savings_audit_logs_group_id FOREIGN KEY (group_id) REFERENCES rotating_savings_groups(id) ON DELETE SET NULL
 );
 
@@ -603,7 +604,7 @@ CREATE TABLE IF NOT EXISTS debts (
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
 
-  CONSTRAINT fk_debts_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_debts_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_debts_account_id FOREIGN KEY (account_id) REFERENCES accounts(id),
   CONSTRAINT fk_debts_contact_id FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE SET NULL,
   CONSTRAINT ck_debts_due_after_start CHECK (due_date >= start_date),
@@ -764,7 +765,7 @@ CREATE TABLE IF NOT EXISTS security_event_elections (
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
 
-  CONSTRAINT fk_security_event_elections_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_security_event_elections_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_security_event_elections_broker_account_id FOREIGN KEY (broker_account_id) REFERENCES investment_accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_security_event_elections_security_event_id FOREIGN KEY (security_event_id) REFERENCES security_events(id) ON DELETE CASCADE,
   CONSTRAINT fk_security_event_elections_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE,
@@ -897,7 +898,7 @@ CREATE TABLE IF NOT EXISTS audit_events (
   PRIMARY KEY (id, occurred_at),
 
   CONSTRAINT fk_audit_events_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-  CONSTRAINT fk_audit_events_actor_user_id FOREIGN KEY (actor_user_id) REFERENCES users(id)
+  CONSTRAINT fk_audit_events_actor_user_id FOREIGN KEY (actor_user_id) REFERENCES users(id) ON UPDATE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_events_account_id_occurred_at
@@ -927,7 +928,7 @@ CREATE TABLE IF NOT EXISTS imported_transactions (
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
 
-  CONSTRAINT fk_imported_transactions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_imported_transactions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_imported_transactions_mapped_account_id FOREIGN KEY (mapped_account_id) REFERENCES accounts(id),
   CONSTRAINT fk_imported_transactions_mapped_category_id FOREIGN KEY (mapped_category_id) REFERENCES categories(id)
 );
@@ -951,7 +952,7 @@ CREATE TABLE IF NOT EXISTS import_mapping_rules (
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
 
-  CONSTRAINT fk_import_mapping_rules_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_import_mapping_rules_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT chk_import_mapping_rules_kind CHECK (kind IN ('account', 'category')),
   CONSTRAINT uq_import_mapping_rules_unique UNIQUE (user_id, kind, normalized_source_name)
 );

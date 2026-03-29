@@ -129,8 +129,9 @@ type ExportTransactionRow struct {
 }
 
 type TransactionRepository interface {
-	CreateTransaction(ctx context.Context, userID string, tx Transaction, lineItems []TransactionLineItem, tagIDs []string) error
+	CreateTransaction(ctx context.Context, userID string, tx Transaction, lineItems []TransactionLineItem, tagIDs []string, participants []GroupExpenseParticipant) error
 	GetTransaction(ctx context.Context, userID string, transactionID string) (*Transaction, error)
+	GetImportedTransaction(ctx context.Context, userID string, importID string) (*ImportedTransaction, error)
 	ListTransactions(ctx context.Context, userID string, filter TransactionListFilter) ([]Transaction, *string, int, error)
 	PatchTransaction(ctx context.Context, userID string, transactionID string, patch TransactionPatch) (*Transaction, error)
 	BatchPatchTransactions(ctx context.Context, userID string, transactionIDs []string, patches map[string]TransactionPatch, mode string) ([]string, []string, error)

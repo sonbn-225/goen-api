@@ -48,7 +48,7 @@ func (h *Handler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Param body body SignupRequest true "Signup request"
 // @Success 200 {object} AuthResponse
 // @Failure 400 {object} response.ErrorEnvelope
-// @Failure 409 {object} response.ErrorEnvelope
+// @Failure 409 {object} response.ErrorEnvelope (conflict: email, phone, or username already exists)
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /auth/signup [post]
 func (h *Handler) Signup(w http.ResponseWriter, r *http.Request) {
@@ -226,7 +226,7 @@ func (h *Handler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param body body object true "Profile patch"
+// @Param body body object true "Profile patch (display_name, email, phone, username)"
 // @Success 200 {object} domain.User
 // @Router /auth/me/profile [patch]
 func (h *Handler) PatchMyProfile(w http.ResponseWriter, r *http.Request) {
@@ -240,13 +240,14 @@ func (h *Handler) PatchMyProfile(w http.ResponseWriter, r *http.Request) {
 		DisplayName *string `json:"display_name"`
 		Email       *string `json:"email"`
 		Phone       *string `json:"phone"`
+		Username    *string `json:"username"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
 		return
 	}
 
-	user, err := h.svc.UpdateMyProfile(r.Context(), userID, body.DisplayName, body.Email, body.Phone)
+	user, err := h.svc.UpdateMyProfile(r.Context(), userID, body.DisplayName, body.Email, body.Phone, body.Username)
 	if err != nil {
 		httpx.WriteServiceError(w, err)
 		return

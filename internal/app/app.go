@@ -18,6 +18,7 @@ import (
 	groupExpense "github.com/sonbn-225/goen-api/internal/modules/group_expense"
 	"github.com/sonbn-225/goen-api/internal/modules/investment"
 	"github.com/sonbn-225/goen-api/internal/modules/marketdata"
+	"github.com/sonbn-225/goen-api/internal/modules/public"
 	"github.com/sonbn-225/goen-api/internal/modules/report"
 	rotatingsavings "github.com/sonbn-225/goen-api/internal/modules/rotating_savings"
 	"github.com/sonbn-225/goen-api/internal/modules/savings"
@@ -93,7 +94,7 @@ func New(cfg *config.Config) *App {
 	tagMod := tag.NewModule(tag.ModuleDeps{
 		Repo: tagRepo,
 	})
-	
+
 	contactMod := contact.NewModule(contact.ModuleDeps{
 		Repo: contactRepo,
 	})
@@ -134,6 +135,9 @@ func New(cfg *config.Config) *App {
 		ContactSvc: contactMod.Service,
 	})
 
+	// Inject debt service into transaction service for group expense support
+	txMod.Service.SetDebtService(debtMod.Service)
+
 	// Group expense module (depends on transaction service and debt service for auto-debt creation)
 	groupExpenseMod := groupExpense.NewModule(groupExpense.ModuleDeps{
 		Repo:    groupExpenseRepo,
@@ -173,6 +177,9 @@ func New(cfg *config.Config) *App {
 		AccountRepo: accountRepo,
 	})
 
+	// Public module
+	publicMod := public.New(userRepo, accountRepo, groupExpenseRepo)
+
 	// Create router
 	h := newModularRouter(cfg, &modules{
 		diagnostics:     diagMod,
@@ -190,6 +197,7 @@ func New(cfg *config.Config) *App {
 		marketData:      marketDataMod,
 		report:          reportMod,
 		contact:         contactMod,
+		public:          publicMod,
 	})
 
 	return &App{
@@ -222,6 +230,7 @@ type modules struct {
 	marketData      *marketdata.Module
 	report          *report.Module
 	contact         *contact.Module
+	public          *public.Module
 }
 
 func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
@@ -244,6 +253,9 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 	registerV1Routes := func(r chi.Router) {
 		// Diagnostics (no auth required)
 		mods.diagnostics.Handler.RegisterRoutes(r)
+
+		// Public module (no auth required)
+		mods.public.RegisterRoutes(r)
 
 		// Auth - uses its own cfg-based middleware
 		mods.auth.Handler.RegisterRoutes(r, cfg)
@@ -286,7 +298,7 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 
 		// Report
 		mods.report.Handler.RegisterRoutes(r, authMiddleware)
-		
+
 		// Contact
 		mods.contact.Handler.RegisterRoutes(r, authMiddleware)
 	}

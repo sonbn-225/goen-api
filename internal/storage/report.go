@@ -26,62 +26,52 @@ func (r *ReportRepo) GetCashflow(ctx context.Context, userID string, months int)
 		return nil, err
 	}
 
-	startDate := time.Now().UTC().AddDate(0, -months, 0)
-	
+	startDate := time.Now().UTC().AddDate(0, -months, 0).Format("2006-01-01")
+
 	rows, err := pool.Query(ctx, `
+		WITH RECURSIVE months AS (
+			SELECT date_trunc('month', $2::date) as m
+			UNION ALL
+			SELECT m + interval '1 month'
+			FROM months
+			WHERE m < date_trunc('month', CURRENT_DATE)
+		),
+		monthly_data AS (
+			SELECT
+				date_trunc('month', t.occurred_at) as month,
+				SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END) as income,
+				SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END) as expense
+			FROM transactions t
+			WHERE t.deleted_at IS NULL
+			  AND t.occurred_at >= $2
+			  AND EXISTS (
+					SELECT 1 FROM user_accounts ua
+					WHERE ua.user_id = $1 AND ua.account_id = t.account_id AND ua.status = 'active'
+			  )
+			GROUP BY 1
+		)
 		SELECT
-			to_char(t.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM') AS month,
-			t.type,
-			SUM(t.amount)::text AS total
-		FROM transactions t
-		WHERE t.deleted_at IS NULL 
-		  AND t.type IN ('income', 'expense')
-		  AND t.occurred_at >= $2
-		  AND EXISTS (
-		      SELECT 1 FROM user_accounts ua
-		      WHERE ua.user_id = $1 AND ua.account_id = t.account_id AND ua.status = 'active'
-		  )
-		GROUP BY month, t.type
-		ORDER BY month ASC
+			to_char(m.m, 'YYYY-MM') as month,
+			COALESCE(d.income, 0)::text as income,
+			COALESCE(d.expense, 0)::text as expense
+		FROM months m
+		LEFT JOIN monthly_data d ON d.month = m.m
+		ORDER BY m.m DESC
 	`, userID, startDate)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	// Aggregate into mapping by month while preserving order
-	var order []string
-	dataMap := make(map[string]*domain.CashflowStat)
+	out := make([]domain.CashflowStat, 0)
 	for rows.Next() {
-		var month string
-		var tType string
-		var total string
-		if err := rows.Scan(&month, &tType, &total); err != nil {
+		var s domain.CashflowStat
+		if err := rows.Scan(&s.Month, &s.Income, &s.Expense); err != nil {
 			return nil, err
 		}
-		
-		stat, ok := dataMap[month]
-		if !ok {
-			stat = &domain.CashflowStat{Month: month, Income: "0", Expense: "0"}
-			dataMap[month] = stat
-			order = append(order, month)
-		}
-		if tType == "income" {
-			stat.Income = total
-		} else if tType == "expense" {
-			stat.Expense = total
-		}
+		out = append(out, s)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	var result []domain.CashflowStat
-	for _, m := range order {
-		result = append(result, *dataMap[m])
-	}
-	
-	return result, nil
+	return out, nil
 }
 
 func (r *ReportRepo) GetTopExpenses(ctx context.Context, userID string, year int, month int, limit int) ([]domain.CategoryExpenseStat, error) {
@@ -95,21 +85,20 @@ func (r *ReportRepo) GetTopExpenses(ctx context.Context, userID string, year int
 
 	rows, err := pool.Query(ctx, `
 		SELECT
-			COALESCE(tli.category_id, '') AS category_id,
-			SUM(tli.amount)::text AS total
-		FROM transaction_line_items tli
-		JOIN transactions t ON t.id = tli.transaction_id
+			li.category_id,
+			SUM(li.amount)::text as amount
+		FROM transaction_line_items li
+		JOIN transactions t ON t.id = li.transaction_id
 		WHERE t.deleted_at IS NULL
 		  AND t.type = 'expense'
-		  AND EXTRACT(YEAR FROM t.occurred_at AT TIME ZONE 'UTC') = $2
-		  AND EXTRACT(MONTH FROM t.occurred_at AT TIME ZONE 'UTC') = $3
-		  AND tli.category_id IS NOT NULL
+		  AND extract(year from t.occurred_at) = $2
+		  AND extract(month from t.occurred_at) = $3
 		  AND EXISTS (
-		      SELECT 1 FROM user_accounts ua
-		      WHERE ua.user_id = $1 AND ua.account_id = t.account_id AND ua.status = 'active'
+				SELECT 1 FROM user_accounts ua
+				WHERE ua.user_id = $1 AND ua.account_id = t.account_id AND ua.status = 'active'
 		  )
-		GROUP BY tli.category_id
-		ORDER BY SUM(tli.amount) DESC
+		GROUP BY li.category_id
+		ORDER BY SUM(li.amount) DESC
 		LIMIT $4
 	`, userID, year, month, limit)
 
@@ -135,4 +124,5 @@ func (r *ReportRepo) GetTopExpenses(ctx context.Context, userID string, year int
 
 	return result, nil
 }
+
 
