@@ -13,8 +13,9 @@ import (
 
 // CreateTagRequest contains create tag parameters.
 type CreateTagRequest struct {
-	Name  string  `json:"name"`
-	Color *string `json:"color,omitempty"`
+	NameVI *string `json:"name_vi,omitempty"`
+	NameEN *string `json:"name_en,omitempty"`
+	Color  *string `json:"color,omitempty"`
 }
 
 // Service handles tag business logic.
@@ -29,9 +30,10 @@ func NewService(repo domain.TagRepository) *Service {
 
 // Create creates a new tag.
 func (s *Service) Create(ctx context.Context, userID string, req CreateTagRequest) (*domain.Tag, error) {
-	name := strings.TrimSpace(req.Name)
-	if name == "" {
-		return nil, apperrors.Validation("name is required", map[string]any{"field": "name"})
+	nameVI := normalizeOptionalString(req.NameVI)
+	nameEN := normalizeOptionalString(req.NameEN)
+	if nameVI == nil && nameEN == nil {
+		return nil, apperrors.Validation("at least one name is required", map[string]any{"field": "name"})
 	}
 
 	color := normalizeOptionalString(req.Color)
@@ -40,7 +42,8 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateTagReques
 	t := domain.Tag{
 		ID:        uuid.NewString(),
 		UserID:    userID,
-		Name:      name,
+		NameVI:    nameVI,
+		NameEN:    nameEN,
 		Color:     color,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -55,6 +58,51 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateTagReques
 		return nil, err
 	}
 	return created, nil
+}
+
+// GetOrCreateByName searches for a tag by name (case-insensitive) or creates it.
+func (s *Service) GetOrCreateByName(ctx context.Context, userID, name, langHint string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", apperrors.Validation("tag name cannot be empty", nil)
+	}
+
+	tags, err := s.repo.ListTags(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	normalizedSearch := strings.ToLower(name)
+	for _, t := range tags {
+		if t.NameVI != nil && strings.ToLower(*t.NameVI) == normalizedSearch {
+			return t.ID, nil
+		}
+		if t.NameEN != nil && strings.ToLower(*t.NameEN) == normalizedSearch {
+			return t.ID, nil
+		}
+	}
+
+	// Create new tag
+	now := time.Now().UTC()
+	id := uuid.NewString()
+	t := domain.Tag{
+		ID:        id,
+		UserID:    userID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	if langHint == "vi" {
+		t.NameVI = &name
+	} else {
+		t.NameEN = &name
+	}
+
+	if err := s.repo.CreateTag(ctx, userID, t); err != nil {
+		return "", err
+	}
+
+	return id, nil
 }
 
 // Get retrieves a tag by ID.

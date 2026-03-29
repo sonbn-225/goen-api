@@ -177,6 +177,9 @@ var (
 // Debt
 var ErrDebtNotFound = errors.New("debt not found")
 
+// Contact
+var ErrContactNotFound = errors.New("contact not found")
+
 // Group Expense
 var (
 	ErrGroupExpenseParticipantNotFound       = errors.New("group expense participant not found")

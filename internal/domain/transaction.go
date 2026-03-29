@@ -6,11 +6,12 @@ import (
 )
 
 type TransactionLineItem struct {
-	ID            string  `json:"id"`
-	CategoryID    *string `json:"category_id,omitempty"`
-	Amount        string  `json:"amount"`
-	Note          *string `json:"note,omitempty"`
-	TransactionID string  `json:"-"`
+	ID            string   `json:"id"`
+	CategoryID    *string  `json:"category_id,omitempty"`
+	TagIDs        []string `json:"tag_ids,omitempty"`
+	Amount        string   `json:"amount"`
+	Note          *string  `json:"note,omitempty"`
+	TransactionID string   `json:"-"`
 }
 
 type Transaction struct {

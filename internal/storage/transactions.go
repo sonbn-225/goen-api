@@ -161,6 +161,16 @@ func createTransactionTx(ctx context.Context, dbtx pgx.Tx, userID string, tx dom
 		if err != nil {
 			return err
 		}
+
+		if len(li.TagIDs) > 0 {
+			_, err = dbtx.Exec(ctx, `
+				INSERT INTO transaction_line_item_tags (line_item_id, tag_id, created_at)
+				SELECT $1, unnest($2::text[]), $3
+			`, li.ID, li.TagIDs, tx.CreatedAt)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	if len(tagIDs) > 0 {
@@ -313,10 +323,15 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT id, category_id, amount::text, note
-		FROM transaction_line_items
-		WHERE transaction_id = $1
-		ORDER BY id ASC
+		SELECT
+			li.id,
+			li.category_id,
+			li.amount::text,
+			li.note,
+			COALESCE((SELECT array_agg(tlit.tag_id ORDER BY tlit.tag_id) FROM transaction_line_item_tags tlit WHERE tlit.line_item_id = li.id), '{}'::text[]) AS tag_ids
+		FROM transaction_line_items li
+		WHERE li.transaction_id = $1
+		ORDER BY li.id ASC
 	`, t.ID)
 	if err != nil {
 		return nil, err
@@ -326,7 +341,7 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, tra
 	items := make([]domain.TransactionLineItem, 0)
 	for rows.Next() {
 		var li domain.TransactionLineItem
-		if err := rows.Scan(&li.ID, &li.CategoryID, &li.Amount, &li.Note); err != nil {
+		if err := rows.Scan(&li.ID, &li.CategoryID, &li.Amount, &li.Note, &li.TagIDs); err != nil {
 			return nil, err
 		}
 		items = append(items, li)
@@ -721,6 +736,16 @@ func (r *TransactionRepo) patchTransactionTx(ctx context.Context, dbtx pgx.Tx, u
 			`, li.ID, transactionID, li.CategoryID, li.Amount, li.Note)
 			if err != nil {
 				return err
+			}
+
+			if len(li.TagIDs) > 0 {
+				_, err = dbtx.Exec(ctx, `
+					INSERT INTO transaction_line_item_tags (line_item_id, tag_id, created_at)
+					SELECT $1, unnest($2::text[]), $3
+				`, li.ID, li.TagIDs, now)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}

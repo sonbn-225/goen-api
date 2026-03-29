@@ -57,6 +57,11 @@ func (s *Service) CreateGroup(ctx context.Context, userID string, req CreateGrou
 		return nil, apperrors.ErrRotatingSavingsNameRequired
 	}
 
+	status := req.Status
+	if status == "" || status == "closed" {
+		status = "active"
+	}
+
 	g := domain.RotatingSavingsGroup{
 		ID:                  uuid.New().String(),
 		UserID:              userID,
@@ -68,7 +73,7 @@ func (s *Service) CreateGroup(ctx context.Context, userID string, req CreateGrou
 		FixedInterestAmount: req.FixedInterestAmount,
 		CycleFrequency:      req.CycleFrequency,
 		StartDate:           req.StartDate,
-		Status:              req.Status,
+		Status:              status,
 		CreatedAt:           time.Now(),
 		UpdatedAt:           time.Now(),
 	}
@@ -80,6 +85,15 @@ func (s *Service) CreateGroup(ctx context.Context, userID string, req CreateGrou
 	if err := s.repo.CreateGroup(ctx, g); err != nil {
 		return nil, err
 	}
+
+	_ = s.repo.CreateAuditLog(ctx, domain.RotatingSavingsAuditLog{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		GroupID:   &g.ID,
+		Action:    "group_created",
+		Details:   map[string]any{"name": g.Name},
+		CreatedAt: time.Now(),
+	})
 
 	return &g, nil
 }
@@ -124,6 +138,15 @@ func (s *Service) UpdateGroup(ctx context.Context, userID string, groupID string
 		return nil, err
 	}
 
+	_ = s.repo.CreateAuditLog(ctx, domain.RotatingSavingsAuditLog{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		GroupID:   &g.ID,
+		Action:    "group_updated",
+		Details:   map[string]any{"status": g.Status},
+		CreatedAt: time.Now(),
+	})
+
 	return g, nil
 }
 
@@ -151,7 +174,7 @@ type GroupSummary struct {
 	Group           domain.RotatingSavingsGroup `json:"group"`
 	TotalPaid       float64                     `json:"total_paid"`
 	TotalReceived   float64                     `json:"total_received"`
-	NetPosition     float64                     `json:"net_position"`
+	RemainingAmount float64                     `json:"remaining_amount"`
 	CompletedCycles int                         `json:"completed_cycles"`
 	TotalCycles     int                         `json:"total_cycles"`
 	NextDueDate     *string                     `json:"next_due_date"`
@@ -164,10 +187,11 @@ type GroupDetailResponse struct {
 	CurrentPayoutValue float64                               `json:"current_payout_value"`
 	CurrentAccruedInterest float64                          `json:"current_accrued_interest"`
 	Contributions      []domain.RotatingSavingsContribution `json:"contributions"`
+	AuditLogs          []domain.RotatingSavingsAuditLog     `json:"audit_logs"`
 	TotalPaid          float64                               `json:"total_paid"`
 	TotalReceived      float64                               `json:"total_received"`
 	NextPayment        float64                               `json:"next_payment"`
-	NetPosition        float64                               `json:"net_position"`
+	RemainingAmount    float64                               `json:"remaining_amount"`
 }
 
 func (s *Service) GetGroupDetail(ctx context.Context, userID string, groupID string) (*GroupDetailResponse, error) {
@@ -180,6 +204,8 @@ func (s *Service) GetGroupDetail(ctx context.Context, userID string, groupID str
 	if err != nil {
 		return nil, err
 	}
+
+	auditLogs, _ := s.repo.ListAuditLogs(ctx, userID, groupID)
 
 	schedule := s.generateSchedule(*g, contributions)
 
@@ -251,6 +277,11 @@ func (s *Service) GetGroupDetail(ctx context.Context, userID string, groupID str
 		}
 	}
 
+	totalExpected := 0.0
+	for _, sc := range schedule {
+		totalExpected += sc.ExpectedAmount
+	}
+
 	return &GroupDetailResponse{
 		Group:               *g,
 		Schedule:            schedule,
@@ -258,10 +289,11 @@ func (s *Service) GetGroupDetail(ctx context.Context, userID string, groupID str
 		CurrentPayoutValue:  payoutValue,
 		CurrentAccruedInterest: accruedInterest,
 		Contributions:       contributions,
+		AuditLogs:           auditLogs,
 		TotalPaid:           totalPaid,
 		TotalReceived:       totalReceived,
 		NextPayment:         nextPayment,
-		NetPosition:         totalReceived - totalPaid,
+		RemainingAmount:     totalExpected - totalPaid,
 	}, nil
 }
 
@@ -419,7 +451,44 @@ func (s *Service) DeleteContribution(ctx context.Context, userID string, groupID
 		}
 	}
 
-	return s.repo.DeleteContribution(ctx, userID, contributionID)
+	if err := s.repo.DeleteContribution(ctx, userID, contributionID); err != nil {
+		return err
+	}
+
+	_ = s.repo.CreateAuditLog(ctx, domain.RotatingSavingsAuditLog{
+		ID:      uuid.New().String(),
+		UserID:  userID,
+		GroupID: &groupID,
+		Action:  "contribution_deleted",
+		Details: map[string]any{
+			"cycle_no": c.CycleNo,
+			"kind":     c.Kind,
+			"amount":   c.Amount,
+			"note":     c.Note,
+		},
+		CreatedAt: time.Now(),
+	})
+
+	// Re-check status
+	history, err := s.repo.ListContributions(ctx, userID, groupID)
+	if err == nil {
+		group, err := s.repo.GetGroup(ctx, userID, groupID)
+		if err == nil {
+			completedCycles := make(map[int]bool)
+			for _, item := range history {
+				if item.CycleNo != nil {
+					completedCycles[*item.CycleNo] = true
+				}
+			}
+			if len(completedCycles) < group.MemberCount && group.Status == "completed" {
+				group.Status = "active"
+				group.UpdatedAt = time.Now()
+				_ = s.repo.UpdateGroup(ctx, *group)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *Service) DeleteGroup(ctx context.Context, userID string, groupID string) error {
@@ -483,11 +552,16 @@ func (s *Service) ListGroups(ctx context.Context, userID string) ([]GroupSummary
 			}
 		}
 
+		totalExpected := 0.0
+		for _, sc := range schedule {
+			totalExpected += sc.ExpectedAmount
+		}
+
 		summaries = append(summaries, GroupSummary{
 			Group:           g,
 			TotalPaid:       totalPaid,
 			TotalReceived:   totalReceived,
-			NetPosition:     totalReceived - totalPaid,
+			RemainingAmount: totalExpected - totalPaid,
 			CompletedCycles: len(completedCyclesMap),
 			TotalCycles:     g.MemberCount,
 			NextDueDate:     nextDueDate,
@@ -576,6 +650,39 @@ func (s *Service) CreateContribution(ctx context.Context, userID string, groupID
 
 	if err := s.repo.CreateContribution(ctx, c); err != nil {
 		return nil, err
+	}
+
+	_ = s.repo.CreateAuditLog(ctx, domain.RotatingSavingsAuditLog{
+		ID:      uuid.New().String(),
+		UserID:  userID,
+		GroupID: &groupID,
+		Action:  "contribution_created",
+		Details: map[string]any{
+			"cycle_no": c.CycleNo,
+			"kind":     c.Kind,
+			"amount":   c.Amount,
+			"note":     c.Note,
+		},
+		CreatedAt: time.Now(),
+	})
+
+	// 1. Get all contributions to check completions
+	history, err := s.repo.ListContributions(ctx, userID, groupID)
+	if err == nil {
+		group, err := s.repo.GetGroup(ctx, userID, groupID)
+		if err == nil {
+			completedCycles := make(map[int]bool)
+			for _, item := range history {
+				if item.CycleNo != nil {
+					completedCycles[*item.CycleNo] = true
+				}
+			}
+			if len(completedCycles) >= group.MemberCount {
+				group.Status = "completed"
+				group.UpdatedAt = time.Now()
+				_ = s.repo.UpdateGroup(ctx, *group)
+			}
+		}
 	}
 
 	return &c, nil

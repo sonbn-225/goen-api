@@ -2954,6 +2954,9 @@ const docTemplate = `{
                 "client_id": {
                     "type": "string"
                 },
+                "contact_id": {
+                    "type": "string"
+                },
                 "direction": {
                     "type": "string"
                 },
@@ -3163,6 +3166,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "closed_at": {
+                    "type": "string"
+                },
+                "contact_avatar_url": {
+                    "type": "string"
+                },
+                "contact_id": {
+                    "type": "string"
+                },
+                "contact_name": {
                     "type": "string"
                 },
                 "created_at": {
@@ -3408,7 +3420,10 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
-                "name": {
+                "name_en": {
+                    "type": "string"
+                },
+                "name_vi": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -3527,6 +3542,12 @@ const docTemplate = `{
                 },
                 "note": {
                     "type": "string"
+                },
+                "tag_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -3810,11 +3831,11 @@ const docTemplate = `{
                 "group": {
                     "$ref": "#/definitions/domain.RotatingSavingsGroup"
                 },
-                "net_position": {
-                    "type": "number"
-                },
                 "next_due_date": {
                     "type": "string"
+                },
+                "remaining_amount": {
+                    "type": "number"
                 },
                 "total_cycles": {
                     "type": "integer"
@@ -3900,7 +3921,10 @@ const docTemplate = `{
                 "color": {
                     "type": "string"
                 },
-                "name": {
+                "name_en": {
+                    "type": "string"
+                },
+                "name_vi": {
                     "type": "string"
                 }
             }
@@ -3978,6 +4002,9 @@ const docTemplate = `{
                 "from_amount": {
                     "type": "string"
                 },
+                "lang": {
+                    "type": "string"
+                },
                 "line_items": {
                     "type": "array",
                     "items": {
@@ -4021,6 +4048,12 @@ const docTemplate = `{
                 },
                 "note": {
                     "type": "string"
+                },
+                "tag_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -4049,6 +4082,12 @@ const docTemplate = `{
                 },
                 "note": {
                     "type": "string"
+                },
+                "tag_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -4098,6 +4137,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/transaction.GroupParticipantInput"
                     }
+                },
+                "lang": {
+                    "type": "string"
                 },
                 "line_items": {
                     "type": "array",

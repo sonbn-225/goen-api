@@ -2,8 +2,6 @@
 package group_expense
 
 import (
-	"context"
-
 	"github.com/sonbn-225/goen-api/internal/domain"
 )
 
@@ -12,17 +10,14 @@ type Module struct {
 	Handler *Handler
 }
 
-type TransactionServiceInterface interface {
-	Get(ctx context.Context, userID, transactionID string) (*domain.Transaction, error)
-}
-
 type ModuleDeps struct {
-	Repo  domain.GroupExpenseRepository
-	TxSvc TransactionServiceInterface
+	Repo    domain.GroupExpenseRepository
+	TxSvc   TransactionServiceInterface
+	DebtSvc DebtServiceInterface
 }
 
 func NewModule(deps ModuleDeps) *Module {
-	svc := NewService(deps.TxSvc, deps.Repo)
+	svc := NewService(deps.TxSvc, deps.DebtSvc, deps.Repo)
 	h := NewHandler(svc)
 	return &Module{Service: svc, Handler: h}
 }

@@ -10,11 +10,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/apperrors"
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/modules/debt"
 )
 
 type ParticipantRequest struct {
 	Name           string `json:"name"`
 	OriginalAmount string `json:"original_amount"`
+	CreateDebt     bool   `json:"create_debt"`
 }
 
 type CreateRequest struct {
@@ -46,12 +48,21 @@ type SettleRequest struct {
 }
 
 type Service struct {
-	txSvc TransactionServiceInterface
-	repo  domain.GroupExpenseRepository
+	txSvc   TransactionServiceInterface
+	debtSvc DebtServiceInterface
+	repo    domain.GroupExpenseRepository
 }
 
-func NewService(txSvc TransactionServiceInterface, repo domain.GroupExpenseRepository) *Service {
-	return &Service{txSvc: txSvc, repo: repo}
+type TransactionServiceInterface interface {
+	Get(ctx context.Context, userID, transactionID string) (*domain.Transaction, error)
+}
+
+type DebtServiceInterface interface {
+	Create(ctx context.Context, userID string, req debt.CreateRequest) (*domain.Debt, error)
+}
+
+func NewService(txSvc TransactionServiceInterface, debtSvc DebtServiceInterface, repo domain.GroupExpenseRepository) *Service {
+	return &Service{txSvc: txSvc, debtSvc: debtSvc, repo: repo}
 }
 
 func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) (*CreateResponse, error) {
@@ -86,6 +97,7 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 		name        *string
 		original    *big.Rat
 		originalStr string
+		createDebt  bool
 	}
 	involved := []person{}
 
@@ -122,7 +134,7 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 			continue
 		}
 		name := n
-		involved = append(involved, person{name: &name, original: r, originalStr: r.FloatString(2)})
+		involved = append(involved, person{name: &name, original: r, originalStr: r.FloatString(2), createDebt: p.CreateDebt})
 	}
 
 	if len(involved) == 0 {
@@ -237,7 +249,41 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 	if err != nil {
 		return nil, err
 	}
+
+	// Create associated debts for all participants.
+	for i, p := range involved {
+		if p.name == nil {
+			continue
+		}
+		share := shares[i]
+		if share.Sign() <= 0 {
+			continue
+		}
+
+		// Use 2099-12-31 as "forever" due date for debts with no fixed term.
+		foreverDate := "2099-12-31"
+		debtName := *p.name
+		if tx.Description != nil && *tx.Description != "" {
+			debtName = *tx.Description + " (" + debtName + ")"
+		}
+
+		_, _ = s.debtSvc.Create(ctx, userID, debt.CreateRequest{
+			AccountID:    accountID,
+			Direction:    "lent",
+			Name:         &debtName,
+			Principal:    formatRatDecimalScale(share, 2),
+			StartDate:    occurredDate,
+			DueDate:      foreverDate,
+			InterestRate: pointer("0"),
+			Status:       pointer("active"),
+		})
+	}
+
 	return &CreateResponse{Transaction: *createdTx, Participants: createdParticipants}, nil
+}
+
+func pointer[T any](v T) *T {
+	return &v
 }
 
 func (s *Service) ListByTransaction(ctx context.Context, userID, transactionID string) ([]domain.GroupExpenseParticipant, error) {

@@ -15,9 +15,10 @@ import (
 
 // CreateLineItemRequest contains line item create parameters.
 type CreateLineItemRequest struct {
-	CategoryID *string `json:"category_id,omitempty"`
-	Amount     string  `json:"amount"`
-	Note       *string `json:"note,omitempty"`
+	CategoryID *string  `json:"category_id,omitempty"`
+	TagIDs     []string `json:"tag_ids,omitempty"`
+	Amount     string   `json:"amount"`
+	Note       *string  `json:"note,omitempty"`
 }
 
 // CreateRequest contains transaction create parameters.
@@ -39,6 +40,7 @@ type CreateRequest struct {
 	CategoryID    *string                 `json:"category_id,omitempty"`
 	TagIDs        []string                `json:"tag_ids,omitempty"`
 	LineItems     []CreateLineItemRequest `json:"line_items,omitempty"`
+	Lang          string                  `json:"lang,omitempty"`
 }
 
 // ListRequest contains transaction list filters.
@@ -65,6 +67,7 @@ type PatchRequest struct {
 	OccurredAt        *string                  `json:"occurred_at,omitempty"`
 	LineItems         *[]LineItemInput         `json:"line_items,omitempty"`
 	GroupParticipants *[]GroupParticipantInput `json:"group_participants,omitempty"`
+	Lang              string                   `json:"lang,omitempty"`
 }
 
 type BatchPatchRequest struct {
@@ -83,9 +86,10 @@ type BatchPatchResult struct {
 
 // LineItemInput is the line item payload for patch.
 type LineItemInput struct {
-	CategoryID *string `json:"category_id,omitempty"`
-	Amount     string  `json:"amount"`
-	Note       *string `json:"note,omitempty"`
+	CategoryID *string  `json:"category_id,omitempty"`
+	TagIDs     []string `json:"tag_ids,omitempty"`
+	Amount     string   `json:"amount"`
+	Note       *string  `json:"note,omitempty"`
 }
 
 // GroupParticipantInput is the group participant payload for patch.
@@ -100,11 +104,16 @@ type Service struct {
 	repo         domain.TransactionRepository
 	categoryRepo domain.CategoryRepository
 	accountRepo  domain.AccountRepository
+	tagService   TagService
+}
+
+type TagService interface {
+	GetOrCreateByName(ctx context.Context, userID, name, langHint string) (string, error)
 }
 
 // NewService creates a new transaction service.
-func NewService(repo domain.TransactionRepository, categoryRepo domain.CategoryRepository, accountRepo domain.AccountRepository) *Service {
-	return &Service{repo: repo, categoryRepo: categoryRepo, accountRepo: accountRepo}
+func NewService(repo domain.TransactionRepository, categoryRepo domain.CategoryRepository, accountRepo domain.AccountRepository, tagService TagService) *Service {
+	return &Service{repo: repo, categoryRepo: categoryRepo, accountRepo: accountRepo, tagService: tagService}
 }
 
 type ImportGoenV1Result struct {
@@ -323,7 +332,28 @@ func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) 
 		return nil, err
 	}
 
-	tagIDs := normalizeTagIDs(req.TagIDs)
+	tagIDs, err := s.ensureTags(ctx, userID, req.TagIDs, req.Lang)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range lineItems {
+		var reqLi *CreateLineItemRequest
+		if i < len(req.LineItems) {
+			reqLi = &req.LineItems[i]
+		} else if i == 0 && req.CategoryID != nil {
+			// case where CategoryID was top-level
+		}
+
+		if reqLi != nil {
+			liTags, err := s.ensureTags(ctx, userID, reqLi.TagIDs, req.Lang)
+			if err != nil {
+				return nil, err
+			}
+			lineItems[i].TagIDs = liTags
+		}
+	}
+
 	if err := s.repo.CreateTransaction(ctx, userID, tx, lineItems, tagIDs); err != nil {
 		if errors.Is(err, apperrors.ErrTransactionForbidden) {
 			return nil, apperrors.Wrap(apperrors.KindForbidden, "forbidden", err)
@@ -492,9 +522,15 @@ func (s *Service) buildTransactionPatch(ctx context.Context, userID, transaction
 			}
 			sum.Add(sum, r)
 
+			liID := uuid.NewString()
+			liTags, err := s.ensureTags(ctx, userID, li.TagIDs, req.Lang)
+			if err != nil {
+				return domain.TransactionPatch{}, err
+			}
 			items[i] = domain.TransactionLineItem{
-				ID:         uuid.NewString(),
+				ID:         liID,
 				CategoryID: li.CategoryID,
+				TagIDs:     liTags,
 				Amount:     liAmt,
 				Note:       li.Note,
 			}
@@ -540,7 +576,47 @@ func (s *Service) buildTransactionPatch(ctx context.Context, userID, transaction
 		}
 	}
 
+	if req.TagIDs != nil {
+		resolved, err := s.ensureTags(ctx, userID, req.TagIDs, req.Lang)
+		if err != nil {
+			return domain.TransactionPatch{}, err
+		}
+		patch.TagIDs = resolved
+	}
+
 	return patch, nil
+}
+
+func (s *Service) ensureTags(ctx context.Context, userID string, inputs []string, lang string) ([]string, error) {
+	if len(inputs) == 0 {
+		return []string{}, nil
+	}
+
+	if lang == "" {
+		lang = "en"
+	}
+
+	out := make([]string, 0, len(inputs))
+	for _, input := range inputs {
+		trimmed := strings.TrimSpace(input)
+		if trimmed == "" {
+			continue
+		}
+
+		// If it's a UUID, assume it's an existing ID.
+		if _, err := uuid.Parse(trimmed); err == nil {
+			out = append(out, trimmed)
+			continue
+		}
+
+		// Otherwise, it's a target label name to get-or-create.
+		id, err := s.tagService.GetOrCreateByName(ctx, userID, trimmed, lang)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, nil
 }
 
 func (s *Service) BatchPatch(ctx context.Context, userID string, req BatchPatchRequest) (*BatchPatchResult, error) {

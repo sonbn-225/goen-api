@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/sonbn-225/goen-api/internal/domain"
+	"github.com/sonbn-225/goen-api/internal/modules/contact"
 )
 
 // Module represents the debt module.
@@ -20,13 +21,14 @@ type TransactionServiceInterface interface {
 
 // ModuleDeps contains dependencies for the debt module.
 type ModuleDeps struct {
-	Repo  domain.DebtRepository
-	TxSvc TransactionServiceInterface
+	Repo       domain.DebtRepository
+	TxSvc      TransactionServiceInterface
+	ContactSvc *contact.Service
 }
 
 // NewModule creates a new debt module.
 func NewModule(deps ModuleDeps) *Module {
-	svc := NewService(deps.TxSvc, deps.Repo)
+	svc := NewService(deps.TxSvc, deps.Repo, deps.ContactSvc)
 	h := NewHandler(svc)
 
 	return &Module{
