@@ -3,10 +3,10 @@ package v1
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
-	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
@@ -31,6 +31,7 @@ func (h *AccountHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 		r.Patch("/accounts/{accountId}", h.Patch)
 		r.Delete("/accounts/{accountId}", h.Delete)
 		r.Get("/accounts/{accountId}/shares", h.ListShares)
+		r.Get("/accounts/{accountId}/audit-events", h.ListAuditEvents)
 		r.Put("/accounts/{accountId}/shares", h.UpsertShare)
 		r.Delete("/accounts/{accountId}/shares/{userId}", h.RevokeShare)
 	})
@@ -119,6 +120,11 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if acc == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "account not found", nil)
+		return
+	}
+
 	response.WriteSuccess(w, http.StatusOK, acc)
 }
 
@@ -130,7 +136,7 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param accountId path string true "Account ID"
-// @Param request body entity.AccountPatch true "Account Patch Payload"
+// @Param request body dto.PatchAccountRequest true "Account Patch Payload"
 // @Success 200 {object} response.SuccessEnvelope{data=dto.AccountResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
@@ -143,15 +149,20 @@ func (h *AccountHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accountID := chi.URLParam(r, "accountId")
-	var patch entity.AccountPatch
-	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+	var req dto.PatchAccountRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json body", nil)
 		return
 	}
 
-	acc, err := h.svc.Patch(r.Context(), userID, accountID, patch)
+	acc, err := h.svc.Patch(r.Context(), userID, accountID, req)
 	if err != nil {
 		response.WriteInternalError(w, err)
+		return
+	}
+
+	if acc == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "account not found", nil)
 		return
 	}
 
@@ -190,8 +201,6 @@ func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // @Tags Accounts
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} response.SuccessEnvelope{data=[]dto.AccountBalanceResponse}
-// @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts/balances [get]
 func (h *AccountHandler) ListBalances(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
@@ -236,6 +245,45 @@ func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
 	response.WriteSuccess(w, http.StatusOK, items)
 }
 
+// ListAuditEvents godoc
+// @Summary List Account Audit Events
+// @Description List recent audit events for an account visible to the current user
+// @Tags Accounts
+// @Produce json
+// @Security BearerAuth
+// @Param accountId path string true "Account ID"
+// @Param limit query int false "Max number of events" default(50)
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.AccountAuditEventResponse}
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /accounts/{accountId}/audit-events [get]
+func (h *AccountHandler) ListAuditEvents(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
+
+	accountID := chi.URLParam(r, "accountId")
+	limit := 50
+	if rawLimit := r.URL.Query().Get("limit"); rawLimit != "" {
+		parsedLimit, err := strconv.Atoi(rawLimit)
+		if err != nil {
+			response.WriteError(w, http.StatusBadRequest, "validation_error", "limit must be an integer", nil)
+			return
+		}
+		limit = parsedLimit
+	}
+
+	items, err := h.svc.ListAuditEvents(r.Context(), userID, accountID, limit)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+
+	response.WriteSuccess(w, http.StatusOK, items)
+}
+
 // UpsertShare godoc
 // @Summary Upsert Account Share
 // @Description Add or update view/admin permissions for another user on an account
@@ -245,7 +293,7 @@ func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Param accountId path string true "Account ID"
 // @Param request body dto.UpsertShareRequest true "Upsert Share Payload"
-// @Success 200 {object} response.SuccessEnvelope{data=object}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.AccountShareResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId}/shares [put]

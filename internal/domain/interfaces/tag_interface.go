@@ -14,8 +14,8 @@ type TagRepository interface {
 }
 
 type TagService interface {
-	Create(ctx context.Context, userID string, req dto.CreateTagRequest) (*entity.Tag, error)
-	Get(ctx context.Context, userID, tagID string) (*entity.Tag, error)
-	List(ctx context.Context, userID string) ([]entity.Tag, error)
+	Create(ctx context.Context, userID string, req dto.CreateTagRequest) (*dto.TagResponse, error)
+	Get(ctx context.Context, userID, tagID string) (*dto.TagResponse, error)
+	List(ctx context.Context, userID string) ([]dto.TagResponse, error)
 	GetOrCreateByName(ctx context.Context, userID, name, langHint string) (string, error)
 }

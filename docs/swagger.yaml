@@ -1,12 +1,23 @@
 basePath: /api/v1
 definitions:
-  dto.AccountBalanceResponse:
+  dto.AccountAuditEventResponse:
     properties:
       account_id:
         type: string
-      balance:
+      action:
         type: string
-      currency:
+      actor_user_id:
+        type: string
+      diff:
+        additionalProperties: {}
+        type: object
+      entity_id:
+        type: string
+      entity_type:
+        type: string
+      id:
+        type: string
+      occurred_at:
         type: string
     type: object
   dto.AccountResponse:
@@ -19,11 +30,7 @@ definitions:
         type: string
       client_id:
         type: string
-      closed_at:
-        type: string
       color:
-        type: string
-      created_at:
         type: string
       currency:
         type: string
@@ -36,8 +43,6 @@ definitions:
       parent_account_id:
         type: string
       status:
-        type: string
-      updated_at:
         type: string
     type: object
   dto.AccountShareResponse:
@@ -105,6 +110,75 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  dto.BudgetWithStatsResponse:
+    properties:
+      alert_threshold_percent:
+        type: integer
+      amount:
+        type: string
+      category_id:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      percent_used:
+        type: integer
+      period:
+        type: string
+      period_end:
+        type: string
+      period_start:
+        type: string
+      remaining:
+        type: string
+      rollover_mode:
+        type: string
+      spent:
+        type: string
+      user_id:
+        type: string
+    type: object
+  dto.CategoryResponse:
+    properties:
+      color:
+        type: string
+      icon:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      parent_category_id:
+        type: string
+      sort_order:
+        type: integer
+      type:
+        type: string
+    type: object
+  dto.ContactResponse:
+    properties:
+      avatar_url:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      linked_avatar_url:
+        type: string
+      linked_display_name:
+        type: string
+      linked_user_id:
+        type: string
+      name:
+        type: string
+      notes:
+        type: string
+      phone:
+        type: string
+      user_id:
+        type: string
     type: object
   dto.CreateAccountRequest:
     properties:
@@ -222,6 +296,15 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  dto.CreateGroupExpenseResponse:
+    properties:
+      participants:
+        items:
+          $ref: '#/definitions/dto.GroupExpenseParticipantResponse'
+        type: array
+      transaction:
+        $ref: '#/definitions/dto.TransactionResponse'
     type: object
   dto.CreateLineItemRequest:
     properties:
@@ -382,6 +465,21 @@ definitions:
       type:
         type: string
     type: object
+  dto.DebtPaymentLinkResponse:
+    properties:
+      created_at:
+        type: string
+      debt_id:
+        type: string
+      id:
+        type: string
+      interest_paid:
+        type: string
+      principal_paid:
+        type: string
+      transaction_id:
+        type: string
+    type: object
   dto.DebtPaymentRequest:
     properties:
       amount_paid:
@@ -396,6 +494,47 @@ definitions:
     required:
     - transaction_id
     type: object
+  dto.DebtResponse:
+    properties:
+      account_id:
+        type: string
+      accrued_interest:
+        type: string
+      client_id:
+        type: string
+      contact_avatar_url:
+        type: string
+      contact_id:
+        type: string
+      contact_name:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      direction:
+        type: string
+      due_date:
+        type: string
+      id:
+        type: string
+      interest_rate:
+        type: string
+      interest_rule:
+        type: string
+      name:
+        type: string
+      outstanding_principal:
+        type: string
+      principal:
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+      user_id:
+        type: string
+    type: object
   dto.GroupExpenseParticipantRequest:
     properties:
       create_debt:
@@ -403,6 +542,25 @@ definitions:
       name:
         type: string
       original_amount:
+        type: string
+    type: object
+  dto.GroupExpenseParticipantResponse:
+    properties:
+      id:
+        type: string
+      is_settled:
+        type: boolean
+      original_amount:
+        type: string
+      participant_name:
+        type: string
+      settlement_transaction_id:
+        type: string
+      share_amount:
+        type: string
+      transaction_id:
+        type: string
+      user_id:
         type: string
     type: object
   dto.GroupExpenseSettleRequest:
@@ -425,6 +583,40 @@ definitions:
       share_amount:
         type: string
     type: object
+  dto.HoldingResponse:
+    properties:
+      as_of:
+        type: string
+      avg_cost:
+        type: string
+      broker_account_id:
+        type: string
+      cost_basis_total:
+        type: string
+      id:
+        type: string
+      market_price:
+        type: string
+      market_value:
+        type: string
+      quantity:
+        type: string
+      security_id:
+        type: string
+      unrealized_pnl:
+        type: string
+    type: object
+  dto.InvestmentAccountResponse:
+    properties:
+      account_id:
+        type: string
+      currency:
+        type: string
+      fee_settings: {}
+      id:
+        type: string
+      tax_settings: {}
+    type: object
   dto.MarketSyncRequest:
     properties:
       force:
@@ -435,6 +627,15 @@ definitions:
         type: boolean
       include_prices:
         type: boolean
+    type: object
+  dto.PatchAccountRequest:
+    properties:
+      color:
+        type: string
+      name:
+        type: string
+      status:
+        type: string
     type: object
   dto.PatchInvestmentAccountRequest:
     properties:
@@ -459,6 +660,40 @@ definitions:
         type: string
       term_months:
         type: integer
+    type: object
+  dto.RealizedPNLReport:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.RealizedPNLReportItem'
+        type: array
+      total_gross:
+        type: string
+      total_net:
+        type: string
+    type: object
+  dto.RealizedPNLReportItem:
+    properties:
+      cost_basis:
+        type: string
+      dividend_gain:
+        type: string
+      fees:
+        type: string
+      gross_realized_gain:
+        type: string
+      net_pnl:
+        type: string
+      proceeds:
+        type: string
+      security_id:
+        type: string
+      symbol:
+        type: string
+      taxes:
+        type: string
+      trade_gain:
+        type: string
     type: object
   dto.RefreshEventRequest:
     properties:
@@ -500,6 +735,22 @@ definitions:
           type: string
         type: array
     type: object
+  dto.RotatingSavingsAuditLogResponse:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      details:
+        additionalProperties: {}
+        type: object
+      group_id:
+        type: string
+      id:
+        type: string
+      user_id:
+        type: string
+    type: object
   dto.RotatingSavingsContributionRequest:
     properties:
       account_id:
@@ -524,6 +775,220 @@ definitions:
       slots_taken:
         type: integer
     type: object
+  dto.RotatingSavingsContributionResponse:
+    properties:
+      amount:
+        type: number
+      collected_fee_per_slot:
+        type: number
+      cycle_no:
+        type: integer
+      due_date:
+        type: string
+      group_id:
+        type: string
+      id:
+        type: string
+      kind:
+        type: string
+      note:
+        type: string
+      slots_taken:
+        type: integer
+      transaction_id:
+        type: string
+    type: object
+  dto.RotatingSavingsGroupDetailResponse:
+    properties:
+      audit_logs:
+        items:
+          $ref: '#/definitions/dto.RotatingSavingsAuditLogResponse'
+        type: array
+      collected_slots_count:
+        type: integer
+      contributions:
+        items:
+          $ref: '#/definitions/dto.RotatingSavingsContributionResponse'
+        type: array
+      current_accrued_interest:
+        type: number
+      current_payout_value:
+        type: number
+      group:
+        $ref: '#/definitions/dto.RotatingSavingsGroupResponse'
+      next_payment:
+        type: number
+      remaining_amount:
+        type: number
+      schedule:
+        items:
+          $ref: '#/definitions/dto.RotatingSavingsScheduleCycle'
+        type: array
+      total_paid:
+        type: number
+      total_received:
+        type: number
+    type: object
+  dto.RotatingSavingsGroupResponse:
+    properties:
+      account_id:
+        type: string
+      contribution_amount:
+        type: number
+      currency:
+        type: string
+      cycle_frequency:
+        type: string
+      fixed_interest_amount:
+        type: number
+      id:
+        type: string
+      member_count:
+        type: integer
+      name:
+        type: string
+      payout_cycle_no:
+        type: integer
+      start_date:
+        type: string
+      status:
+        type: string
+      user_id:
+        type: string
+      user_slots:
+        type: integer
+    type: object
+  dto.RotatingSavingsGroupSummary:
+    properties:
+      completed_cycles:
+        type: integer
+      group:
+        $ref: '#/definitions/dto.RotatingSavingsGroupResponse'
+      next_due_date:
+        type: string
+      remaining_amount:
+        type: number
+      total_cycles:
+        type: integer
+      total_paid:
+        type: number
+      total_received:
+        type: number
+    type: object
+  dto.RotatingSavingsScheduleCycle:
+    properties:
+      accrued_interest:
+        type: number
+      contribution_id:
+        type: string
+      cycle_no:
+        type: integer
+      due_date:
+        type: string
+      expected_amount:
+        type: number
+      is_paid:
+        type: boolean
+      is_payout:
+        type: boolean
+      kind:
+        description: uncollected, partial_collected, collected
+        type: string
+      payout_amount:
+        type: number
+      payout_id:
+        type: string
+      payout_slots:
+        type: integer
+      user_collected_slots:
+        type: integer
+    type: object
+  dto.SavingsResponse:
+    properties:
+      accrued_interest:
+        type: string
+      auto_renew:
+        type: boolean
+      id:
+        type: string
+      interest_rate:
+        type: string
+      maturity_date:
+        type: string
+      parent_account_id:
+        type: string
+      principal:
+        type: string
+      savings_account_id:
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+      term_months:
+        type: integer
+    type: object
+  dto.SecurityEventResponse:
+    properties:
+      cash_amount_per_share:
+        type: string
+      currency:
+        type: string
+      effective_date:
+        type: string
+      event_type:
+        type: string
+      ex_date:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      pay_date:
+        type: string
+      ratio_denominator:
+        type: string
+      ratio_numerator:
+        type: string
+      record_date:
+        type: string
+      security_id:
+        type: string
+      subscription_price:
+        type: string
+    type: object
+  dto.SecurityPriceDailyResponse:
+    properties:
+      close:
+        type: string
+      high:
+        type: string
+      id:
+        type: string
+      low:
+        type: string
+      open:
+        type: string
+      price_date:
+        type: string
+      security_id:
+        type: string
+      volume:
+        type: string
+    type: object
+  dto.SecurityResponse:
+    properties:
+      asset_class:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      symbol:
+        type: string
+    type: object
   dto.SigninRequest:
     properties:
       login:
@@ -545,6 +1010,48 @@ definitions:
       phone:
         type: string
       username:
+        type: string
+    type: object
+  dto.TagResponse:
+    properties:
+      color:
+        type: string
+      id:
+        type: string
+      name_en:
+        type: string
+      name_vi:
+        type: string
+      user_id:
+        type: string
+    type: object
+  dto.TradeResponse:
+    properties:
+      broker_account_id:
+        type: string
+      client_id:
+        type: string
+      fee_transaction_id:
+        type: string
+      fees:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      price:
+        type: string
+      quantity:
+        type: string
+      security_id:
+        type: string
+      side:
+        type: string
+      tax_transaction_id:
+        type: string
+      taxes:
         type: string
     type: object
   dto.TransactionLineItemResponse:
@@ -613,8 +1120,6 @@ definitions:
         type: array
       client_id:
         type: string
-      created_at:
-        type: string
       description:
         type: string
       exchange_rate:
@@ -658,8 +1163,6 @@ definitions:
       to_currency:
         type: string
       type:
-        type: string
-      updated_at:
         type: string
     type: object
   dto.UpdateBudgetRequest:
@@ -723,8 +1226,6 @@ definitions:
     properties:
       avatar_url:
         type: string
-      created_at:
-        type: string
       display_name:
         type: string
       email:
@@ -738,386 +1239,8 @@ definitions:
       settings: {}
       status:
         type: string
-      updated_at:
-        type: string
       username:
         type: string
-    type: object
-  entity.Account:
-    properties:
-      account_number:
-        type: string
-      account_type:
-        type: string
-      balance:
-        description: Joined
-        type: string
-      client_id:
-        type: string
-      closed_at:
-        type: string
-      color:
-        type: string
-      created_at:
-        type: string
-      created_by:
-        type: string
-      currency:
-        type: string
-      deleted_at:
-        type: string
-      id:
-        type: string
-      investment_account_id:
-        description: Joined
-        type: string
-      name:
-        type: string
-      parent_account_id:
-        type: string
-      status:
-        type: string
-      updated_at:
-        type: string
-      updated_by:
-        type: string
-    type: object
-  entity.AccountPatch:
-    properties:
-      color:
-        type: string
-      name:
-        type: string
-      status:
-        type: string
-    type: object
-  entity.Budget:
-    properties:
-      alert_threshold_percent:
-        type: integer
-      amount:
-        type: string
-      category_id:
-        type: string
-      created_at:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
-      period:
-        description: month, week, custom
-        type: string
-      period_end:
-        type: string
-      period_start:
-        type: string
-      remaining:
-        type: string
-      rollover_mode:
-        type: string
-      spent:
-        description: Enriched fields
-        type: string
-      updated_at:
-        type: string
-      user_id:
-        type: string
-    type: object
-  entity.Category:
-    properties:
-      color:
-        type: string
-      created_at:
-        type: string
-      deleted_at:
-        type: string
-      icon:
-        type: string
-      id:
-        type: string
-      is_active:
-        type: boolean
-      parent_category_id:
-        type: string
-      sort_order:
-        type: integer
-      type:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  entity.Contact:
-    properties:
-      avatar_url:
-        type: string
-      created_at:
-        type: string
-      deleted_at:
-        type: string
-      email:
-        type: string
-      id:
-        type: string
-      linked_avatar_url:
-        type: string
-      linked_display_name:
-        type: string
-      linked_user_id:
-        type: string
-      name:
-        type: string
-      notes:
-        type: string
-      phone:
-        type: string
-      updated_at:
-        type: string
-      user_id:
-        type: string
-    type: object
-  entity.Debt:
-    properties:
-      account_id:
-        type: string
-      accrued_interest:
-        type: string
-      client_id:
-        type: string
-      closed_at:
-        type: string
-      contact_avatar_url:
-        type: string
-      contact_id:
-        type: string
-      contact_name:
-        type: string
-      created_at:
-        type: string
-      currency:
-        type: string
-      direction:
-        description: lent, borrowed
-        type: string
-      due_date:
-        type: string
-      id:
-        type: string
-      interest_rate:
-        type: string
-      interest_rule:
-        type: string
-      name:
-        type: string
-      outstanding_principal:
-        type: string
-      principal:
-        type: string
-      start_date:
-        type: string
-      status:
-        description: active, paid, cancelled
-        type: string
-      updated_at:
-        type: string
-      user_id:
-        type: string
-    type: object
-  entity.Savings:
-    properties:
-      accrued_interest:
-        type: string
-      auto_renew:
-        type: boolean
-      closed_at:
-        type: string
-      created_at:
-        type: string
-      id:
-        type: string
-      interest_rate:
-        type: string
-      maturity_date:
-        type: string
-      parent_account_id:
-        type: string
-      principal:
-        type: string
-      savings_account_id:
-        type: string
-      start_date:
-        type: string
-      status:
-        type: string
-      term_months:
-        type: integer
-      updated_at:
-        type: string
-    type: object
-  entity.Security:
-    properties:
-      asset_class:
-        type: string
-      created_at:
-        type: string
-      currency:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
-      symbol:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  entity.Tag:
-    properties:
-      color:
-        type: string
-      created_at:
-        type: string
-      id:
-        type: string
-      name_en:
-        type: string
-      name_vi:
-        type: string
-      updated_at:
-        type: string
-      user_id:
-        type: string
-    type: object
-  entity.Trade:
-    properties:
-      broker_account_id:
-        type: string
-      client_id:
-        type: string
-      created_at:
-        type: string
-      fee_transaction_id:
-        type: string
-      fees:
-        type: string
-      id:
-        type: string
-      note:
-        type: string
-      occurred_at:
-        type: string
-      price:
-        type: string
-      quantity:
-        type: string
-      security_id:
-        type: string
-      side:
-        description: buy, sell
-        type: string
-      tax_transaction_id:
-        type: string
-      taxes:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  entity.Transaction:
-    properties:
-      account_currency:
-        description: Currencies are derived from linked accounts (not stored on transactions).
-        type: string
-      account_id:
-        type: string
-      amount:
-        type: string
-      category_colors:
-        items:
-          type: string
-        type: array
-      category_ids:
-        items:
-          type: string
-        type: array
-      category_names:
-        description: Wrapper fields (enriched)
-        items:
-          type: string
-        type: array
-      client_id:
-        type: string
-      created_at:
-        type: string
-      created_by:
-        type: string
-      deleted_at:
-        type: string
-      description:
-        type: string
-      exchange_rate:
-        type: string
-      external_ref:
-        type: string
-      from_account_id:
-        type: string
-      from_amount:
-        description: For FX transfers, amounts can differ per side.
-        type: string
-      from_currency:
-        type: string
-      id:
-        type: string
-      line_items:
-        items:
-          $ref: '#/definitions/entity.TransactionLineItem'
-        type: array
-      occurred_at:
-        type: string
-      occurred_date:
-        type: string
-      status:
-        description: pending, posted, cancelled
-        type: string
-      tag_colors:
-        items:
-          type: string
-        type: array
-      tag_ids:
-        items:
-          type: string
-        type: array
-      tag_names:
-        items:
-          type: string
-        type: array
-      to_account_id:
-        type: string
-      to_amount:
-        type: string
-      to_currency:
-        type: string
-      type:
-        description: expense, income, transfer
-        type: string
-      updated_at:
-        type: string
-      updated_by:
-        type: string
-    type: object
-  entity.TransactionLineItem:
-    properties:
-      amount:
-        type: string
-      category_id:
-        type: string
-      id:
-        type: string
-      note:
-        type: string
-      tag_ids:
-        items:
-          type: string
-        type: array
     type: object
   response.ErrorBody:
     properties:
@@ -1280,7 +1403,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/entity.AccountPatch'
+          $ref: '#/definitions/dto.PatchAccountRequest'
       produces:
       - application/json
       responses:
@@ -1304,6 +1427,48 @@ paths:
       security:
       - BearerAuth: []
       summary: Update Account
+      tags:
+      - Accounts
+  /accounts/{accountId}/audit-events:
+    get:
+      description: List recent audit events for an account visible to the current
+        user
+      parameters:
+      - description: Account ID
+        in: path
+        name: accountId
+        required: true
+        type: string
+      - default: 50
+        description: Max number of events
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.AccountAuditEventResponse'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List Account Audit Events
       tags:
       - Accounts
   /accounts/{accountId}/shares:
@@ -1364,7 +1529,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  type: object
+                  $ref: '#/definitions/dto.AccountShareResponse'
               type: object
         "400":
           description: Bad Request
@@ -1410,22 +1575,7 @@ paths:
       description: Get current financial balance calculations for each account
       produces:
       - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/response.SuccessEnvelope'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/dto.AccountBalanceResponse'
-                  type: array
-              type: object
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
+      responses: {}
       security:
       - BearerAuth: []
       summary: List Account Balances
@@ -1583,7 +1733,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/entity.Budget'
+                    $ref: '#/definitions/dto.BudgetWithStatsResponse'
                   type: array
               type: object
         "401":
@@ -1616,7 +1766,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Budget'
+                  $ref: '#/definitions/dto.BudgetWithStatsResponse'
               type: object
         "400":
           description: Bad Request
@@ -1674,7 +1824,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Budget'
+                  $ref: '#/definitions/dto.BudgetWithStatsResponse'
               type: object
         "401":
           description: Unauthorized
@@ -1715,7 +1865,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Budget'
+                  $ref: '#/definitions/dto.BudgetWithStatsResponse'
               type: object
         "400":
           description: Bad Request
@@ -1749,7 +1899,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/entity.Category'
+                    $ref: '#/definitions/dto.CategoryResponse'
                   type: array
               type: object
         "401":
@@ -1780,7 +1930,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Category'
+                  $ref: '#/definitions/dto.CategoryResponse'
               type: object
         "400":
           description: Bad Request
@@ -1813,7 +1963,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/entity.Contact'
+                    $ref: '#/definitions/dto.ContactResponse'
                   type: array
               type: object
         "401":
@@ -1846,7 +1996,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Contact'
+                  $ref: '#/definitions/dto.ContactResponse'
               type: object
         "400":
           description: Bad Request
@@ -1904,7 +2054,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Contact'
+                  $ref: '#/definitions/dto.ContactResponse'
               type: object
         "401":
           description: Unauthorized
@@ -1945,7 +2095,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Contact'
+                  $ref: '#/definitions/dto.ContactResponse'
               type: object
         "400":
           description: Bad Request
@@ -1978,7 +2128,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/entity.Debt'
+                    $ref: '#/definitions/dto.DebtResponse'
                   type: array
               type: object
         "401":
@@ -2011,7 +2161,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Debt'
+                  $ref: '#/definitions/dto.DebtResponse'
               type: object
         "400":
           description: Bad Request
@@ -2069,7 +2219,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Debt'
+                  $ref: '#/definitions/dto.DebtResponse'
               type: object
         "401":
           description: Unauthorized
@@ -2110,7 +2260,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Debt'
+                  $ref: '#/definitions/dto.DebtResponse'
               type: object
         "400":
           description: Bad Request
@@ -2149,7 +2299,7 @@ paths:
             - properties:
                 data:
                   items:
-                    type: object
+                    $ref: '#/definitions/dto.DebtPaymentLinkResponse'
                   type: array
               type: object
         "401":
@@ -2192,7 +2342,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  type: object
+                  $ref: '#/definitions/dto.DebtResponse'
               type: object
         "400":
           description: Bad Request
@@ -2256,7 +2406,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Transaction'
+                  $ref: '#/definitions/dto.CreateGroupExpenseResponse'
               type: object
         "400":
           description: Bad Request
@@ -2322,7 +2472,7 @@ paths:
             - properties:
                 data:
                   items:
-                    type: object
+                    $ref: '#/definitions/dto.GroupExpenseParticipantResponse'
                   type: array
               type: object
         "400":
@@ -2366,7 +2516,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Transaction'
+                  $ref: '#/definitions/dto.TransactionResponse'
               type: object
         "400":
           description: Bad Request
@@ -2408,7 +2558,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/entity.Account'
+                    $ref: '#/definitions/dto.InvestmentAccountResponse'
                   type: array
               type: object
         "500":
@@ -2439,7 +2589,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Account'
+                  $ref: '#/definitions/dto.InvestmentAccountResponse'
               type: object
         "500":
           description: Internal Server Error
@@ -2477,7 +2627,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Account'
+                  $ref: '#/definitions/dto.InvestmentAccountResponse'
               type: object
         "400":
           description: Bad Request
@@ -2512,7 +2662,7 @@ paths:
             - properties:
                 data:
                   items:
-                    type: object
+                    $ref: '#/definitions/dto.HoldingResponse'
                   type: array
               type: object
         "500":
@@ -2543,7 +2693,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  type: object
+                  $ref: '#/definitions/dto.RealizedPNLReport'
               type: object
         "500":
           description: Internal Server Error
@@ -2574,7 +2724,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/entity.Trade'
+                    $ref: '#/definitions/dto.TradeResponse'
                   type: array
               type: object
         "500":
@@ -2612,7 +2762,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Trade'
+                  $ref: '#/definitions/dto.TradeResponse'
               type: object
         "400":
           description: Bad Request
@@ -2695,7 +2845,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Trade'
+                  $ref: '#/definitions/dto.TradeResponse'
               type: object
         "400":
           description: Bad Request
@@ -3152,7 +3302,7 @@ paths:
             - properties:
                 data:
                   items:
-                    type: object
+                    $ref: '#/definitions/dto.RotatingSavingsGroupSummary'
                   type: array
               type: object
         "500":
@@ -3185,7 +3335,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  type: object
+                  $ref: '#/definitions/dto.RotatingSavingsGroupResponse'
               type: object
         "400":
           description: Bad Request
@@ -3250,7 +3400,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  type: object
+                  $ref: '#/definitions/dto.RotatingSavingsGroupDetailResponse'
               type: object
         "500":
           description: Internal Server Error
@@ -3287,7 +3437,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  type: object
+                  $ref: '#/definitions/dto.RotatingSavingsGroupResponse'
               type: object
         "400":
           description: Bad Request
@@ -3329,7 +3479,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  type: object
+                  $ref: '#/definitions/dto.RotatingSavingsContributionResponse'
               type: object
         "400":
           description: Bad Request
@@ -3395,7 +3545,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/entity.Savings'
+                    $ref: '#/definitions/dto.SavingsResponse'
                   type: array
               type: object
         "500":
@@ -3428,7 +3578,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Savings'
+                  $ref: '#/definitions/dto.SavingsResponse'
               type: object
         "400":
           description: Bad Request
@@ -3493,7 +3643,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Savings'
+                  $ref: '#/definitions/dto.SavingsResponse'
               type: object
         "404":
           description: Not Found
@@ -3530,7 +3680,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Savings'
+                  $ref: '#/definitions/dto.SavingsResponse'
               type: object
         "400":
           description: Bad Request
@@ -3559,7 +3709,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/entity.Security'
+                    $ref: '#/definitions/dto.SecurityResponse'
                   type: array
               type: object
         "500":
@@ -3703,7 +3853,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Security'
+                  $ref: '#/definitions/dto.SecurityResponse'
               type: object
         "500":
           description: Internal Server Error
@@ -3740,7 +3890,7 @@ paths:
             - properties:
                 data:
                   items:
-                    type: object
+                    $ref: '#/definitions/dto.SecurityEventResponse'
                   type: array
               type: object
         "500":
@@ -3778,7 +3928,7 @@ paths:
             - properties:
                 data:
                   items:
-                    type: object
+                    $ref: '#/definitions/dto.SecurityPriceDailyResponse'
                   type: array
               type: object
         "500":
@@ -3840,7 +3990,7 @@ paths:
             - properties:
                 data:
                   items:
-                    $ref: '#/definitions/entity.Tag'
+                    $ref: '#/definitions/dto.TagResponse'
                   type: array
               type: object
         "401":
@@ -3873,7 +4023,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Tag'
+                  $ref: '#/definitions/dto.TagResponse'
               type: object
         "400":
           description: Bad Request
@@ -3907,7 +4057,7 @@ paths:
             - $ref: '#/definitions/response.SuccessEnvelope'
             - properties:
                 data:
-                  $ref: '#/definitions/entity.Tag'
+                  $ref: '#/definitions/dto.TagResponse'
               type: object
         "400":
           description: Bad Request

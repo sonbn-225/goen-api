@@ -309,8 +309,6 @@ func (s *AuthService) mapToUserResponse(user entity.User) dto.UserResponse {
 		PublicShareURL: user.PublicShareURL,
 		Settings:       user.Settings,
 		Status:         user.Status,
-		CreatedAt:      user.CreatedAt,
-		UpdatedAt:      user.UpdatedAt,
 	}
 }
 

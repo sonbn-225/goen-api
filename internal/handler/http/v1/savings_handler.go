@@ -13,7 +13,7 @@ import (
 )
 
 type SavingsHandler struct {
-	savingsSvc interfaces.SavingsService
+	savingsSvc  interfaces.SavingsService
 	rotatingSvc interfaces.RotatingSavingsService
 }
 
@@ -44,7 +44,7 @@ func (h *SavingsHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 			r.Get("/", h.GetRotatingGroupDetail)
 			r.Patch("/", h.UpdateRotatingGroup)
 			r.Delete("/", h.DeleteRotatingGroup)
-			
+
 			r.Post("/contributions", h.CreateContribution)
 			r.Delete("/contributions/{contributionId}", h.DeleteContribution)
 		})
@@ -58,7 +58,7 @@ func (h *SavingsHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags Savings
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} response.SuccessEnvelope{data=[]entity.Savings}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.SavingsResponse}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /savings [get]
 func (h *SavingsHandler) ListSavings(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +69,7 @@ func (h *SavingsHandler) ListSavings(w http.ResponseWriter, r *http.Request) {
 	}
 	items, err := h.savingsSvc.ListSavings(r.Context(), userID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, items)
@@ -83,7 +83,7 @@ func (h *SavingsHandler) ListSavings(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateSavingsRequest true "Savings Creation Payload"
-// @Success 201 {object} response.SuccessEnvelope{data=entity.Savings}
+// @Success 201 {object} response.SuccessEnvelope{data=dto.SavingsResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /savings [post]
@@ -100,7 +100,7 @@ func (h *SavingsHandler) CreateSavings(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := h.savingsSvc.CreateSavings(r.Context(), userID, req)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusCreated, item)
@@ -113,7 +113,7 @@ func (h *SavingsHandler) CreateSavings(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Savings ID"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Savings}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.SavingsResponse}
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /savings/{id} [get]
 func (h *SavingsHandler) GetSavings(w http.ResponseWriter, r *http.Request) {
@@ -125,7 +125,7 @@ func (h *SavingsHandler) GetSavings(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	item, err := h.savingsSvc.GetSavings(r.Context(), userID, id)
 	if err != nil {
-		response.WriteError(w, http.StatusNotFound, "not_found", "Savings not found", nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, item)
@@ -140,7 +140,7 @@ func (h *SavingsHandler) GetSavings(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Param id path string true "Savings ID"
 // @Param request body dto.PatchSavingsRequest true "Savings Update Payload"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Savings}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.SavingsResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /savings/{id} [patch]
@@ -158,7 +158,7 @@ func (h *SavingsHandler) PatchSavings(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := h.savingsSvc.PatchSavings(r.Context(), userID, id, req)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, item)
@@ -182,7 +182,7 @@ func (h *SavingsHandler) DeleteSavings(w http.ResponseWriter, r *http.Request) {
 	}
 	id := chi.URLParam(r, "id")
 	if err := h.savingsSvc.DeleteSavings(r.Context(), userID, id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Savings deleted"})
@@ -195,7 +195,7 @@ func (h *SavingsHandler) DeleteSavings(w http.ResponseWriter, r *http.Request) {
 // @Tags RotatingSavings
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} response.SuccessEnvelope{data=[]object}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.RotatingSavingsGroupSummary}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings [get]
 func (h *SavingsHandler) ListRotatingGroups(w http.ResponseWriter, r *http.Request) {
@@ -206,7 +206,7 @@ func (h *SavingsHandler) ListRotatingGroups(w http.ResponseWriter, r *http.Reque
 	}
 	groups, err := h.rotatingSvc.ListGroups(r.Context(), userID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, groups)
@@ -220,7 +220,7 @@ func (h *SavingsHandler) ListRotatingGroups(w http.ResponseWriter, r *http.Reque
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateRotatingSavingsGroupRequest true "Rotating Group Payload"
-// @Success 201 {object} response.SuccessEnvelope{data=object}
+// @Success 201 {object} response.SuccessEnvelope{data=dto.RotatingSavingsGroupResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings [post]
@@ -237,7 +237,7 @@ func (h *SavingsHandler) CreateRotatingGroup(w http.ResponseWriter, r *http.Requ
 	}
 	group, err := h.rotatingSvc.CreateGroup(r.Context(), userID, req)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusCreated, group)
@@ -250,7 +250,7 @@ func (h *SavingsHandler) CreateRotatingGroup(w http.ResponseWriter, r *http.Requ
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Rotating Savings Group ID"
-// @Success 200 {object} response.SuccessEnvelope{data=object}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.RotatingSavingsGroupDetailResponse}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/{id} [get]
 func (h *SavingsHandler) GetRotatingGroupDetail(w http.ResponseWriter, r *http.Request) {
@@ -262,7 +262,7 @@ func (h *SavingsHandler) GetRotatingGroupDetail(w http.ResponseWriter, r *http.R
 	id := chi.URLParam(r, "id")
 	detail, err := h.rotatingSvc.GetGroupDetail(r.Context(), userID, id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, detail)
@@ -277,7 +277,7 @@ func (h *SavingsHandler) GetRotatingGroupDetail(w http.ResponseWriter, r *http.R
 // @Security BearerAuth
 // @Param id path string true "Rotating Savings Group ID"
 // @Param request body dto.UpdateRotatingSavingsGroupRequest true "Update Group Payload"
-// @Success 200 {object} response.SuccessEnvelope{data=object}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.RotatingSavingsGroupResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/{id} [patch]
@@ -295,7 +295,7 @@ func (h *SavingsHandler) UpdateRotatingGroup(w http.ResponseWriter, r *http.Requ
 	}
 	group, err := h.rotatingSvc.UpdateGroup(r.Context(), userID, id, req)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, group)
@@ -319,7 +319,7 @@ func (h *SavingsHandler) DeleteRotatingGroup(w http.ResponseWriter, r *http.Requ
 	}
 	id := chi.URLParam(r, "id")
 	if err := h.rotatingSvc.DeleteGroup(r.Context(), userID, id); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Rotating savings group deleted"})
@@ -334,7 +334,7 @@ func (h *SavingsHandler) DeleteRotatingGroup(w http.ResponseWriter, r *http.Requ
 // @Security BearerAuth
 // @Param id path string true "Rotating Savings Group ID"
 // @Param request body dto.RotatingSavingsContributionRequest true "Contribution Payload"
-// @Success 201 {object} response.SuccessEnvelope{data=object}
+// @Success 201 {object} response.SuccessEnvelope{data=dto.RotatingSavingsContributionResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/{id}/contributions [post]
@@ -352,7 +352,7 @@ func (h *SavingsHandler) CreateContribution(w http.ResponseWriter, r *http.Reque
 	}
 	contrib, err := h.rotatingSvc.CreateContribution(r.Context(), userID, id, req)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusCreated, contrib)
@@ -378,7 +378,7 @@ func (h *SavingsHandler) DeleteContribution(w http.ResponseWriter, r *http.Reque
 	id := chi.URLParam(r, "id")
 	contribID := chi.URLParam(r, "contributionId")
 	if err := h.rotatingSvc.DeleteContribution(r.Context(), userID, id, contribID); err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Contribution deleted"})

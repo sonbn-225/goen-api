@@ -18,9 +18,9 @@ func NewSavingsService(repo interfaces.SavingsRepository) *SavingsService {
 	return &SavingsService{repo: repo}
 }
 
-func (s *SavingsService) CreateSavings(ctx context.Context, userID string, req dto.CreateSavingsRequest) (*entity.Savings, error) {
+func (s *SavingsService) CreateSavings(ctx context.Context, userID string, req dto.CreateSavingsRequest) (*dto.SavingsResponse, error) {
 	now := time.Now().UTC()
-	instr := entity.Savings(entity.Savings{
+	instr := entity.Savings{
 		ID:               uuid.NewString(),
 		SavingsAccountID: req.SavingsAccountID,
 		ParentAccountID:  req.ParentAccountID,
@@ -34,23 +34,36 @@ func (s *SavingsService) CreateSavings(ctx context.Context, userID string, req d
 		Status:           "active",
 		CreatedAt:        now,
 		UpdatedAt:        now,
-	})
+	}
 
 	if err := s.repo.CreateSavings(ctx, userID, instr); err != nil {
 		return nil, err
 	}
-	return &instr, nil
+	resp := dto.NewSavingsResponse(instr)
+	return &resp, nil
 }
 
-func (s *SavingsService) GetSavings(ctx context.Context, userID, id string) (*entity.Savings, error) {
-	return s.repo.GetSavings(ctx, userID, id)
+func (s *SavingsService) GetSavings(ctx context.Context, userID, id string) (*dto.SavingsResponse, error) {
+	it, err := s.repo.GetSavings(ctx, userID, id)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewSavingsResponse(*it)
+	return &resp, nil
 }
 
-func (s *SavingsService) ListSavings(ctx context.Context, userID string) ([]entity.Savings, error) {
-	return s.repo.ListSavings(ctx, userID)
+func (s *SavingsService) ListSavings(ctx context.Context, userID string) ([]dto.SavingsResponse, error) {
+	items, err := s.repo.ListSavings(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewSavingsResponses(items), nil
 }
 
-func (s *SavingsService) PatchSavings(ctx context.Context, userID, id string, req dto.PatchSavingsRequest) (*entity.Savings, error) {
+func (s *SavingsService) PatchSavings(ctx context.Context, userID, id string, req dto.PatchSavingsRequest) (*dto.SavingsResponse, error) {
 	cur, err := s.repo.GetSavings(ctx, userID, id)
 	if err != nil {
 		return nil, err
@@ -88,7 +101,8 @@ func (s *SavingsService) PatchSavings(ctx context.Context, userID, id string, re
 		return nil, err
 	}
 
-	return cur, nil
+	resp := dto.NewSavingsResponse(*cur)
+	return &resp, nil
 }
 
 func (s *SavingsService) DeleteSavings(ctx context.Context, userID, id string) error {

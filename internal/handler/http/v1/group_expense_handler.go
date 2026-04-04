@@ -39,7 +39,7 @@ func (h *GroupExpenseHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateGroupExpenseRequest true "Group Expense Creation Payload"
-// @Success 201 {object} response.SuccessEnvelope{data=entity.Transaction}
+// @Success 201 {object} response.SuccessEnvelope{data=dto.CreateGroupExpenseResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /group-expenses [post]
@@ -72,7 +72,7 @@ func (h *GroupExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param transactionId path string true "Transaction ID"
-// @Success 200 {object} response.SuccessEnvelope{data=[]object}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.GroupExpenseParticipantResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /group-expenses/participants/{transactionId} [get]
@@ -107,7 +107,7 @@ func (h *GroupExpenseHandler) ListByTransaction(w http.ResponseWriter, r *http.R
 // @Security BearerAuth
 // @Param participantId path string true "Participant ID"
 // @Param request body dto.GroupExpenseSettleRequest true "Settlement details"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Transaction}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.TransactionResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /group-expenses/settle/{participantId} [post]

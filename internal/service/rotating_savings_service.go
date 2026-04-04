@@ -29,7 +29,7 @@ func NewRotatingSavingsService(
 	}
 }
 
-func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID string, req dto.CreateRotatingSavingsGroupRequest) (*entity.RotatingSavingsGroup, error) {
+func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID string, req dto.CreateRotatingSavingsGroupRequest) (*dto.RotatingSavingsGroupResponse, error) {
 	status := req.Status
 	if status == "" {
 		status = "active"
@@ -66,19 +66,31 @@ func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 		Action:    "group_created",
 		Details:   map[string]any{"name": g.Name},
 		CreatedAt: time.Now().UTC(),
-	})
+	} )
 
-	return &g, nil
+	resp := dto.NewRotatingSavingsGroupResponse(g)
+	return &resp, nil
 }
 
-func (s *RotatingSavingsService) GetGroup(ctx context.Context, userID, groupID string) (*entity.RotatingSavingsGroup, error) {
-	return s.repo.GetRotatingGroup(ctx, userID, groupID)
-}
-
-func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupID string, req dto.UpdateRotatingSavingsGroupRequest) (*entity.RotatingSavingsGroup, error) {
+func (s *RotatingSavingsService) GetGroup(ctx context.Context, userID, groupID string) (*dto.RotatingSavingsGroupResponse, error) {
 	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
 	if err != nil {
 		return nil, err
+	}
+	if g == nil {
+		return nil, nil
+	}
+	resp := dto.NewRotatingSavingsGroupResponse(*g)
+	return &resp, nil
+}
+
+func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupID string, req dto.UpdateRotatingSavingsGroupRequest) (*dto.RotatingSavingsGroupResponse, error) {
+	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if g == nil {
+		return nil, errors.New("group not found")
 	}
 
 	if req.AccountID != nil { g.AccountID = *req.AccountID }
@@ -103,13 +115,17 @@ func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupI
 		CreatedAt: time.Now().UTC(),
 	})
 
-	return g, nil
+	resp := dto.NewRotatingSavingsGroupResponse(*g)
+	return &resp, nil
 }
 
 func (s *RotatingSavingsService) GetGroupDetail(ctx context.Context, userID, groupID string) (*dto.RotatingSavingsGroupDetailResponse, error) {
 	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
 	if err != nil {
 		return nil, err
+	}
+	if g == nil {
+		return nil, errors.New("group not found")
 	}
 
 	contributions, err := s.repo.GetContributions(ctx, groupID)
@@ -149,13 +165,13 @@ func (s *RotatingSavingsService) GetGroupDetail(ctx context.Context, userID, gro
 	accruedInterest := 0.0 
 
 	return &dto.RotatingSavingsGroupDetailResponse{
-		Group:                  *g,
+		Group:                  dto.NewRotatingSavingsGroupResponse(*g),
 		Schedule:               schedule,
 		CollectedSlotsCount:    collectedSlotsCount,
 		CurrentPayoutValue:     payoutValue,
 		CurrentAccruedInterest: accruedInterest,
-		Contributions:          contributions,
-		AuditLogs:              auditLogs,
+		Contributions:          dto.NewRotatingSavingsContributionResponses(contributions),
+		AuditLogs:              dto.NewRotatingSavingsAuditLogResponses(auditLogs),
 		TotalPaid:              totalPaid,
 		TotalReceived:          totalReceived,
 		NextPayment:            nextPayment,
@@ -266,7 +282,7 @@ func (s *RotatingSavingsService) ListGroups(ctx context.Context, userID string) 
 		}
 
 		summaries = append(summaries, dto.RotatingSavingsGroupSummary{
-			Group: g, TotalPaid: totalPaid, TotalReceived: totalReceived,
+			Group: dto.NewRotatingSavingsGroupResponse(g), TotalPaid: totalPaid, TotalReceived: totalReceived,
 			RemainingAmount: totalExpected - totalPaid, CompletedCycles: len(completedCycles),
 			TotalCycles: g.MemberCount, NextDueDate: nextDate,
 		})
@@ -274,10 +290,13 @@ func (s *RotatingSavingsService) ListGroups(ctx context.Context, userID string) 
 	return summaries, nil
 }
 
-func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID, groupID string, req dto.RotatingSavingsContributionRequest) (*entity.RotatingSavingsContribution, error) {
+func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID, groupID string, req dto.RotatingSavingsContributionRequest) (*dto.RotatingSavingsContributionResponse, error) {
 	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
 	if err != nil {
 		return nil, err
+	}
+	if g == nil {
+		return nil, errors.New("group not found")
 	}
 
 	txType := "expense"
@@ -315,7 +334,8 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 		ID: uuid.NewString(), UserID: userID, GroupID: &groupID, Action: "contribution_created", Details: map[string]any{"kind": c.Kind, "amount": req.Amount}, CreatedAt: time.Now().UTC(),
 	})
 
-	return &c, nil
+	resp := dto.NewRotatingSavingsContributionResponse(c)
+	return &resp, nil
 }
 
 func (s *RotatingSavingsService) DeleteContribution(ctx context.Context, userID, groupID, id string) error {

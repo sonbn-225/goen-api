@@ -37,7 +37,7 @@ func (h *BudgetHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags Budgets
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} response.SuccessEnvelope{data=[]entity.Budget}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.BudgetWithStatsResponse}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /budgets [get]
 func (h *BudgetHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +63,7 @@ func (h *BudgetHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateBudgetRequest true "Budget Creation Payload"
-// @Success 201 {object} response.SuccessEnvelope{data=entity.Budget}
+// @Success 201 {object} response.SuccessEnvelope{data=dto.BudgetWithStatsResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /budgets [post]
@@ -95,7 +95,7 @@ func (h *BudgetHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Budget ID"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Budget}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.BudgetWithStatsResponse}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /budgets/{id} [get]
@@ -124,7 +124,7 @@ func (h *BudgetHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Param id path string true "Budget ID"
 // @Param request body dto.UpdateBudgetRequest true "Budget Update Payload"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Budget}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.BudgetWithStatsResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /budgets/{id} [patch]

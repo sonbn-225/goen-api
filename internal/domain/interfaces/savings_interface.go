@@ -30,21 +30,21 @@ type SavingsRepository interface {
 }
 
 type SavingsService interface {
-	CreateSavings(ctx context.Context, userID string, req dto.CreateSavingsRequest) (*entity.Savings, error)
-	GetSavings(ctx context.Context, userID, savingsID string) (*entity.Savings, error)
-	ListSavings(ctx context.Context, userID string) ([]entity.Savings, error)
-	PatchSavings(ctx context.Context, userID, savingsID string, req dto.PatchSavingsRequest) (*entity.Savings, error)
+	CreateSavings(ctx context.Context, userID string, req dto.CreateSavingsRequest) (*dto.SavingsResponse, error)
+	GetSavings(ctx context.Context, userID, savingsID string) (*dto.SavingsResponse, error)
+	ListSavings(ctx context.Context, userID string) ([]dto.SavingsResponse, error)
+	PatchSavings(ctx context.Context, userID, savingsID string, req dto.PatchSavingsRequest) (*dto.SavingsResponse, error)
 	DeleteSavings(ctx context.Context, userID, savingsID string) error
 }
 
 type RotatingSavingsService interface {
-	CreateGroup(ctx context.Context, userID string, req dto.CreateRotatingSavingsGroupRequest) (*entity.RotatingSavingsGroup, error)
-	GetGroup(ctx context.Context, userID, groupID string) (*entity.RotatingSavingsGroup, error)
+	CreateGroup(ctx context.Context, userID string, req dto.CreateRotatingSavingsGroupRequest) (*dto.RotatingSavingsGroupResponse, error)
+	GetGroup(ctx context.Context, userID, groupID string) (*dto.RotatingSavingsGroupResponse, error)
 	GetGroupDetail(ctx context.Context, userID, groupID string) (*dto.RotatingSavingsGroupDetailResponse, error)
-	UpdateGroup(ctx context.Context, userID, groupID string, req dto.UpdateRotatingSavingsGroupRequest) (*entity.RotatingSavingsGroup, error)
+	UpdateGroup(ctx context.Context, userID, groupID string, req dto.UpdateRotatingSavingsGroupRequest) (*dto.RotatingSavingsGroupResponse, error)
 	DeleteGroup(ctx context.Context, userID, groupID string) error
 	ListGroups(ctx context.Context, userID string) ([]dto.RotatingSavingsGroupSummary, error)
 
-	CreateContribution(ctx context.Context, userID, groupID string, req dto.RotatingSavingsContributionRequest) (*entity.RotatingSavingsContribution, error)
+	CreateContribution(ctx context.Context, userID, groupID string, req dto.RotatingSavingsContributionRequest) (*dto.RotatingSavingsContributionResponse, error)
 	DeleteContribution(ctx context.Context, userID, groupID, contributionID string) error
 }

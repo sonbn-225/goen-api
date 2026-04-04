@@ -19,7 +19,7 @@ func NewContactService(repo interfaces.ContactRepository) *ContactService {
 	return &ContactService{repo: repo}
 }
 
-func (s *ContactService) Create(ctx context.Context, userID string, req dto.CreateContactRequest) (*entity.Contact, error) {
+func (s *ContactService) Create(ctx context.Context, userID string, req dto.CreateContactRequest) (*dto.ContactResponse, error) {
 	now := time.Now().UTC()
 	c := entity.Contact{
 		ID:        uuid.NewString(),
@@ -52,35 +52,65 @@ func (s *ContactService) Create(ctx context.Context, userID string, req dto.Crea
 	return s.Get(ctx, userID, c.ID)
 }
 
-func (s *ContactService) Get(ctx context.Context, userID, contactID string) (*entity.Contact, error) {
-	return s.repo.GetContact(ctx, userID, contactID)
+func (s *ContactService) Get(ctx context.Context, userID, contactID string) (*dto.ContactResponse, error) {
+	it, err := s.repo.GetContact(ctx, userID, contactID)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewContactResponse(*it)
+	return &resp, nil
 }
 
-func (s *ContactService) List(ctx context.Context, userID string) ([]entity.Contact, error) {
-	return s.repo.ListContacts(ctx, userID)
+func (s *ContactService) List(ctx context.Context, userID string) ([]dto.ContactResponse, error) {
+	items, err := s.repo.ListContacts(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewContactResponses(items), nil
 }
 
-func (s *ContactService) Update(ctx context.Context, userID, contactID string, req dto.UpdateContactRequest) (*entity.Contact, error) {
+func (s *ContactService) Update(ctx context.Context, userID, contactID string, req dto.UpdateContactRequest) (*dto.ContactResponse, error) {
 	cur, err := s.repo.GetContact(ctx, userID, contactID)
 	if err != nil {
 		return nil, err
 	}
 
-	if req.Name != nil { cur.Name = strings.TrimSpace(*req.Name) }
-	if req.Email != nil { cur.Email = req.Email }
-	if req.Phone != nil { cur.Phone = req.Phone }
-	if req.AvatarURL != nil { cur.AvatarURL = req.AvatarURL }
-	if req.Notes != nil { cur.Notes = req.Notes }
+	if req.Name != nil {
+		cur.Name = strings.TrimSpace(*req.Name)
+	}
+	if req.Email != nil {
+		cur.Email = req.Email
+	}
+	if req.Phone != nil {
+		cur.Phone = req.Phone
+	}
+	if req.AvatarURL != nil {
+		cur.AvatarURL = req.AvatarURL
+	}
+	if req.Notes != nil {
+		cur.Notes = req.Notes
+	}
 	cur.UpdatedAt = time.Now().UTC()
 
 	// Re-check linking if email/phone changed
 	if req.Email != nil || req.Phone != nil {
 		if cur.Email != nil && strings.TrimSpace(*cur.Email) != "" {
 			u, _ := s.repo.FindUserByEmail(ctx, strings.TrimSpace(*cur.Email))
-			if u != nil { cur.LinkedUserID = &u.ID } else { cur.LinkedUserID = nil }
+			if u != nil {
+				cur.LinkedUserID = &u.ID
+			} else {
+				cur.LinkedUserID = nil
+			}
 		} else if cur.Phone != nil && strings.TrimSpace(*cur.Phone) != "" {
 			u, _ := s.repo.FindUserByPhone(ctx, strings.TrimSpace(*cur.Phone))
-			if u != nil { cur.LinkedUserID = &u.ID } else { cur.LinkedUserID = nil }
+			if u != nil {
+				cur.LinkedUserID = &u.ID
+			} else {
+				cur.LinkedUserID = nil
+			}
 		} else {
 			cur.LinkedUserID = nil
 		}

@@ -23,7 +23,7 @@ func NewDebtService(repo interfaces.DebtRepository, contactSvc interfaces.Contac
 	return &DebtService{repo: repo, contactSvc: contactSvc}
 }
 
-func (s *DebtService) Create(ctx context.Context, userID string, req dto.CreateDebtRequest) (*entity.Debt, error) {
+func (s *DebtService) Create(ctx context.Context, userID string, req dto.CreateDebtRequest) (*dto.DebtResponse, error) {
 	contactID := utils.NormalizeOptionalString(req.ContactID)
 	if contactID == nil && req.ContactName != nil && strings.TrimSpace(*req.ContactName) != "" {
 		id, err := s.contactSvc.GetOrCreateByName(ctx, userID, *req.ContactName)
@@ -61,27 +61,56 @@ func (s *DebtService) Create(ctx context.Context, userID string, req dto.CreateD
 	if err := s.repo.CreateDebt(ctx, d); err != nil {
 		return nil, err
 	}
-	return s.repo.GetDebt(ctx, userID, d.ID)
+
+	created, err := s.repo.GetDebt(ctx, userID, d.ID)
+	if err != nil {
+		return nil, err
+	}
+	if created == nil {
+		return nil, nil
+	}
+	resp := dto.NewDebtResponse(*created)
+	return &resp, nil
 }
 
-func (s *DebtService) Get(ctx context.Context, userID string, debtID string) (*entity.Debt, error) {
-	return s.repo.GetDebt(ctx, userID, debtID)
+func (s *DebtService) Get(ctx context.Context, userID string, debtID string) (*dto.DebtResponse, error) {
+	it, err := s.repo.GetDebt(ctx, userID, debtID)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewDebtResponse(*it)
+	return &resp, nil
 }
 
-func (s *DebtService) List(ctx context.Context, userID string) ([]entity.Debt, error) {
-	return s.repo.ListDebts(ctx, userID)
+func (s *DebtService) List(ctx context.Context, userID string) ([]dto.DebtResponse, error) {
+	items, err := s.repo.ListDebts(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewDebtResponses(items), nil
 }
 
-func (s *DebtService) Update(ctx context.Context, userID string, debtID string, req dto.UpdateDebtRequest) (*entity.Debt, error) {
+func (s *DebtService) Update(ctx context.Context, userID string, debtID string, req dto.UpdateDebtRequest) (*dto.DebtResponse, error) {
 	cur, err := s.repo.GetDebt(ctx, userID, debtID)
 	if err != nil {
 		return nil, err
 	}
 
-	if req.Name != nil { cur.Name = req.Name }
-	if req.DueDate != nil { cur.DueDate = *req.DueDate }
-	if req.Status != nil { cur.Status = *req.Status }
-	if req.InterestRate != nil { cur.InterestRate = req.InterestRate }
+	if req.Name != nil {
+		cur.Name = req.Name
+	}
+	if req.DueDate != nil {
+		cur.DueDate = *req.DueDate
+	}
+	if req.Status != nil {
+		cur.Status = *req.Status
+	}
+	if req.InterestRate != nil {
+		cur.InterestRate = req.InterestRate
+	}
 	cur.UpdatedAt = time.Now().UTC()
 
 	if cur.Status == "paid" && cur.ClosedAt == nil {
@@ -92,14 +121,23 @@ func (s *DebtService) Update(ctx context.Context, userID string, debtID string, 
 	if err := s.repo.UpdateDebt(ctx, userID, *cur); err != nil {
 		return nil, err
 	}
-	return s.repo.GetDebt(ctx, userID, debtID)
+
+	updated, err := s.repo.GetDebt(ctx, userID, debtID)
+	if err != nil {
+		return nil, err
+	}
+	if updated == nil {
+		return nil, nil
+	}
+	resp := dto.NewDebtResponse(*updated)
+	return &resp, nil
 }
 
 func (s *DebtService) Delete(ctx context.Context, userID string, debtID string) error {
 	return s.repo.DeleteDebt(ctx, userID, debtID)
 }
 
-func (s *DebtService) AddPayment(ctx context.Context, userID string, debtID string, req dto.DebtPaymentRequest) (*entity.Debt, error) {
+func (s *DebtService) AddPayment(ctx context.Context, userID string, debtID string, req dto.DebtPaymentRequest) (*dto.DebtResponse, error) {
 	debt, err := s.repo.GetDebt(ctx, userID, debtID)
 	if err != nil {
 		return nil, err
@@ -112,7 +150,7 @@ func (s *DebtService) AddPayment(ctx context.Context, userID string, debtID stri
 		// Auto-distribute: interest first, then principal
 		paid, _ := new(big.Rat).SetString(*req.AmountPaid)
 		accrued, _ := new(big.Rat).SetString(debt.AccruedInterest)
-		
+
 		if paid.Cmp(accrued) >= 0 {
 			interestPaid = accrued.FloatString(2)
 			rem := new(big.Rat).Sub(paid, accrued)
@@ -164,9 +202,21 @@ func (s *DebtService) AddPayment(ctx context.Context, userID string, debtID stri
 		return nil, err
 	}
 
-	return s.repo.GetDebt(ctx, userID, debtID)
+	updated, err := s.repo.GetDebt(ctx, userID, debtID)
+	if err != nil {
+		return nil, err
+	}
+	if updated == nil {
+		return nil, nil
+	}
+	resp := dto.NewDebtResponse(*updated)
+	return &resp, nil
 }
 
-func (s *DebtService) ListPayments(ctx context.Context, userID string, debtID string) ([]entity.DebtPaymentLink, error) {
-	return s.repo.ListPaymentLinks(ctx, userID, debtID)
+func (s *DebtService) ListPayments(ctx context.Context, userID string, debtID string) ([]dto.DebtPaymentLinkResponse, error) {
+	items, err := s.repo.ListPaymentLinks(ctx, userID, debtID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewDebtPaymentLinkResponses(items), nil
 }

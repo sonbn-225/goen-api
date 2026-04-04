@@ -1,5 +1,11 @@
 package dto
 
+import (
+	"time"
+
+	"github.com/sonbn-225/goen-api/internal/domain/entity"
+)
+
 type CreateDebtRequest struct {
 	ClientID     *string `json:"client_id,omitempty"`
 	AccountID    string  `json:"account_id" binding:"required"`
@@ -26,4 +32,86 @@ type DebtPaymentRequest struct {
 	PrincipalPaid *string `json:"principal_paid,omitempty"`
 	InterestPaid  *string `json:"interest_paid,omitempty"`
 	AmountPaid    *string `json:"amount_paid,omitempty"` // Total paid, can be split by service
+}
+
+type DebtResponse struct {
+	ID                   string     `json:"id"`
+	ClientID             *string    `json:"client_id,omitempty"`
+	UserID               string     `json:"user_id"`
+	AccountID            *string    `json:"account_id,omitempty"`
+	Direction            string     `json:"direction"`
+	Name                 *string    `json:"name,omitempty"`
+	ContactID            *string    `json:"contact_id,omitempty"`
+	ContactName          *string    `json:"contact_name,omitempty"`
+	ContactAvatarURL     *string    `json:"contact_avatar_url,omitempty"`
+	Principal            string     `json:"principal"`
+	Currency             *string    `json:"currency,omitempty"`
+	StartDate            string     `json:"start_date"`
+	DueDate              string     `json:"due_date"`
+	InterestRate         *string    `json:"interest_rate,omitempty"`
+	InterestRule         *string    `json:"interest_rule,omitempty"`
+	OutstandingPrincipal string     `json:"outstanding_principal"`
+	AccruedInterest      string     `json:"accrued_interest"`
+	Status               string     `json:"status"`
+	CreatedAt            time.Time  `json:"created_at"`
+}
+
+func NewDebtResponse(d entity.Debt) DebtResponse {
+	return DebtResponse{
+		ID:                   d.ID,
+		ClientID:             d.ClientID,
+		UserID:               d.UserID,
+		AccountID:            d.AccountID,
+		Direction:            d.Direction,
+		Name:                 d.Name,
+		ContactID:            d.ContactID,
+		ContactName:          d.ContactName,
+		ContactAvatarURL:     d.ContactAvatarURL,
+		Principal:            d.Principal,
+		Currency:             d.Currency,
+		StartDate:            d.StartDate,
+		DueDate:              d.DueDate,
+		InterestRate:         d.InterestRate,
+		InterestRule:         d.InterestRule,
+		OutstandingPrincipal: d.OutstandingPrincipal,
+		AccruedInterest:      d.AccruedInterest,
+		Status:               d.Status,
+		CreatedAt:            d.CreatedAt,
+	}
+}
+
+func NewDebtResponses(items []entity.Debt) []DebtResponse {
+	out := make([]DebtResponse, len(items))
+	for i, it := range items {
+		out[i] = NewDebtResponse(it)
+	}
+	return out
+}
+
+type DebtPaymentLinkResponse struct {
+	ID            string    `json:"id"`
+	DebtID        string    `json:"debt_id"`
+	TransactionID string    `json:"transaction_id"`
+	PrincipalPaid *string   `json:"principal_paid,omitempty"`
+	InterestPaid  *string   `json:"interest_paid,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+func NewDebtPaymentLinkResponse(l entity.DebtPaymentLink) DebtPaymentLinkResponse {
+	return DebtPaymentLinkResponse{
+		ID:            l.ID,
+		DebtID:        l.DebtID,
+		TransactionID: l.TransactionID,
+		PrincipalPaid: l.PrincipalPaid,
+		InterestPaid:  l.InterestPaid,
+		CreatedAt:     l.CreatedAt,
+	}
+}
+
+func NewDebtPaymentLinkResponses(items []entity.DebtPaymentLink) []DebtPaymentLinkResponse {
+	out := make([]DebtPaymentLinkResponse, len(items))
+	for i, it := range items {
+		out[i] = NewDebtPaymentLinkResponse(it)
+	}
+	return out
 }

@@ -28,21 +28,30 @@ func (s *TransactionService) SetDebtService(ds interfaces.DebtService) {
 	s.debtSvc = ds
 }
 
-func (s *TransactionService) List(ctx context.Context, userID string, req dto.CreateTransactionRequest) ([]entity.Transaction, *string, int, error) {
-	// Note: req contains filters, but for simplicity of the interface, let's keep it direct.
-	// Actually, the interface says `List(ctx, userID, req)`.
-	// For now, I'll use entity.TransactionListFilter from service to repo.
+func (s *TransactionService) List(ctx context.Context, userID string, req dto.CreateTransactionRequest) ([]dto.TransactionResponse, *string, int, error) {
 	filter := entity.TransactionListFilter{
 		// Map from req fields (to be refined)
 	}
-	return s.repo.ListTransactions(ctx, userID, filter)
+	items, cursor, total, err := s.repo.ListTransactions(ctx, userID, filter)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	return dto.NewTransactionResponses(items), cursor, total, nil
 }
 
-func (s *TransactionService) Get(ctx context.Context, userID, transactionID string) (*entity.Transaction, error) {
-	return s.repo.GetTransaction(ctx, userID, transactionID)
+func (s *TransactionService) Get(ctx context.Context, userID, transactionID string) (*dto.TransactionResponse, error) {
+	it, err := s.repo.GetTransaction(ctx, userID, transactionID)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewTransactionResponse(*it)
+	return &resp, nil
 }
 
-func (s *TransactionService) Create(ctx context.Context, userID string, req dto.CreateTransactionRequest) (*entity.Transaction, error) {
+func (s *TransactionService) Create(ctx context.Context, userID string, req dto.CreateTransactionRequest) (*dto.TransactionResponse, error) {
 	kind := strings.TrimSpace(req.Type)
 	if kind != "expense" && kind != "income" && kind != "transfer" {
 		return nil, errors.New("invalid transaction type")
@@ -141,14 +150,16 @@ func (s *TransactionService) Create(ctx context.Context, userID string, req dto.
 			for _, p := range participants {
 				// Simple debt create
 				debtName := p.ParticipantName
-				if description != nil { debtName = *description + " ("+p.ParticipantName+")" }
+				if description != nil {
+					debtName = *description + " (" + p.ParticipantName + ")"
+				}
 				_, _ = s.debtSvc.Create(ctx, userID, dto.CreateDebtRequest{
 					AccountID: *tx.AccountID,
 					Direction: "lent",
-					Name: &debtName,
+					Name:      &debtName,
 					Principal: p.ShareAmount,
 					StartDate: tx.OccurredDate,
-					DueDate: "2099-12-31",
+					DueDate:   "2099-12-31",
 				})
 			}
 		}
@@ -158,10 +169,18 @@ func (s *TransactionService) Create(ctx context.Context, userID string, req dto.
 		return nil, err
 	}
 
-	return s.repo.GetTransaction(ctx, userID, id)
+	it, err := s.repo.GetTransaction(ctx, userID, id)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewTransactionResponse(*it)
+	return &resp, nil
 }
 
-func (s *TransactionService) Patch(ctx context.Context, userID, transactionID string, req dto.TransactionPatchRequest) (*entity.Transaction, error) {
+func (s *TransactionService) Patch(ctx context.Context, userID, transactionID string, req dto.TransactionPatchRequest) (*dto.TransactionResponse, error) {
 	// Simplified patch for now (similar to repo logic)
 	patch := entity.TransactionPatch{
 		Description: utils.NormalizeOptionalString(req.Description),
@@ -172,16 +191,28 @@ func (s *TransactionService) Patch(ctx context.Context, userID, transactionID st
 	}
 	if req.OccurredAt != nil {
 		t, err := utils.ParseTimeOrDate(*req.OccurredAt)
-		if err == nil { patch.OccurredAt = &t }
+		if err == nil {
+			patch.OccurredAt = &t
+		}
 	}
 	// Note: LineItems and Participants replace-all could be added easily.
-	
-	return s.repo.PatchTransaction(ctx, userID, transactionID, patch)
+
+	it, err := s.repo.PatchTransaction(ctx, userID, transactionID, patch)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewTransactionResponse(*it)
+	return &resp, nil
 }
 
 func (s *TransactionService) BatchPatch(ctx context.Context, userID string, req dto.BatchPatchRequest) (*dto.BatchPatchResult, error) {
 	mode := "atomic"
-	if req.Mode != nil { mode = *req.Mode }
+	if req.Mode != nil {
+		mode = *req.Mode
+	}
 
 	patches := make(map[string]entity.TransactionPatch, len(req.TransactionIDs))
 	for _, id := range req.TransactionIDs {
@@ -197,14 +228,16 @@ func (s *TransactionService) BatchPatch(ctx context.Context, userID string, req 
 	}
 
 	updated, failed, err := s.repo.BatchPatchTransactions(ctx, userID, req.TransactionIDs, patches, mode)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 
 	return &dto.BatchPatchResult{
-		Mode: mode,
+		Mode:         mode,
 		UpdatedCount: len(updated),
-		FailedCount: len(failed),
-		UpdatedIDs: updated,
-		FailedIDs: failed,
+		FailedCount:  len(failed),
+		UpdatedIDs:   updated,
+		FailedIDs:    failed,
 	}, nil
 }
 
@@ -213,14 +246,30 @@ func (s *TransactionService) Delete(ctx context.Context, userID, transactionID s
 }
 
 // Stubs for Imports
-func (s *TransactionService) StageImport(ctx context.Context, userID string, items []dto.StageImportedItem) (int, int, []string, error) { return 0, 0, nil, nil }
-func (s *TransactionService) ListImported(ctx context.Context, userID string) ([]entity.ImportedTransaction, error) { return nil, nil }
-func (s *TransactionService) PatchImported(ctx context.Context, userID, importID string, patch entity.ImportedTransactionPatch) (*entity.ImportedTransaction, error) { return nil, nil }
-func (s *TransactionService) DeleteImported(ctx context.Context, userID, importID string) error { return nil }
-func (s *TransactionService) ClearImported(ctx context.Context, userID string) error { return nil }
-func (s *TransactionService) UpsertMappingRules(ctx context.Context, userID string, inputs []dto.MappingRuleInput) ([]entity.ImportMappingRule, error) { return nil, nil }
-func (s *TransactionService) ListMappingRules(ctx context.Context, userID string) ([]entity.ImportMappingRule, error) { return nil, nil }
-func (s *TransactionService) DeleteMappingRule(ctx context.Context, userID, ruleID string) error { return nil }
+func (s *TransactionService) StageImport(ctx context.Context, userID string, items []dto.StageImportedItem) (int, int, []string, error) {
+	return 0, 0, nil, nil
+}
+func (s *TransactionService) ListImported(ctx context.Context, userID string) ([]dto.ImportedTransactionResponse, error) {
+	return nil, nil
+}
+func (s *TransactionService) PatchImported(ctx context.Context, userID, importID string, patch entity.ImportedTransactionPatch) (*dto.ImportedTransactionResponse, error) {
+	return nil, nil
+}
+func (s *TransactionService) DeleteImported(ctx context.Context, userID, importID string) error {
+	return nil
+}
+func (s *TransactionService) ClearImported(ctx context.Context, userID string) error {
+	return nil
+}
+func (s *TransactionService) UpsertMappingRules(ctx context.Context, userID string, inputs []dto.MappingRuleInput) ([]dto.ImportMappingRuleResponse, error) {
+	return nil, nil
+}
+func (s *TransactionService) ListMappingRules(ctx context.Context, userID string) ([]dto.ImportMappingRuleResponse, error) {
+	return nil, nil
+}
+func (s *TransactionService) DeleteMappingRule(ctx context.Context, userID, ruleID string) error {
+	return nil
+}
 
 // Helpers
 func (s *TransactionService) ensureTags(ctx context.Context, userID string, inputs []string, lang string) ([]string, error) {

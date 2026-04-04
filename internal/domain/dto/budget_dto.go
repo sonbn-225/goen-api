@@ -1,6 +1,11 @@
 package dto
 
-import "github.com/sonbn-225/goen-api/internal/domain/entity"
+import (
+	"math/big"
+
+	"github.com/sonbn-225/goen-api/internal/domain/entity"
+	"github.com/sonbn-225/goen-api/internal/pkg/utils"
+)
 
 type CreateBudgetRequest struct {
 	Name                  *string `json:"name,omitempty"`
@@ -21,8 +26,55 @@ type UpdateBudgetRequest struct {
 }
 
 type BudgetWithStatsResponse struct {
-	entity.Budget
-	Spent       string `json:"spent"`
-	Remaining   string `json:"remaining"`
-	PercentUsed int    `json:"percent_used"`
+	ID                    string    `json:"id"`
+	UserID                string    `json:"user_id"`
+	Name                  *string   `json:"name,omitempty"`
+	Period                string    `json:"period"`
+	PeriodStart           *string   `json:"period_start,omitempty"`
+	PeriodEnd             *string   `json:"period_end,omitempty"`
+	Amount                string    `json:"amount"`
+	AlertThresholdPercent *int      `json:"alert_threshold_percent,omitempty"`
+	RolloverMode          *string   `json:"rollover_mode,omitempty"`
+	CategoryID            *string   `json:"category_id,omitempty"`
+	Spent                 string    `json:"spent"`
+	Remaining             string    `json:"remaining"`
+	PercentUsed           int       `json:"percent_used"`
+}
+
+func NewBudgetWithStatsResponse(b entity.Budget) BudgetWithStatsResponse {
+	percentUsed := 0
+	if utils.IsValidDecimal(b.Amount) && utils.IsValidDecimal(b.Spent) {
+		amt, _ := new(big.Rat).SetString(b.Amount)
+		spent, _ := new(big.Rat).SetString(b.Spent)
+		if amt.Sign() > 0 {
+			res := new(big.Rat).Quo(spent, amt)
+			res.Mul(res, big.NewRat(100, 1))
+			f, _ := res.Float64()
+			percentUsed = int(f)
+		}
+	}
+
+	return BudgetWithStatsResponse{
+		ID:                    b.ID,
+		UserID:                b.UserID,
+		Name:                  b.Name,
+		Period:                b.Period,
+		PeriodStart:           b.PeriodStart,
+		PeriodEnd:             b.PeriodEnd,
+		Amount:                b.Amount,
+		AlertThresholdPercent: b.AlertThresholdPercent,
+		RolloverMode:          b.RolloverMode,
+		CategoryID:            b.CategoryID,
+		Spent:                 b.Spent,
+		Remaining:             b.Remaining,
+		PercentUsed:           percentUsed,
+	}
+}
+
+func NewBudgetWithStatsResponses(items []entity.Budget) []BudgetWithStatsResponse {
+	out := make([]BudgetWithStatsResponse, len(items))
+	for i, it := range items {
+		out[i] = NewBudgetWithStatsResponse(it)
+	}
+	return out
 }

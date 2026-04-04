@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/sonbn-225/goen-api/internal/domain/entity"
+	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 )
 
@@ -17,7 +17,7 @@ func NewReportService(r interfaces.ReportRepository, a interfaces.AccountReposit
 	return &ReportService{reportRepo: r, accountRepo: a}
 }
 
-func (s *ReportService) GetDashboardReport(ctx context.Context, userID string) (*entity.DashboardReport, error) {
+func (s *ReportService) GetDashboardReport(ctx context.Context, userID string) (*dto.DashboardReportResponse, error) {
 	balances, err := s.accountRepo.ListAccountBalancesForUser(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -37,21 +37,21 @@ func (s *ReportService) GetDashboardReport(ctx context.Context, userID string) (
 		return nil, err
 	}
 
-	report := &entity.DashboardReport{
-		TotalBalances:    balances,
-		Cashflow6Months:  cashflow,
-		TopExpensesMonth: topExpenses,
+	report := &dto.DashboardReportResponse{
+		TotalBalances:    dto.NewAccountBalanceResponses(balances),
+		Cashflow6Months:  dto.NewCashflowStatResponses(cashflow),
+		TopExpensesMonth: dto.NewCategoryExpenseStatResponses(topExpenses),
 	}
 
 	// Make sure arrays are not null when serialized
 	if report.TotalBalances == nil {
-		report.TotalBalances = make([]entity.AccountBalance, 0)
+		report.TotalBalances = make([]dto.AccountBalanceResponse, 0)
 	}
 	if report.Cashflow6Months == nil {
-		report.Cashflow6Months = make([]entity.CashflowStat, 0)
+		report.Cashflow6Months = make([]dto.CashflowStatResponse, 0)
 	}
 	if report.TopExpensesMonth == nil {
-		report.TopExpensesMonth = make([]entity.CategoryExpenseStat, 0)
+		report.TopExpensesMonth = make([]dto.CategoryExpenseStatResponse, 0)
 	}
 
 	return report, nil

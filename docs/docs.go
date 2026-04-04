@@ -134,35 +134,7 @@ const docTemplate = `{
                     "Accounts"
                 ],
                 "summary": "List Account Balances",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.AccountBalanceResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
         "/accounts/{accountId}": {
@@ -291,7 +263,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/entity.AccountPatch"
+                            "$ref": "#/definitions/dto.PatchAccountRequest"
                         }
                     }
                 ],
@@ -308,6 +280,74 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/dto.AccountResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{accountId}/audit-events": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List recent audit events for an account visible to the current user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "List Account Audit Events",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Account ID",
+                        "name": "accountId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Max number of events",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.AccountAuditEventResponse"
+                                            }
                                         }
                                     }
                                 }
@@ -430,7 +470,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "object"
+                                            "$ref": "#/definitions/dto.AccountShareResponse"
                                         }
                                     }
                                 }
@@ -751,7 +791,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/entity.Budget"
+                                                "$ref": "#/definitions/dto.BudgetWithStatsResponse"
                                             }
                                         }
                                     }
@@ -807,7 +847,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Budget"
+                                            "$ref": "#/definitions/dto.BudgetWithStatsResponse"
                                         }
                                     }
                                 }
@@ -865,7 +905,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Budget"
+                                            "$ref": "#/definitions/dto.BudgetWithStatsResponse"
                                         }
                                     }
                                 }
@@ -971,7 +1011,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Budget"
+                                            "$ref": "#/definitions/dto.BudgetWithStatsResponse"
                                         }
                                     }
                                 }
@@ -1030,7 +1070,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/entity.Category"
+                                                "$ref": "#/definitions/dto.CategoryResponse"
                                             }
                                         }
                                     }
@@ -1083,7 +1123,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Category"
+                                            "$ref": "#/definitions/dto.CategoryResponse"
                                         }
                                     }
                                 }
@@ -1140,7 +1180,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/entity.Contact"
+                                                "$ref": "#/definitions/dto.ContactResponse"
                                             }
                                         }
                                     }
@@ -1196,7 +1236,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Contact"
+                                            "$ref": "#/definitions/dto.ContactResponse"
                                         }
                                     }
                                 }
@@ -1254,7 +1294,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Contact"
+                                            "$ref": "#/definitions/dto.ContactResponse"
                                         }
                                     }
                                 }
@@ -1360,7 +1400,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Contact"
+                                            "$ref": "#/definitions/dto.ContactResponse"
                                         }
                                     }
                                 }
@@ -1417,7 +1457,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/entity.Debt"
+                                                "$ref": "#/definitions/dto.DebtResponse"
                                             }
                                         }
                                     }
@@ -1473,7 +1513,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Debt"
+                                            "$ref": "#/definitions/dto.DebtResponse"
                                         }
                                     }
                                 }
@@ -1531,7 +1571,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Debt"
+                                            "$ref": "#/definitions/dto.DebtResponse"
                                         }
                                     }
                                 }
@@ -1637,7 +1677,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Debt"
+                                            "$ref": "#/definitions/dto.DebtResponse"
                                         }
                                     }
                                 }
@@ -1703,7 +1743,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object"
+                                                "$ref": "#/definitions/dto.DebtPaymentLinkResponse"
                                             }
                                         }
                                     }
@@ -1772,7 +1812,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "object"
+                                            "$ref": "#/definitions/dto.DebtResponse"
                                         }
                                     }
                                 }
@@ -1879,7 +1919,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Transaction"
+                                            "$ref": "#/definitions/dto.CreateGroupExpenseResponse"
                                         }
                                     }
                                 }
@@ -1993,7 +2033,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object"
+                                                "$ref": "#/definitions/dto.GroupExpenseParticipantResponse"
                                             }
                                         }
                                     }
@@ -2064,7 +2104,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Transaction"
+                                            "$ref": "#/definitions/dto.TransactionResponse"
                                         }
                                     }
                                 }
@@ -2135,7 +2175,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/entity.Account"
+                                                "$ref": "#/definitions/dto.InvestmentAccountResponse"
                                             }
                                         }
                                     }
@@ -2188,7 +2228,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Account"
+                                            "$ref": "#/definitions/dto.InvestmentAccountResponse"
                                         }
                                     }
                                 }
@@ -2250,7 +2290,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Account"
+                                            "$ref": "#/definitions/dto.InvestmentAccountResponse"
                                         }
                                     }
                                 }
@@ -2310,7 +2350,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object"
+                                                "$ref": "#/definitions/dto.HoldingResponse"
                                             }
                                         }
                                     }
@@ -2363,7 +2403,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "object"
+                                            "$ref": "#/definitions/dto.RealizedPNLReport"
                                         }
                                     }
                                 }
@@ -2417,7 +2457,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/entity.Trade"
+                                                "$ref": "#/definitions/dto.TradeResponse"
                                             }
                                         }
                                     }
@@ -2480,7 +2520,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Trade"
+                                            "$ref": "#/definitions/dto.TradeResponse"
                                         }
                                     }
                                 }
@@ -2557,7 +2597,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Trade"
+                                            "$ref": "#/definitions/dto.TradeResponse"
                                         }
                                     }
                                 }
@@ -3378,7 +3418,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object"
+                                                "$ref": "#/definitions/dto.RotatingSavingsGroupSummary"
                                             }
                                         }
                                     }
@@ -3434,7 +3474,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "object"
+                                            "$ref": "#/definitions/dto.RotatingSavingsGroupResponse"
                                         }
                                     }
                                 }
@@ -3492,7 +3532,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "object"
+                                            "$ref": "#/definitions/dto.RotatingSavingsGroupDetailResponse"
                                         }
                                     }
                                 }
@@ -3607,7 +3647,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "object"
+                                            "$ref": "#/definitions/dto.RotatingSavingsGroupResponse"
                                         }
                                     }
                                 }
@@ -3677,7 +3717,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "object"
+                                            "$ref": "#/definitions/dto.RotatingSavingsContributionResponse"
                                         }
                                     }
                                 }
@@ -3790,7 +3830,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/entity.Savings"
+                                                "$ref": "#/definitions/dto.SavingsResponse"
                                             }
                                         }
                                     }
@@ -3846,7 +3886,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Savings"
+                                            "$ref": "#/definitions/dto.SavingsResponse"
                                         }
                                     }
                                 }
@@ -3904,7 +3944,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Savings"
+                                            "$ref": "#/definitions/dto.SavingsResponse"
                                         }
                                     }
                                 }
@@ -4019,7 +4059,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Savings"
+                                            "$ref": "#/definitions/dto.SavingsResponse"
                                         }
                                     }
                                 }
@@ -4065,7 +4105,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/entity.Security"
+                                                "$ref": "#/definitions/dto.SecurityResponse"
                                             }
                                         }
                                     }
@@ -4305,7 +4345,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Security"
+                                            "$ref": "#/definitions/dto.SecurityResponse"
                                         }
                                     }
                                 }
@@ -4366,7 +4406,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object"
+                                                "$ref": "#/definitions/dto.SecurityEventResponse"
                                             }
                                         }
                                     }
@@ -4428,7 +4468,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object"
+                                                "$ref": "#/definitions/dto.SecurityPriceDailyResponse"
                                             }
                                         }
                                     }
@@ -4538,7 +4578,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/entity.Tag"
+                                                "$ref": "#/definitions/dto.TagResponse"
                                             }
                                         }
                                     }
@@ -4594,7 +4634,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Tag"
+                                            "$ref": "#/definitions/dto.TagResponse"
                                         }
                                     }
                                 }
@@ -4652,7 +4692,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/entity.Tag"
+                                            "$ref": "#/definitions/dto.TagResponse"
                                         }
                                     }
                                 }
@@ -5019,16 +5059,32 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "dto.AccountBalanceResponse": {
+        "dto.AccountAuditEventResponse": {
             "type": "object",
             "properties": {
                 "account_id": {
                     "type": "string"
                 },
-                "balance": {
+                "action": {
                     "type": "string"
                 },
-                "currency": {
+                "actor_user_id": {
+                    "type": "string"
+                },
+                "diff": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "entity_id": {
+                    "type": "string"
+                },
+                "entity_type": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "occurred_at": {
                     "type": "string"
                 }
             }
@@ -5048,13 +5104,7 @@ const docTemplate = `{
                 "client_id": {
                     "type": "string"
                 },
-                "closed_at": {
-                    "type": "string"
-                },
                 "color": {
-                    "type": "string"
-                },
-                "created_at": {
                     "type": "string"
                 },
                 "currency": {
@@ -5073,9 +5123,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
-                },
-                "updated_at": {
                     "type": "string"
                 }
             }
@@ -5178,6 +5225,111 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "dto.BudgetWithStatsResponse": {
+            "type": "object",
+            "properties": {
+                "alert_threshold_percent": {
+                    "type": "integer"
+                },
+                "amount": {
+                    "type": "string"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "percent_used": {
+                    "type": "integer"
+                },
+                "period": {
+                    "type": "string"
+                },
+                "period_end": {
+                    "type": "string"
+                },
+                "period_start": {
+                    "type": "string"
+                },
+                "remaining": {
+                    "type": "string"
+                },
+                "rollover_mode": {
+                    "type": "string"
+                },
+                "spent": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.CategoryResponse": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "parent_category_id": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ContactResponse": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "linked_avatar_url": {
+                    "type": "string"
+                },
+                "linked_display_name": {
+                    "type": "string"
+                },
+                "linked_user_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
                 }
             }
         },
@@ -5353,6 +5505,20 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "dto.CreateGroupExpenseResponse": {
+            "type": "object",
+            "properties": {
+                "participants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.GroupExpenseParticipantResponse"
+                    }
+                },
+                "transaction": {
+                    "$ref": "#/definitions/dto.TransactionResponse"
                 }
             }
         },
@@ -5596,6 +5762,29 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.DebtPaymentLinkResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "debt_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interest_paid": {
+                    "type": "string"
+                },
+                "principal_paid": {
+                    "type": "string"
+                },
+                "transaction_id": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.DebtPaymentRequest": {
             "type": "object",
             "required": [
@@ -5617,6 +5806,68 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.DebtResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "accrued_interest": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "contact_avatar_url": {
+                    "type": "string"
+                },
+                "contact_id": {
+                    "type": "string"
+                },
+                "contact_name": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "direction": {
+                    "type": "string"
+                },
+                "due_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interest_rate": {
+                    "type": "string"
+                },
+                "interest_rule": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "outstanding_principal": {
+                    "type": "string"
+                },
+                "principal": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.GroupExpenseParticipantRequest": {
             "type": "object",
             "properties": {
@@ -5627,6 +5878,35 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "original_amount": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.GroupExpenseParticipantResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "is_settled": {
+                    "type": "boolean"
+                },
+                "original_amount": {
+                    "type": "string"
+                },
+                "participant_name": {
+                    "type": "string"
+                },
+                "settlement_transaction_id": {
+                    "type": "string"
+                },
+                "share_amount": {
+                    "type": "string"
+                },
+                "transaction_id": {
+                    "type": "string"
+                },
+                "user_id": {
                     "type": "string"
                 }
             }
@@ -5662,6 +5942,57 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.HoldingResponse": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "type": "string"
+                },
+                "avg_cost": {
+                    "type": "string"
+                },
+                "broker_account_id": {
+                    "type": "string"
+                },
+                "cost_basis_total": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "market_price": {
+                    "type": "string"
+                },
+                "market_value": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "string"
+                },
+                "security_id": {
+                    "type": "string"
+                },
+                "unrealized_pnl": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.InvestmentAccountResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "fee_settings": {},
+                "id": {
+                    "type": "string"
+                },
+                "tax_settings": {}
+            }
+        },
         "dto.MarketSyncRequest": {
             "type": "object",
             "properties": {
@@ -5676,6 +6007,20 @@ const docTemplate = `{
                 },
                 "include_prices": {
                     "type": "boolean"
+                }
+            }
+        },
+        "dto.PatchAccountRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         },
@@ -5712,6 +6057,58 @@ const docTemplate = `{
                 },
                 "term_months": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.RealizedPNLReport": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.RealizedPNLReportItem"
+                    }
+                },
+                "total_gross": {
+                    "type": "string"
+                },
+                "total_net": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.RealizedPNLReportItem": {
+            "type": "object",
+            "properties": {
+                "cost_basis": {
+                    "type": "string"
+                },
+                "dividend_gain": {
+                    "type": "string"
+                },
+                "fees": {
+                    "type": "string"
+                },
+                "gross_realized_gain": {
+                    "type": "string"
+                },
+                "net_pnl": {
+                    "type": "string"
+                },
+                "proceeds": {
+                    "type": "string"
+                },
+                "security_id": {
+                    "type": "string"
+                },
+                "symbol": {
+                    "type": "string"
+                },
+                "taxes": {
+                    "type": "string"
+                },
+                "trade_gain": {
+                    "type": "string"
                 }
             }
         },
@@ -5777,6 +6174,30 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.RotatingSavingsAuditLogResponse": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "details": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "group_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.RotatingSavingsContributionRequest": {
             "type": "object",
             "properties": {
@@ -5813,6 +6234,331 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.RotatingSavingsContributionResponse": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "collected_fee_per_slot": {
+                    "type": "number"
+                },
+                "cycle_no": {
+                    "type": "integer"
+                },
+                "due_date": {
+                    "type": "string"
+                },
+                "group_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "slots_taken": {
+                    "type": "integer"
+                },
+                "transaction_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.RotatingSavingsGroupDetailResponse": {
+            "type": "object",
+            "properties": {
+                "audit_logs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.RotatingSavingsAuditLogResponse"
+                    }
+                },
+                "collected_slots_count": {
+                    "type": "integer"
+                },
+                "contributions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.RotatingSavingsContributionResponse"
+                    }
+                },
+                "current_accrued_interest": {
+                    "type": "number"
+                },
+                "current_payout_value": {
+                    "type": "number"
+                },
+                "group": {
+                    "$ref": "#/definitions/dto.RotatingSavingsGroupResponse"
+                },
+                "next_payment": {
+                    "type": "number"
+                },
+                "remaining_amount": {
+                    "type": "number"
+                },
+                "schedule": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.RotatingSavingsScheduleCycle"
+                    }
+                },
+                "total_paid": {
+                    "type": "number"
+                },
+                "total_received": {
+                    "type": "number"
+                }
+            }
+        },
+        "dto.RotatingSavingsGroupResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "contribution_amount": {
+                    "type": "number"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "cycle_frequency": {
+                    "type": "string"
+                },
+                "fixed_interest_amount": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "member_count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "payout_cycle_no": {
+                    "type": "integer"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "user_slots": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.RotatingSavingsGroupSummary": {
+            "type": "object",
+            "properties": {
+                "completed_cycles": {
+                    "type": "integer"
+                },
+                "group": {
+                    "$ref": "#/definitions/dto.RotatingSavingsGroupResponse"
+                },
+                "next_due_date": {
+                    "type": "string"
+                },
+                "remaining_amount": {
+                    "type": "number"
+                },
+                "total_cycles": {
+                    "type": "integer"
+                },
+                "total_paid": {
+                    "type": "number"
+                },
+                "total_received": {
+                    "type": "number"
+                }
+            }
+        },
+        "dto.RotatingSavingsScheduleCycle": {
+            "type": "object",
+            "properties": {
+                "accrued_interest": {
+                    "type": "number"
+                },
+                "contribution_id": {
+                    "type": "string"
+                },
+                "cycle_no": {
+                    "type": "integer"
+                },
+                "due_date": {
+                    "type": "string"
+                },
+                "expected_amount": {
+                    "type": "number"
+                },
+                "is_paid": {
+                    "type": "boolean"
+                },
+                "is_payout": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "description": "uncollected, partial_collected, collected",
+                    "type": "string"
+                },
+                "payout_amount": {
+                    "type": "number"
+                },
+                "payout_id": {
+                    "type": "string"
+                },
+                "payout_slots": {
+                    "type": "integer"
+                },
+                "user_collected_slots": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.SavingsResponse": {
+            "type": "object",
+            "properties": {
+                "accrued_interest": {
+                    "type": "string"
+                },
+                "auto_renew": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interest_rate": {
+                    "type": "string"
+                },
+                "maturity_date": {
+                    "type": "string"
+                },
+                "parent_account_id": {
+                    "type": "string"
+                },
+                "principal": {
+                    "type": "string"
+                },
+                "savings_account_id": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "term_months": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.SecurityEventResponse": {
+            "type": "object",
+            "properties": {
+                "cash_amount_per_share": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "effective_date": {
+                    "type": "string"
+                },
+                "event_type": {
+                    "type": "string"
+                },
+                "ex_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "pay_date": {
+                    "type": "string"
+                },
+                "ratio_denominator": {
+                    "type": "string"
+                },
+                "ratio_numerator": {
+                    "type": "string"
+                },
+                "record_date": {
+                    "type": "string"
+                },
+                "security_id": {
+                    "type": "string"
+                },
+                "subscription_price": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.SecurityPriceDailyResponse": {
+            "type": "object",
+            "properties": {
+                "close": {
+                    "type": "string"
+                },
+                "high": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "low": {
+                    "type": "string"
+                },
+                "open": {
+                    "type": "string"
+                },
+                "price_date": {
+                    "type": "string"
+                },
+                "security_id": {
+                    "type": "string"
+                },
+                "volume": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.SecurityResponse": {
+            "type": "object",
+            "properties": {
+                "asset_class": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "symbol": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.SigninRequest": {
             "type": "object",
             "required": [
@@ -5844,6 +6590,70 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.TagResponse": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name_en": {
+                    "type": "string"
+                },
+                "name_vi": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.TradeResponse": {
+            "type": "object",
+            "properties": {
+                "broker_account_id": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "fee_transaction_id": {
+                    "type": "string"
+                },
+                "fees": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "string"
+                },
+                "security_id": {
+                    "type": "string"
+                },
+                "side": {
+                    "type": "string"
+                },
+                "tax_transaction_id": {
+                    "type": "string"
+                },
+                "taxes": {
                     "type": "string"
                 }
             }
@@ -5948,9 +6758,6 @@ const docTemplate = `{
                 "client_id": {
                     "type": "string"
                 },
-                "created_at": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string"
                 },
@@ -6015,9 +6822,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
-                    "type": "string"
-                },
-                "updated_at": {
                     "type": "string"
                 }
             }
@@ -6116,9 +6920,6 @@ const docTemplate = `{
                 "avatar_url": {
                     "type": "string"
                 },
-                "created_at": {
-                    "type": "string"
-                },
                 "display_name": {
                     "type": "string"
                 },
@@ -6138,575 +6939,8 @@ const docTemplate = `{
                 "status": {
                     "type": "string"
                 },
-                "updated_at": {
-                    "type": "string"
-                },
                 "username": {
                     "type": "string"
-                }
-            }
-        },
-        "entity.Account": {
-            "type": "object",
-            "properties": {
-                "account_number": {
-                    "type": "string"
-                },
-                "account_type": {
-                    "type": "string"
-                },
-                "balance": {
-                    "description": "Joined",
-                    "type": "string"
-                },
-                "client_id": {
-                    "type": "string"
-                },
-                "closed_at": {
-                    "type": "string"
-                },
-                "color": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "created_by": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "deleted_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "investment_account_id": {
-                    "description": "Joined",
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "parent_account_id": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "updated_by": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.AccountPatch": {
-            "type": "object",
-            "properties": {
-                "color": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.Budget": {
-            "type": "object",
-            "properties": {
-                "alert_threshold_percent": {
-                    "type": "integer"
-                },
-                "amount": {
-                    "type": "string"
-                },
-                "category_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "period": {
-                    "description": "month, week, custom",
-                    "type": "string"
-                },
-                "period_end": {
-                    "type": "string"
-                },
-                "period_start": {
-                    "type": "string"
-                },
-                "remaining": {
-                    "type": "string"
-                },
-                "rollover_mode": {
-                    "type": "string"
-                },
-                "spent": {
-                    "description": "Enriched fields",
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.Category": {
-            "type": "object",
-            "properties": {
-                "color": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "deleted_at": {
-                    "type": "string"
-                },
-                "icon": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "is_active": {
-                    "type": "boolean"
-                },
-                "parent_category_id": {
-                    "type": "string"
-                },
-                "sort_order": {
-                    "type": "integer"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.Contact": {
-            "type": "object",
-            "properties": {
-                "avatar_url": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "deleted_at": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "linked_avatar_url": {
-                    "type": "string"
-                },
-                "linked_display_name": {
-                    "type": "string"
-                },
-                "linked_user_id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "notes": {
-                    "type": "string"
-                },
-                "phone": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.Debt": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "accrued_interest": {
-                    "type": "string"
-                },
-                "client_id": {
-                    "type": "string"
-                },
-                "closed_at": {
-                    "type": "string"
-                },
-                "contact_avatar_url": {
-                    "type": "string"
-                },
-                "contact_id": {
-                    "type": "string"
-                },
-                "contact_name": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "direction": {
-                    "description": "lent, borrowed",
-                    "type": "string"
-                },
-                "due_date": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "interest_rate": {
-                    "type": "string"
-                },
-                "interest_rule": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "outstanding_principal": {
-                    "type": "string"
-                },
-                "principal": {
-                    "type": "string"
-                },
-                "start_date": {
-                    "type": "string"
-                },
-                "status": {
-                    "description": "active, paid, cancelled",
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.Savings": {
-            "type": "object",
-            "properties": {
-                "accrued_interest": {
-                    "type": "string"
-                },
-                "auto_renew": {
-                    "type": "boolean"
-                },
-                "closed_at": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "interest_rate": {
-                    "type": "string"
-                },
-                "maturity_date": {
-                    "type": "string"
-                },
-                "parent_account_id": {
-                    "type": "string"
-                },
-                "principal": {
-                    "type": "string"
-                },
-                "savings_account_id": {
-                    "type": "string"
-                },
-                "start_date": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "term_months": {
-                    "type": "integer"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.Security": {
-            "type": "object",
-            "properties": {
-                "asset_class": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "symbol": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.Tag": {
-            "type": "object",
-            "properties": {
-                "color": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name_en": {
-                    "type": "string"
-                },
-                "name_vi": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.Trade": {
-            "type": "object",
-            "properties": {
-                "broker_account_id": {
-                    "type": "string"
-                },
-                "client_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "fee_transaction_id": {
-                    "type": "string"
-                },
-                "fees": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "note": {
-                    "type": "string"
-                },
-                "occurred_at": {
-                    "type": "string"
-                },
-                "price": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "string"
-                },
-                "security_id": {
-                    "type": "string"
-                },
-                "side": {
-                    "description": "buy, sell",
-                    "type": "string"
-                },
-                "tax_transaction_id": {
-                    "type": "string"
-                },
-                "taxes": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.Transaction": {
-            "type": "object",
-            "properties": {
-                "account_currency": {
-                    "description": "Currencies are derived from linked accounts (not stored on transactions).",
-                    "type": "string"
-                },
-                "account_id": {
-                    "type": "string"
-                },
-                "amount": {
-                    "type": "string"
-                },
-                "category_colors": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "category_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "category_names": {
-                    "description": "Wrapper fields (enriched)",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "client_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "created_by": {
-                    "type": "string"
-                },
-                "deleted_at": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "exchange_rate": {
-                    "type": "string"
-                },
-                "external_ref": {
-                    "type": "string"
-                },
-                "from_account_id": {
-                    "type": "string"
-                },
-                "from_amount": {
-                    "description": "For FX transfers, amounts can differ per side.",
-                    "type": "string"
-                },
-                "from_currency": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "line_items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/entity.TransactionLineItem"
-                    }
-                },
-                "occurred_at": {
-                    "type": "string"
-                },
-                "occurred_date": {
-                    "type": "string"
-                },
-                "status": {
-                    "description": "pending, posted, cancelled",
-                    "type": "string"
-                },
-                "tag_colors": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "tag_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "tag_names": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "to_account_id": {
-                    "type": "string"
-                },
-                "to_amount": {
-                    "type": "string"
-                },
-                "to_currency": {
-                    "type": "string"
-                },
-                "type": {
-                    "description": "expense, income, transfer",
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "updated_by": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.TransactionLineItem": {
-            "type": "object",
-            "properties": {
-                "amount": {
-                    "type": "string"
-                },
-                "category_id": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "note": {
-                    "type": "string"
-                },
-                "tag_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
                 }
             }
         },

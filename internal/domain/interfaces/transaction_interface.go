@@ -29,22 +29,22 @@ type TransactionRepository interface {
 }
 
 type TransactionService interface {
-	Create(ctx context.Context, userID string, req dto.CreateTransactionRequest) (*entity.Transaction, error)
-	Get(ctx context.Context, userID, transactionID string) (*entity.Transaction, error)
-	List(ctx context.Context, userID string, req dto.CreateTransactionRequest) ([]entity.Transaction, *string, int, error) // Note: Filter is DTO-ed
-	Patch(ctx context.Context, userID, transactionID string, req dto.TransactionPatchRequest) (*entity.Transaction, error)
+	Create(ctx context.Context, userID string, req dto.CreateTransactionRequest) (*dto.TransactionResponse, error)
+	Get(ctx context.Context, userID, transactionID string) (*dto.TransactionResponse, error)
+	List(ctx context.Context, userID string, req dto.CreateTransactionRequest) ([]dto.TransactionResponse, *string, int, error)
+	Patch(ctx context.Context, userID, transactionID string, req dto.TransactionPatchRequest) (*dto.TransactionResponse, error)
 	BatchPatch(ctx context.Context, userID string, req dto.BatchPatchRequest) (*dto.BatchPatchResult, error)
 	Delete(ctx context.Context, userID, transactionID string) error
 
 	// Imports
 	StageImport(ctx context.Context, userID string, items []dto.StageImportedItem) (int, int, []string, error)
-	ListImported(ctx context.Context, userID string) ([]entity.ImportedTransaction, error)
-	PatchImported(ctx context.Context, userID, importID string, patch entity.ImportedTransactionPatch) (*entity.ImportedTransaction, error)
+	ListImported(ctx context.Context, userID string) ([]dto.ImportedTransactionResponse, error)
+	PatchImported(ctx context.Context, userID, importID string, patch entity.ImportedTransactionPatch) (*dto.ImportedTransactionResponse, error)
 	DeleteImported(ctx context.Context, userID, importID string) error
 	ClearImported(ctx context.Context, userID string) error
 
 	// Rules
-	UpsertMappingRules(ctx context.Context, userID string, inputs []dto.MappingRuleInput) ([]entity.ImportMappingRule, error)
-	ListMappingRules(ctx context.Context, userID string) ([]entity.ImportMappingRule, error)
+	UpsertMappingRules(ctx context.Context, userID string, inputs []dto.MappingRuleInput) ([]dto.ImportMappingRuleResponse, error)
+	ListMappingRules(ctx context.Context, userID string) ([]dto.ImportMappingRuleResponse, error)
 	DeleteMappingRule(ctx context.Context, userID, ruleID string) error
 }
