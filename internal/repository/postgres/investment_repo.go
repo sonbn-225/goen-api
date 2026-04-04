@@ -19,38 +19,6 @@ func NewInvestmentRepo(db *database.Postgres) *InvestmentRepo {
 	return &InvestmentRepo{db: db}
 }
 
-func (r *InvestmentRepo) CreateInvestmentAccount(ctx context.Context, userID string, ia entity.InvestmentAccount) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-
-	cmd, err := pool.Exec(ctx, `
-		INSERT INTO investment_accounts (
-			id, account_id, fee_settings, tax_settings, created_at, updated_at
-		)
-		SELECT $1,$2,$3,$4,$5,$6
-		WHERE EXISTS (
-			SELECT 1
-			FROM accounts a
-			JOIN user_accounts ua ON ua.account_id = a.id
-			WHERE a.id = $2
-			  AND a.account_type = 'broker'
-			  AND a.deleted_at IS NULL
-			  AND ua.user_id = $7
-			  AND ua.status = 'active'
-			  AND ua.permission IN ('owner','editor')
-		)
-	`, ia.ID, ia.AccountID, ia.FeeSettings, ia.TaxSettings, ia.CreatedAt, ia.UpdatedAt, userID)
-	if err != nil {
-		return err
-	}
-	if cmd.RowsAffected() == 0 {
-		return errors.New("forbidden: account access required")
-	}
-	return nil
-}
-
 func (r *InvestmentRepo) GetInvestmentAccount(ctx context.Context, userID string, investmentAccountID string) (*entity.InvestmentAccount, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -135,7 +103,7 @@ func (r *InvestmentRepo) UpdateInvestmentAccountSettings(ctx context.Context, us
 		}
 		return nil, err
 	}
-	
+
 	// Refetch to get currency
 	return r.GetInvestmentAccount(ctx, userID, out.ID)
 }
@@ -221,10 +189,18 @@ func (r *InvestmentRepo) ListSecurityPrices(ctx context.Context, securityID stri
 			return nil, err
 		}
 		p.PriceDate = priceDate.Format("2006-01-02")
-		if open.Valid { p.Open = &open.String }
-		if high.Valid { p.High = &high.String }
-		if low.Valid { p.Low = &low.String }
-		if volume.Valid { p.Volume = &volume.String }
+		if open.Valid {
+			p.Open = &open.String
+		}
+		if high.Valid {
+			p.High = &high.String
+		}
+		if low.Valid {
+			p.Low = &low.String
+		}
+		if volume.Valid {
+			p.Volume = &volume.String
+		}
 		results = append(results, p)
 	}
 	return results, nil
@@ -262,14 +238,34 @@ func (r *InvestmentRepo) ListSecurityEvents(ctx context.Context, securityID stri
 		); err != nil {
 			return nil, err
 		}
-		if exDate.Valid { d := exDate.Time.Format("2006-01-02"); e.ExDate = &d }
-		if recordDate.Valid { d := recordDate.Time.Format("2006-01-02"); e.RecordDate = &d }
-		if payDate.Valid { d := payDate.Time.Format("2006-01-02"); e.PayDate = &d }
-		if effectiveDate.Valid { d := effectiveDate.Time.Format("2006-01-02"); e.EffectiveDate = &d }
-		if cashPerShare.Valid { e.CashAmountPerShare = &cashPerShare.String }
-		if ratioNum.Valid { e.RatioNumerator = &ratioNum.String }
-		if ratioDen.Valid { e.RatioDenominator = &ratioDen.String }
-		if subPrice.Valid { e.SubscriptionPrice = &subPrice.String }
+		if exDate.Valid {
+			d := exDate.Time.Format("2006-01-02")
+			e.ExDate = &d
+		}
+		if recordDate.Valid {
+			d := recordDate.Time.Format("2006-01-02")
+			e.RecordDate = &d
+		}
+		if payDate.Valid {
+			d := payDate.Time.Format("2006-01-02")
+			e.PayDate = &d
+		}
+		if effectiveDate.Valid {
+			d := effectiveDate.Time.Format("2006-01-02")
+			e.EffectiveDate = &d
+		}
+		if cashPerShare.Valid {
+			e.CashAmountPerShare = &cashPerShare.String
+		}
+		if ratioNum.Valid {
+			e.RatioNumerator = &ratioNum.String
+		}
+		if ratioDen.Valid {
+			e.RatioDenominator = &ratioDen.String
+		}
+		if subPrice.Valid {
+			e.SubscriptionPrice = &subPrice.String
+		}
 		results = append(results, e)
 	}
 	return results, nil
@@ -301,14 +297,34 @@ func (r *InvestmentRepo) GetSecurityEvent(ctx context.Context, securityEventID s
 		}
 		return nil, err
 	}
-	if exDate.Valid { d := exDate.Time.Format("2006-01-02"); e.ExDate = &d }
-	if recordDate.Valid { d := recordDate.Time.Format("2006-01-02"); e.RecordDate = &d }
-	if payDate.Valid { d := payDate.Time.Format("2006-01-02"); e.PayDate = &d }
-	if effectiveDate.Valid { d := effectiveDate.Time.Format("2006-01-02"); e.EffectiveDate = &d }
-	if cashPerShare.Valid { e.CashAmountPerShare = &cashPerShare.String }
-	if ratioNum.Valid { e.RatioNumerator = &ratioNum.String }
-	if ratioDen.Valid { e.RatioDenominator = &ratioDen.String }
-	if subPrice.Valid { e.SubscriptionPrice = &subPrice.String }
+	if exDate.Valid {
+		d := exDate.Time.Format("2006-01-02")
+		e.ExDate = &d
+	}
+	if recordDate.Valid {
+		d := recordDate.Time.Format("2006-01-02")
+		e.RecordDate = &d
+	}
+	if payDate.Valid {
+		d := payDate.Time.Format("2006-01-02")
+		e.PayDate = &d
+	}
+	if effectiveDate.Valid {
+		d := effectiveDate.Time.Format("2006-01-02")
+		e.EffectiveDate = &d
+	}
+	if cashPerShare.Valid {
+		e.CashAmountPerShare = &cashPerShare.String
+	}
+	if ratioNum.Valid {
+		e.RatioNumerator = &ratioNum.String
+	}
+	if ratioDen.Valid {
+		e.RatioDenominator = &ratioDen.String
+	}
+	if subPrice.Valid {
+		e.SubscriptionPrice = &subPrice.String
+	}
 	return &e, nil
 }
 

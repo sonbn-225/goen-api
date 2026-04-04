@@ -23,12 +23,17 @@ func NewTransactionHandler(svc interfaces.TransactionService) *TransactionHandle
 func (h *TransactionHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-		r.Get("/transactions", h.List)
-		r.Post("/transactions", h.Create)
-		r.Post("/transactions/batch-patch", h.BatchPatch)
-		r.Get("/transactions/{transactionId}", h.Get)
-		r.Patch("/transactions/{transactionId}", h.Patch)
-		r.Delete("/transactions/{transactionId}", h.Delete)
+
+		r.Route("/transactions", func(r chi.Router) {
+			r.Get("/", h.List)
+			r.Post("/", h.Create)
+			r.Post("/batch-patch", h.BatchPatch)
+			r.Route("/{transactionId}", func(r chi.Router) {
+				r.Get("/", h.Get)
+				r.Patch("/", h.Patch)
+				r.Delete("/", h.Delete)
+			})
+		})
 	})
 }
 

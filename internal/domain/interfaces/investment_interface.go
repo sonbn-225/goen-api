@@ -9,7 +9,6 @@ import (
 
 type InvestmentRepository interface {
 	// Investment accounts
-	CreateInvestmentAccount(ctx context.Context, userID string, ia entity.InvestmentAccount) error
 	GetInvestmentAccount(ctx context.Context, userID string, investmentAccountID string) (*entity.InvestmentAccount, error)
 	ListInvestmentAccounts(ctx context.Context, userID string) ([]entity.InvestmentAccount, error)
 	UpdateInvestmentAccountSettings(ctx context.Context, userID string, investmentAccountID string, feeSettings any, taxSettings any) (*entity.InvestmentAccount, error)

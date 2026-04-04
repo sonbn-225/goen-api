@@ -21,22 +21,39 @@ func NewInvestmentHandler(svc interfaces.InvestmentService) *InvestmentHandler {
 }
 
 func (h *InvestmentHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
-	r.Get("/investment-accounts", h.ListInvestmentAccounts)
-	r.Get("/investment-accounts/{id}", h.GetInvestmentAccount)
-	r.Patch("/investment-accounts/{id}", h.UpdateInvestmentAccountSettings)
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(cfg))
 
-	r.Get("/investment-accounts/{id}/trades", h.ListTrades)
-	r.Post("/investment-accounts/{id}/trades", h.CreateTrade)
-	r.Put("/investment-accounts/{id}/trades/{tradeId}", h.UpdateTrade)
-	r.Delete("/investment-accounts/{id}/trades/{tradeId}", h.DeleteTrade)
+		r.Route("/investments/accounts", func(r chi.Router) {
+			r.Get("/", h.ListInvestmentAccounts)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", h.GetInvestmentAccount)
+				r.Patch("/", h.UpdateInvestmentAccountSettings)
 
-	r.Get("/investment-accounts/{id}/holdings", h.ListHoldings)
-	r.Get("/investment-accounts/{id}/reports/realized-pnl", h.GetRealizedPNLReport)
+				r.Route("/trades", func(r chi.Router) {
+					r.Get("/", h.ListTrades)
+					r.Post("/", h.CreateTrade)
+					r.Patch("/{tradeId}", h.UpdateTrade)
+					r.Delete("/{tradeId}", h.DeleteTrade)
+				})
 
-	r.Get("/securities", h.ListSecurities)
-	r.Get("/securities/{securityId}", h.GetSecurity)
-	r.Get("/securities/{securityId}/prices-daily", h.ListSecurityPrices)
-	r.Get("/securities/{securityId}/events", h.ListSecurityEvents)
+				r.Get("/holdings", h.ListHoldings)
+				r.Get("/reports/realized-pnl", h.GetRealizedPNLReport)
+				r.Get("/eligible-actions", h.ListEligibleActions)
+				r.Post("/actions/{eventId}/claim", h.ClaimAction)
+				r.Post("/backfill-cash", h.BackfillCash)
+			})
+		})
+
+		r.Route("/investments/securities", func(r chi.Router) {
+			r.Get("/", h.ListSecurities)
+			r.Route("/{securityId}", func(r chi.Router) {
+				r.Get("/", h.GetSecurity)
+				r.Get("/prices-daily", h.ListSecurityPrices)
+				r.Get("/events", h.ListSecurityEvents)
+			})
+		})
+	})
 }
 
 // ListInvestmentAccounts godoc
@@ -47,7 +64,7 @@ func (h *InvestmentHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Security BearerAuth
 // @Success 200 {object} response.SuccessEnvelope{data=[]dto.InvestmentAccountResponse}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /investment-accounts [get]
+// @Router /investments/accounts [get]
 func (h *InvestmentHandler) ListInvestmentAccounts(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -71,7 +88,7 @@ func (h *InvestmentHandler) ListInvestmentAccounts(w http.ResponseWriter, r *htt
 // @Param id path string true "Account ID"
 // @Success 200 {object} response.SuccessEnvelope{data=dto.InvestmentAccountResponse}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /investment-accounts/{id} [get]
+// @Router /investments/accounts/{id} [get]
 func (h *InvestmentHandler) GetInvestmentAccount(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -99,7 +116,7 @@ func (h *InvestmentHandler) GetInvestmentAccount(w http.ResponseWriter, r *http.
 // @Success 200 {object} response.SuccessEnvelope{data=dto.InvestmentAccountResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /investment-accounts/{id} [patch]
+// @Router /investments/accounts/{id} [patch]
 func (h *InvestmentHandler) UpdateInvestmentAccountSettings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -129,7 +146,7 @@ func (h *InvestmentHandler) UpdateInvestmentAccountSettings(w http.ResponseWrite
 // @Param id path string true "Account ID"
 // @Success 200 {object} response.SuccessEnvelope{data=[]dto.TradeResponse}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /investment-accounts/{id}/trades [get]
+// @Router /investments/accounts/{id}/trades [get]
 func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -157,7 +174,7 @@ func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 // @Success 201 {object} response.SuccessEnvelope{data=dto.TradeResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /investment-accounts/{id}/trades [post]
+// @Router /investments/accounts/{id}/trades [post]
 func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -191,7 +208,7 @@ func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) 
 // @Success 200 {object} response.SuccessEnvelope{data=dto.TradeResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /investment-accounts/{id}/trades/{tradeId} [put]
+// @Router /investments/accounts/{id}/trades/{tradeId} [patch]
 func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -223,7 +240,7 @@ func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) 
 // @Param tradeId path string true "Trade ID"
 // @Success 200 {object} response.SuccessEnvelope{data=map[string]string}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /investment-accounts/{id}/trades/{tradeId} [delete]
+// @Router /investments/accounts/{id}/trades/{tradeId} [delete]
 func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -249,7 +266,7 @@ func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) 
 // @Param id path string true "Account ID"
 // @Success 200 {object} response.SuccessEnvelope{data=[]dto.HoldingResponse}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /investment-accounts/{id}/holdings [get]
+// @Router /investments/accounts/{id}/holdings [get]
 func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -274,7 +291,7 @@ func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request)
 // @Param id path string true "Account ID"
 // @Success 200 {object} response.SuccessEnvelope{data=dto.RealizedPNLReport}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /investment-accounts/{id}/reports/realized-pnl [get]
+// @Router /investments/accounts/{id}/reports/realized-pnl [get]
 func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -290,6 +307,59 @@ func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.
 	response.WriteSuccess(w, http.StatusOK, report)
 }
 
+func (h *InvestmentHandler) ListEligibleActions(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	items, err := h.svc.ListEligibleCorporateActions(r.Context(), userID, id)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+	response.WriteSuccess(w, http.StatusOK, items)
+}
+
+func (h *InvestmentHandler) ClaimAction(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	eventID := chi.URLParam(r, "eventId")
+
+	var req dto.ClaimCorporateActionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
+		return
+	}
+
+	trade, err := h.svc.ClaimCorporateAction(r.Context(), userID, id, eventID, req)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+	response.WriteSuccess(w, http.StatusOK, trade)
+}
+
+func (h *InvestmentHandler) BackfillCash(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	result, err := h.svc.BackfillTradePrincipalTransactions(r.Context(), userID, id)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+	response.WriteSuccess(w, http.StatusOK, result)
+}
+
 // ListSecurities godoc
 // @Summary List Securities
 // @Description Retrieve list of all available securities in the system
@@ -297,7 +367,7 @@ func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.
 // @Produce json
 // @Success 200 {object} response.SuccessEnvelope{data=[]dto.SecurityResponse}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /securities [get]
+// @Router /investments/securities [get]
 func (h *InvestmentHandler) ListSecurities(w http.ResponseWriter, r *http.Request) {
 	securities, err := h.svc.ListSecurities(r.Context())
 	if err != nil {
@@ -315,7 +385,7 @@ func (h *InvestmentHandler) ListSecurities(w http.ResponseWriter, r *http.Reques
 // @Param securityId path string true "Security ID"
 // @Success 200 {object} response.SuccessEnvelope{data=dto.SecurityResponse}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /securities/{securityId} [get]
+// @Router /investments/securities/{securityId} [get]
 func (h *InvestmentHandler) GetSecurity(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "securityId")
 	security, err := h.svc.GetSecurity(r.Context(), id)
@@ -336,7 +406,7 @@ func (h *InvestmentHandler) GetSecurity(w http.ResponseWriter, r *http.Request) 
 // @Param to query string false "To Date (YYYY-MM-DD)"
 // @Success 200 {object} response.SuccessEnvelope{data=[]dto.SecurityPriceDailyResponse}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /securities/{securityId}/prices-daily [get]
+// @Router /investments/securities/{securityId}/prices-daily [get]
 func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "securityId")
 	from := r.URL.Query().Get("from")
@@ -367,7 +437,7 @@ func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Re
 // @Param to query string false "To Date (YYYY-MM-DD)"
 // @Success 200 {object} response.SuccessEnvelope{data=[]dto.SecurityEventResponse}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /securities/{securityId}/events [get]
+// @Router /investments/securities/{securityId}/events [get]
 func (h *InvestmentHandler) ListSecurityEvents(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "securityId")
 	from := r.URL.Query().Get("from")

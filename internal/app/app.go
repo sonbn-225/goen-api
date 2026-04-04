@@ -68,6 +68,7 @@ func New(cfg *config.Config) (*App, error) {
 	investmentRepo := postgres.NewInvestmentRepo(db)
 	marketDataRepo := postgres.NewMarketDataRepo(db)
 	savingsRepo := postgres.NewSavingsRepo(db)
+	rotatingSavingsRepo := postgres.NewRotatingSavingsRepo(db)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, refreshRepo, s3, cfg)
@@ -80,10 +81,10 @@ func New(cfg *config.Config) (*App, error) {
 	budgetSvc := service.NewBudgetService(budgetRepo, categoryRepo)
 	reportSvc := service.NewReportService(reportRepo, accountRepo)
 	groupExpenseSvc := service.NewGroupExpenseService(transactionSvc, debtSvc, groupExpenseRepo)
-	investmentSvc := service.NewInvestmentService(investmentRepo, accountSvc, transactionSvc)
+	investmentSvc := service.NewInvestmentService(investmentRepo, transactionSvc)
 	marketDataSvc := service.NewMarketDataService(cfg, marketDataRepo, rds, investmentSvc)
 	savingsSvc := service.NewSavingsService(savingsRepo)
-	rotatingSavingsSvc := service.NewRotatingSavingsService(savingsRepo, accountSvc, transactionSvc)
+	rotatingSavingsSvc := service.NewRotatingSavingsService(rotatingSavingsRepo, accountSvc, transactionSvc)
 	publicSvc := service.NewPublicService(userRepo, accountRepo, groupExpenseRepo)
 	diagnosticsSvc := service.NewDiagnosticsService(db)
 
@@ -106,12 +107,13 @@ func New(cfg *config.Config) (*App, error) {
 	groupExpenseHandler := v1.NewGroupExpenseHandler(groupExpenseSvc)
 	investmentHandler := v1.NewInvestmentHandler(investmentSvc)
 	marketDataHandler := v1.NewMarketDataHandler(marketDataSvc)
-	savingsHandler := v1.NewSavingsHandler(savingsSvc, rotatingSavingsSvc)
+	savingsHandler := v1.NewSavingsHandler(savingsSvc)
+	rotatingSavingsHandler := v1.NewRotatingSavingsHandler(rotatingSavingsSvc)
 	publicHandler := v1.NewPublicHandler(publicSvc)
 	diagnosticsHandler := v1.NewDiagnosticsHandler(diagnosticsSvc)
 
 	r := chi.NewRouter()
- 
+
 	// CORS
 	corsOpts := cors.Options{
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -170,6 +172,7 @@ func New(cfg *config.Config) (*App, error) {
 		investmentHandler.RegisterRoutes(r, cfg)
 		marketDataHandler.RegisterRoutes(r, cfg)
 		savingsHandler.RegisterRoutes(r, cfg)
+		rotatingSavingsHandler.RegisterRoutes(r, cfg)
 		publicHandler.RegisterRoutes(r, cfg)
 		diagnosticsHandler.RegisterRoutes(r, cfg)
 	})

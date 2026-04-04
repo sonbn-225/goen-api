@@ -27,7 +27,6 @@ type AccountService interface {
 	Create(ctx context.Context, userID string, req dto.CreateAccountRequest) (*dto.AccountResponse, error)
 	Patch(ctx context.Context, userID, accountID string, req dto.PatchAccountRequest) (*dto.AccountResponse, error)
 	Delete(ctx context.Context, userID, accountID string) error
-	ListBalances(ctx context.Context, userID string) ([]dto.AccountBalanceResponse, error)
 	ListShares(ctx context.Context, userID, accountID string) ([]dto.AccountShareResponse, error)
 	UpsertShare(ctx context.Context, userID, accountID, login, permission string) (*dto.AccountShareResponse, error)
 	RevokeShare(ctx context.Context, userID, accountID, targetUserID string) error

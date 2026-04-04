@@ -23,11 +23,16 @@ func NewBudgetHandler(svc interfaces.BudgetService) *BudgetHandler {
 func (h *BudgetHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-		r.Get("/budgets", h.List)
-		r.Post("/budgets", h.Create)
-		r.Get("/budgets/{id}", h.Get)
-		r.Patch("/budgets/{id}", h.Update)
-		r.Delete("/budgets/{id}", h.Delete)
+
+		r.Route("/budgets", func(r chi.Router) {
+			r.Get("/", h.List)
+			r.Post("/", h.Create)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", h.Get)
+				r.Patch("/", h.Update)
+				r.Delete("/", h.Delete)
+			})
+		})
 	})
 }
 

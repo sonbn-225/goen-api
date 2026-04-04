@@ -23,11 +23,16 @@ func NewContactHandler(svc interfaces.ContactService) *ContactHandler {
 func (h *ContactHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-		r.Get("/contacts", h.List)
-		r.Post("/contacts", h.Create)
-		r.Get("/contacts/{id}", h.Get)
-		r.Patch("/contacts/{id}", h.Update)
-		r.Delete("/contacts/{id}", h.Delete)
+
+		r.Route("/contacts", func(r chi.Router) {
+			r.Get("/", h.List)
+			r.Post("/", h.Create)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", h.Get)
+				r.Patch("/", h.Update)
+				r.Delete("/", h.Delete)
+			})
+		})
 	})
 }
 

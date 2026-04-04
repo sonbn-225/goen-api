@@ -119,24 +119,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/accounts/balances": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get current financial balance calculations for each account",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Accounts"
-                ],
-                "summary": "List Account Balances",
-                "responses": {}
-            }
-        },
         "/accounts/{accountId}": {
             "get": {
                 "security": [
@@ -2146,7 +2128,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/investment-accounts": {
+        "/investments/accounts": {
             "get": {
                 "security": [
                     {
@@ -2192,7 +2174,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/investment-accounts/{id}": {
+        "/investments/accounts/{id}": {
             "get": {
                 "security": [
                     {
@@ -2312,7 +2294,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/investment-accounts/{id}/holdings": {
+        "/investments/accounts/{id}/holdings": {
             "get": {
                 "security": [
                     {
@@ -2367,7 +2349,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/investment-accounts/{id}/reports/realized-pnl": {
+        "/investments/accounts/{id}/reports/realized-pnl": {
             "get": {
                 "security": [
                     {
@@ -2419,7 +2401,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/investment-accounts/{id}/trades": {
+        "/investments/accounts/{id}/trades": {
             "get": {
                 "security": [
                     {
@@ -2542,8 +2524,68 @@ const docTemplate = `{
                 }
             }
         },
-        "/investment-accounts/{id}/trades/{tradeId}": {
-            "put": {
+        "/investments/accounts/{id}/trades/{tradeId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a trade from an investment account",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Investments"
+                ],
+                "summary": "Delete Trade",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Trade ID",
+                        "name": "tradeId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2617,37 +2659,23 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "delete": {
+            }
+        },
+        "/investments/market-data/status": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Delete a trade from an investment account",
+                "description": "Retrieve the status of the global background market data sync routines",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Investments"
+                    "MarketData"
                 ],
-                "summary": "Delete Trade",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Trade ID",
-                        "name": "tradeId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
+                "summary": "Get Global Market Data Status",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2660,10 +2688,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "object",
-                                            "additionalProperties": {
-                                                "type": "string"
-                                            }
+                                            "type": "object"
                                         }
                                     }
                                 }
@@ -2679,7 +2704,70 @@ const docTemplate = `{
                 }
             }
         },
-        "/market-data/refresh-symbols": {
+        "/investments/market-data/sync": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trigger a global sync mapping all active investments to real-time prices",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "MarketData"
+                ],
+                "summary": "Enqueue Global Market Sync",
+                "parameters": [
+                    {
+                        "description": "Market Sync Payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.MarketSyncRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/investments/market-data/sync-symbols": {
             "post": {
                 "security": [
                     {
@@ -2742,21 +2830,211 @@ const docTemplate = `{
                 }
             }
         },
-        "/market-data/status": {
+        "/investments/securities": {
             "get": {
+                "description": "Retrieve list of all available securities in the system",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Securities"
+                ],
+                "summary": "List Securities",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.SecurityResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/investments/securities/{id}/events/refresh": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieve the status of the global background market data sync routines",
+                "description": "Manually queue an event updates fetch (dividends, splits) for a security",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "MarketData"
                 ],
-                "summary": "Get Global Market Data Status",
+                "summary": "Refresh Security Events",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Refresh Event Payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.RefreshEventRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/investments/securities/{id}/prices-daily/refresh": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Manually queue a price refresh from provider for a specific security",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "MarketData"
+                ],
+                "summary": "Refresh Security Prices",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Refresh Payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.RefreshPriceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/investments/securities/{id}/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Real-time sync status for a distinct security ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "MarketData"
+                ],
+                "summary": "Get Security Sync Status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2785,38 +3063,28 @@ const docTemplate = `{
                 }
             }
         },
-        "/market-data/sync": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Trigger a global sync mapping all active investments to real-time prices",
-                "consumes": [
-                    "application/json"
-                ],
+        "/investments/securities/{securityId}": {
+            "get": {
+                "description": "Retrieve details of a specific security by ID",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "MarketData"
+                    "Securities"
                 ],
-                "summary": "Enqueue Global Market Sync",
+                "summary": "Get Security",
                 "parameters": [
                     {
-                        "description": "Market Sync Payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.MarketSyncRequest"
-                        }
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "securityId",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
-                    "202": {
-                        "description": "Accepted",
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "allOf": [
                                 {
@@ -2826,17 +3094,135 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "object"
+                                            "$ref": "#/definitions/dto.SecurityResponse"
                                         }
                                     }
                                 }
                             ]
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/investments/securities/{securityId}/events": {
+            "get": {
+                "description": "Retrieve events (dividends, splits, etc) mapping to a security",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Securities"
+                ],
+                "summary": "List Security Events",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "securityId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "From Date (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To Date (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.SecurityEventResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/investments/securities/{securityId}/prices-daily": {
+            "get": {
+                "description": "Retrieve historical/daily prices for a security between dates",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Securities"
+                ],
+                "summary": "List Security Prices",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "securityId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "From Date (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To Date (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.SecurityPriceDailyResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -3389,7 +3775,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/rotating-savings": {
+        "/rotating-savings/groups": {
             "get": {
                 "security": [
                     {
@@ -3496,7 +3882,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/rotating-savings/{id}": {
+        "/rotating-savings/groups/{id}": {
             "get": {
                 "security": [
                     {
@@ -3669,7 +4055,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/rotating-savings/{id}/contributions": {
+        "/rotating-savings/groups/{id}/contributions": {
             "post": {
                 "security": [
                     {
@@ -3739,7 +4125,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/rotating-savings/{id}/contributions/{contributionId}": {
+        "/rotating-savings/groups/{id}/contributions/{contributionId}": {
             "delete": {
                 "security": [
                     {
@@ -4070,410 +4456,6 @@ const docTemplate = `{
                         "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/securities": {
-            "get": {
-                "description": "Retrieve list of all available securities in the system",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Securities"
-                ],
-                "summary": "List Securities",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.SecurityResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/securities/{id}/refresh-events": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Manually queue an event updates fetch (dividends, splits) for a security",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "MarketData"
-                ],
-                "summary": "Refresh Security Events",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Refresh Event Payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.RefreshEventRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/securities/{id}/refresh-prices": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Manually queue a price refresh from provider for a specific security",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "MarketData"
-                ],
-                "summary": "Refresh Security Prices",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Refresh Payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.RefreshPriceRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "Accepted",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/securities/{id}/status": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Real-time sync status for a distinct security ID",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "MarketData"
-                ],
-                "summary": "Get Security Sync Status",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/securities/{securityId}": {
-            "get": {
-                "description": "Retrieve details of a specific security by ID",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Securities"
-                ],
-                "summary": "Get Security",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "securityId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.SecurityResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/securities/{securityId}/events": {
-            "get": {
-                "description": "Retrieve events (dividends, splits, etc) mapping to a security",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Securities"
-                ],
-                "summary": "List Security Events",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "securityId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "From Date (YYYY-MM-DD)",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "To Date (YYYY-MM-DD)",
-                        "name": "to",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.SecurityEventResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/securities/{securityId}/prices-daily": {
-            "get": {
-                "description": "Retrieve historical/daily prices for a security between dates",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Securities"
-                ],
-                "summary": "List Security Prices",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "securityId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "From Date (YYYY-MM-DD)",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "To Date (YYYY-MM-DD)",
-                        "name": "to",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.SecurityPriceDailyResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
                         }
                     },
                     "500": {
@@ -5983,6 +5965,9 @@ const docTemplate = `{
                 "account_id": {
                     "type": "string"
                 },
+                "created_at": {
+                    "type": "string"
+                },
                 "currency": {
                     "type": "string"
                 },
@@ -5990,7 +5975,10 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
-                "tax_settings": {}
+                "tax_settings": {},
+                "updated_at": {
+                    "type": "string"
+                }
             }
         },
         "dto.MarketSyncRequest": {

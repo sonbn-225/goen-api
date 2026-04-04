@@ -13,40 +13,28 @@ import (
 )
 
 type SavingsHandler struct {
-	savingsSvc  interfaces.SavingsService
-	rotatingSvc interfaces.RotatingSavingsService
+	savingsSvc interfaces.SavingsService
 }
 
-func NewSavingsHandler(savingsSvc interfaces.SavingsService, rotatingSvc interfaces.RotatingSavingsService) *SavingsHandler {
+func NewSavingsHandler(savingsSvc interfaces.SavingsService) *SavingsHandler {
 	return &SavingsHandler{
-		savingsSvc:  savingsSvc,
-		rotatingSvc: rotatingSvc,
+		savingsSvc: savingsSvc,
 	}
 }
 
 func (h *SavingsHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
-	// Savings
-	r.Route("/savings", func(r chi.Router) {
-		r.Get("/", h.ListSavings)
-		r.Post("/", h.CreateSavings)
-		r.Route("/{id}", func(r chi.Router) {
-			r.Get("/", h.GetSavings)
-			r.Patch("/", h.PatchSavings)
-			r.Delete("/", h.DeleteSavings)
-		})
-	})
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(cfg))
 
-	// Rotating Savings
-	r.Route("/rotating-savings", func(r chi.Router) {
-		r.Get("/", h.ListRotatingGroups)
-		r.Post("/", h.CreateRotatingGroup)
-		r.Route("/{id}", func(r chi.Router) {
-			r.Get("/", h.GetRotatingGroupDetail)
-			r.Patch("/", h.UpdateRotatingGroup)
-			r.Delete("/", h.DeleteRotatingGroup)
-
-			r.Post("/contributions", h.CreateContribution)
-			r.Delete("/contributions/{contributionId}", h.DeleteContribution)
+		// Savings
+		r.Route("/savings", func(r chi.Router) {
+			r.Get("/", h.ListSavings)
+			r.Post("/", h.CreateSavings)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", h.GetSavings)
+				r.Patch("/", h.PatchSavings)
+				r.Delete("/", h.DeleteSavings)
+			})
 		})
 	})
 }
@@ -186,200 +174,4 @@ func (h *SavingsHandler) DeleteSavings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Savings deleted"})
-}
-
-// Rotating Savings Handlers
-// ListRotatingGroups godoc
-// @Summary List Rotating Savings Groups
-// @Description Retrieve a list of Rotating Savings (Hụi) groups
-// @Tags RotatingSavings
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} response.SuccessEnvelope{data=[]dto.RotatingSavingsGroupSummary}
-// @Failure 500 {object} response.ErrorEnvelope
-// @Router /rotating-savings [get]
-func (h *SavingsHandler) ListRotatingGroups(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
-		return
-	}
-	groups, err := h.rotatingSvc.ListGroups(r.Context(), userID)
-	if err != nil {
-		response.WriteInternalError(w, err)
-		return
-	}
-	response.WriteSuccess(w, http.StatusOK, groups)
-}
-
-// CreateRotatingGroup godoc
-// @Summary Create Rotating Savings Group
-// @Description Define a new rotating savings (Hụi) group
-// @Tags RotatingSavings
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param request body dto.CreateRotatingSavingsGroupRequest true "Rotating Group Payload"
-// @Success 201 {object} response.SuccessEnvelope{data=dto.RotatingSavingsGroupResponse}
-// @Failure 400 {object} response.ErrorEnvelope
-// @Failure 500 {object} response.ErrorEnvelope
-// @Router /rotating-savings [post]
-func (h *SavingsHandler) CreateRotatingGroup(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
-		return
-	}
-	var req dto.CreateRotatingSavingsGroupRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
-		return
-	}
-	group, err := h.rotatingSvc.CreateGroup(r.Context(), userID, req)
-	if err != nil {
-		response.WriteInternalError(w, err)
-		return
-	}
-	response.WriteSuccess(w, http.StatusCreated, group)
-}
-
-// GetRotatingGroupDetail godoc
-// @Summary Get Rotating Savings Group
-// @Description Retrieve detailed aggregation of a Rotating Savings group
-// @Tags RotatingSavings
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "Rotating Savings Group ID"
-// @Success 200 {object} response.SuccessEnvelope{data=dto.RotatingSavingsGroupDetailResponse}
-// @Failure 500 {object} response.ErrorEnvelope
-// @Router /rotating-savings/{id} [get]
-func (h *SavingsHandler) GetRotatingGroupDetail(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
-		return
-	}
-	id := chi.URLParam(r, "id")
-	detail, err := h.rotatingSvc.GetGroupDetail(r.Context(), userID, id)
-	if err != nil {
-		response.WriteInternalError(w, err)
-		return
-	}
-	response.WriteSuccess(w, http.StatusOK, detail)
-}
-
-// UpdateRotatingGroup godoc
-// @Summary Update Rotating Savings Group
-// @Description Partially update metadata properties for a group
-// @Tags RotatingSavings
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "Rotating Savings Group ID"
-// @Param request body dto.UpdateRotatingSavingsGroupRequest true "Update Group Payload"
-// @Success 200 {object} response.SuccessEnvelope{data=dto.RotatingSavingsGroupResponse}
-// @Failure 400 {object} response.ErrorEnvelope
-// @Failure 500 {object} response.ErrorEnvelope
-// @Router /rotating-savings/{id} [patch]
-func (h *SavingsHandler) UpdateRotatingGroup(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
-		return
-	}
-	id := chi.URLParam(r, "id")
-	var req dto.UpdateRotatingSavingsGroupRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
-		return
-	}
-	group, err := h.rotatingSvc.UpdateGroup(r.Context(), userID, id, req)
-	if err != nil {
-		response.WriteInternalError(w, err)
-		return
-	}
-	response.WriteSuccess(w, http.StatusOK, group)
-}
-
-// DeleteRotatingGroup godoc
-// @Summary Delete Rotating Savings Group
-// @Description Clean up a specific rotating group structure
-// @Tags RotatingSavings
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "Rotating Savings Group ID"
-// @Success 200 {object} response.SuccessEnvelope{data=map[string]string}
-// @Failure 500 {object} response.ErrorEnvelope
-// @Router /rotating-savings/{id} [delete]
-func (h *SavingsHandler) DeleteRotatingGroup(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
-		return
-	}
-	id := chi.URLParam(r, "id")
-	if err := h.rotatingSvc.DeleteGroup(r.Context(), userID, id); err != nil {
-		response.WriteInternalError(w, err)
-		return
-	}
-	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Rotating savings group deleted"})
-}
-
-// CreateContribution godoc
-// @Summary Create Contribution
-// @Description Make a contribution (bidding/paying) within a group cycle
-// @Tags RotatingSavings
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "Rotating Savings Group ID"
-// @Param request body dto.RotatingSavingsContributionRequest true "Contribution Payload"
-// @Success 201 {object} response.SuccessEnvelope{data=dto.RotatingSavingsContributionResponse}
-// @Failure 400 {object} response.ErrorEnvelope
-// @Failure 500 {object} response.ErrorEnvelope
-// @Router /rotating-savings/{id}/contributions [post]
-func (h *SavingsHandler) CreateContribution(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
-		return
-	}
-	id := chi.URLParam(r, "id")
-	var req dto.RotatingSavingsContributionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
-		return
-	}
-	contrib, err := h.rotatingSvc.CreateContribution(r.Context(), userID, id, req)
-	if err != nil {
-		response.WriteInternalError(w, err)
-		return
-	}
-	response.WriteSuccess(w, http.StatusCreated, contrib)
-}
-
-// DeleteContribution godoc
-// @Summary Delete Contribution
-// @Description Void a rotating savings contribution history by ID
-// @Tags RotatingSavings
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "Rotating Savings Group ID"
-// @Param contributionId path string true "Contribution ID"
-// @Success 200 {object} response.SuccessEnvelope{data=map[string]string}
-// @Failure 500 {object} response.ErrorEnvelope
-// @Router /rotating-savings/{id}/contributions/{contributionId} [delete]
-func (h *SavingsHandler) DeleteContribution(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
-		return
-	}
-	id := chi.URLParam(r, "id")
-	contribID := chi.URLParam(r, "contributionId")
-	if err := h.rotatingSvc.DeleteContribution(r.Context(), userID, id, contribID); err != nil {
-		response.WriteInternalError(w, err)
-		return
-	}
-	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Contribution deleted"})
 }

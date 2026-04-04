@@ -610,12 +610,16 @@ definitions:
     properties:
       account_id:
         type: string
+      created_at:
+        type: string
       currency:
         type: string
       fee_settings: {}
       id:
         type: string
       tax_settings: {}
+      updated_at:
+        type: string
     type: object
   dto.MarketSyncRequest:
     properties:
@@ -1568,17 +1572,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Revoke Account Share
-      tags:
-      - Accounts
-  /accounts/balances:
-    get:
-      description: Get current financial balance calculations for each account
-      produces:
-      - application/json
-      responses: {}
-      security:
-      - BearerAuth: []
-      summary: List Account Balances
       tags:
       - Accounts
   /auth/logout:
@@ -2544,7 +2537,7 @@ paths:
       summary: System Health Check
       tags:
       - System
-  /investment-accounts:
+  /investments/accounts:
     get:
       description: Retrieve a list of investment accounts for the current user
       produces:
@@ -2570,7 +2563,7 @@ paths:
       summary: List Investment Accounts
       tags:
       - Investments
-  /investment-accounts/{id}:
+  /investments/accounts/{id}:
     get:
       description: Retrieve a specific investment account by ID
       parameters:
@@ -2642,7 +2635,7 @@ paths:
       summary: Update Investment Account Settings
       tags:
       - Investments
-  /investment-accounts/{id}/holdings:
+  /investments/accounts/{id}/holdings:
     get:
       description: Retrieve current holdings for an investment account
       parameters:
@@ -2674,7 +2667,7 @@ paths:
       summary: List Holdings
       tags:
       - Investments
-  /investment-accounts/{id}/reports/realized-pnl:
+  /investments/accounts/{id}/reports/realized-pnl:
     get:
       description: Realized profit/loss report for an investment account
       parameters:
@@ -2704,7 +2697,7 @@ paths:
       summary: Get Realized P&L Report
       tags:
       - Investments
-  /investment-accounts/{id}/trades:
+  /investments/accounts/{id}/trades:
     get:
       description: Retrieve trades associated with an investment account
       parameters:
@@ -2777,7 +2770,7 @@ paths:
       summary: Create Trade
       tags:
       - Investments
-  /investment-accounts/{id}/trades/{tradeId}:
+  /investments/accounts/{id}/trades/{tradeId}:
     delete:
       description: Delete a trade from an investment account
       parameters:
@@ -2814,7 +2807,7 @@ paths:
       summary: Delete Trade
       tags:
       - Investments
-    put:
+    patch:
       consumes:
       - application/json
       description: Update an existing trade record
@@ -2860,44 +2853,7 @@ paths:
       summary: Update Trade
       tags:
       - Investments
-  /market-data/refresh-symbols:
-    post:
-      consumes:
-      - application/json
-      description: Trigger a refresh for distinct market symbols immediately
-      parameters:
-      - description: Symbols payload
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.RefreshSymbolsRequest'
-      produces:
-      - application/json
-      responses:
-        "202":
-          description: Accepted
-          schema:
-            allOf:
-            - $ref: '#/definitions/response.SuccessEnvelope'
-            - properties:
-                data:
-                  type: object
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Refresh Specific Symbols
-      tags:
-      - MarketData
-  /market-data/status:
+  /investments/market-data/status:
     get:
       description: Retrieve the status of the global background market data sync routines
       produces:
@@ -2921,7 +2877,7 @@ paths:
       summary: Get Global Market Data Status
       tags:
       - MarketData
-  /market-data/sync:
+  /investments/market-data/sync:
     post:
       consumes:
       - application/json
@@ -2959,6 +2915,286 @@ paths:
       summary: Enqueue Global Market Sync
       tags:
       - MarketData
+  /investments/market-data/sync-symbols:
+    post:
+      consumes:
+      - application/json
+      description: Trigger a refresh for distinct market symbols immediately
+      parameters:
+      - description: Symbols payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshSymbolsRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Refresh Specific Symbols
+      tags:
+      - MarketData
+  /investments/securities:
+    get:
+      description: Retrieve list of all available securities in the system
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.SecurityResponse'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: List Securities
+      tags:
+      - Securities
+  /investments/securities/{id}/events/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Manually queue an event updates fetch (dividends, splits) for a
+        security
+      parameters:
+      - description: Security ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Refresh Event Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshEventRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Refresh Security Events
+      tags:
+      - MarketData
+  /investments/securities/{id}/prices-daily/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Manually queue a price refresh from provider for a specific security
+      parameters:
+      - description: Security ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Refresh Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshPriceRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Refresh Security Prices
+      tags:
+      - MarketData
+  /investments/securities/{id}/status:
+    get:
+      description: Real-time sync status for a distinct security ID
+      parameters:
+      - description: Security ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get Security Sync Status
+      tags:
+      - MarketData
+  /investments/securities/{securityId}:
+    get:
+      description: Retrieve details of a specific security by ID
+      parameters:
+      - description: Security ID
+        in: path
+        name: securityId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.SecurityResponse'
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: Get Security
+      tags:
+      - Securities
+  /investments/securities/{securityId}/events:
+    get:
+      description: Retrieve events (dividends, splits, etc) mapping to a security
+      parameters:
+      - description: Security ID
+        in: path
+        name: securityId
+        required: true
+        type: string
+      - description: From Date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: To Date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.SecurityEventResponse'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: List Security Events
+      tags:
+      - Securities
+  /investments/securities/{securityId}/prices-daily:
+    get:
+      description: Retrieve historical/daily prices for a security between dates
+      parameters:
+      - description: Security ID
+        in: path
+        name: securityId
+        required: true
+        type: string
+      - description: From Date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: To Date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.SecurityPriceDailyResponse'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: List Security Prices
+      tags:
+      - Securities
   /media/{bucket}/{key}:
     get:
       description: Retrieve images via minio reverse proxy
@@ -3288,7 +3524,7 @@ paths:
       summary: Get Dashboard Report
       tags:
       - Reports
-  /rotating-savings:
+  /rotating-savings/groups:
     get:
       description: Retrieve a list of Rotating Savings (Hụi) groups
       produces:
@@ -3350,7 +3586,7 @@ paths:
       summary: Create Rotating Savings Group
       tags:
       - RotatingSavings
-  /rotating-savings/{id}:
+  /rotating-savings/groups/{id}:
     delete:
       description: Clean up a specific rotating group structure
       parameters:
@@ -3452,7 +3688,7 @@ paths:
       summary: Update Rotating Savings Group
       tags:
       - RotatingSavings
-  /rotating-savings/{id}/contributions:
+  /rotating-savings/groups/{id}/contributions:
     post:
       consumes:
       - application/json
@@ -3494,7 +3730,7 @@ paths:
       summary: Create Contribution
       tags:
       - RotatingSavings
-  /rotating-savings/{id}/contributions/{contributionId}:
+  /rotating-savings/groups/{id}/contributions/{contributionId}:
     delete:
       description: Void a rotating savings contribution history by ID
       parameters:
@@ -3695,249 +3931,6 @@ paths:
       summary: Update Savings
       tags:
       - Savings
-  /securities:
-    get:
-      description: Retrieve list of all available securities in the system
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/response.SuccessEnvelope'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/dto.SecurityResponse'
-                  type: array
-              type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List Securities
-      tags:
-      - Securities
-  /securities/{id}/refresh-events:
-    post:
-      consumes:
-      - application/json
-      description: Manually queue an event updates fetch (dividends, splits) for a
-        security
-      parameters:
-      - description: Security ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Refresh Event Payload
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.RefreshEventRequest'
-      produces:
-      - application/json
-      responses:
-        "202":
-          description: Accepted
-          schema:
-            allOf:
-            - $ref: '#/definitions/response.SuccessEnvelope'
-            - properties:
-                data:
-                  type: object
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Refresh Security Events
-      tags:
-      - MarketData
-  /securities/{id}/refresh-prices:
-    post:
-      consumes:
-      - application/json
-      description: Manually queue a price refresh from provider for a specific security
-      parameters:
-      - description: Security ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Refresh Payload
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.RefreshPriceRequest'
-      produces:
-      - application/json
-      responses:
-        "202":
-          description: Accepted
-          schema:
-            allOf:
-            - $ref: '#/definitions/response.SuccessEnvelope'
-            - properties:
-                data:
-                  type: object
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Refresh Security Prices
-      tags:
-      - MarketData
-  /securities/{id}/status:
-    get:
-      description: Real-time sync status for a distinct security ID
-      parameters:
-      - description: Security ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/response.SuccessEnvelope'
-            - properties:
-                data:
-                  type: object
-              type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Get Security Sync Status
-      tags:
-      - MarketData
-  /securities/{securityId}:
-    get:
-      description: Retrieve details of a specific security by ID
-      parameters:
-      - description: Security ID
-        in: path
-        name: securityId
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/response.SuccessEnvelope'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.SecurityResponse'
-              type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Get Security
-      tags:
-      - Securities
-  /securities/{securityId}/events:
-    get:
-      description: Retrieve events (dividends, splits, etc) mapping to a security
-      parameters:
-      - description: Security ID
-        in: path
-        name: securityId
-        required: true
-        type: string
-      - description: From Date (YYYY-MM-DD)
-        in: query
-        name: from
-        type: string
-      - description: To Date (YYYY-MM-DD)
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/response.SuccessEnvelope'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/dto.SecurityEventResponse'
-                  type: array
-              type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List Security Events
-      tags:
-      - Securities
-  /securities/{securityId}/prices-daily:
-    get:
-      description: Retrieve historical/daily prices for a security between dates
-      parameters:
-      - description: Security ID
-        in: path
-        name: securityId
-        required: true
-        type: string
-      - description: From Date (YYYY-MM-DD)
-        in: query
-        name: from
-        type: string
-      - description: To Date (YYYY-MM-DD)
-        in: query
-        name: to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/response.SuccessEnvelope'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/dto.SecurityPriceDailyResponse'
-                  type: array
-              type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List Security Prices
-      tags:
-      - Securities
   /settings/me:
     patch:
       consumes:
