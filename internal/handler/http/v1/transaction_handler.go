@@ -53,7 +53,7 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 		// To be filled from query params if needed by service.
 		// For now service LIST is stubbed anyway.
 	}
-	
+
 	items, cursor, total, err := h.svc.List(r.Context(), userID, req)
 	if err != nil {
 		response.WriteInternalError(w, err)
@@ -125,6 +125,11 @@ func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if tx == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "transaction not found", nil)
+		return
+	}
+
 	response.WriteSuccess(w, http.StatusOK, tx)
 }
 
@@ -158,6 +163,11 @@ func (h *TransactionHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	tx, err := h.svc.Patch(r.Context(), userID, transactionID, req)
 	if err != nil {
 		response.WriteInternalError(w, err)
+		return
+	}
+
+	if tx == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "transaction not found", nil)
 		return
 	}
 

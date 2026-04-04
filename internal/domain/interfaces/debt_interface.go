@@ -24,12 +24,12 @@ type DebtRepository interface {
 }
 
 type DebtService interface {
-	Create(ctx context.Context, userID string, req dto.CreateDebtRequest) (*entity.Debt, error)
-	Get(ctx context.Context, userID string, debtID string) (*entity.Debt, error)
-	List(ctx context.Context, userID string) ([]entity.Debt, error)
-	Update(ctx context.Context, userID string, debtID string, req dto.UpdateDebtRequest) (*entity.Debt, error)
+	Create(ctx context.Context, userID string, req dto.CreateDebtRequest) (*dto.DebtResponse, error)
+	Get(ctx context.Context, userID string, debtID string) (*dto.DebtResponse, error)
+	List(ctx context.Context, userID string) ([]dto.DebtResponse, error)
+	Update(ctx context.Context, userID string, debtID string, req dto.UpdateDebtRequest) (*dto.DebtResponse, error)
 	Delete(ctx context.Context, userID string, debtID string) error
 
-	AddPayment(ctx context.Context, userID string, debtID string, req dto.DebtPaymentRequest) (*entity.Debt, error)
-	ListPayments(ctx context.Context, userID string, debtID string) ([]entity.DebtPaymentLink, error)
+	AddPayment(ctx context.Context, userID string, debtID string, req dto.DebtPaymentRequest) (*dto.DebtResponse, error)
+	ListPayments(ctx context.Context, userID string, debtID string) ([]dto.DebtPaymentLinkResponse, error)
 }

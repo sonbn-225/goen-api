@@ -45,7 +45,7 @@ func (h *InvestmentHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags Investments
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} response.SuccessEnvelope{data=[]entity.Account}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.InvestmentAccountResponse}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /investment-accounts [get]
 func (h *InvestmentHandler) ListInvestmentAccounts(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +56,7 @@ func (h *InvestmentHandler) ListInvestmentAccounts(w http.ResponseWriter, r *htt
 	}
 	accounts, err := h.svc.ListInvestmentAccounts(r.Context(), userID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, accounts)
@@ -69,7 +69,7 @@ func (h *InvestmentHandler) ListInvestmentAccounts(w http.ResponseWriter, r *htt
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Account ID"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Account}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.InvestmentAccountResponse}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /investment-accounts/{id} [get]
 func (h *InvestmentHandler) GetInvestmentAccount(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +81,7 @@ func (h *InvestmentHandler) GetInvestmentAccount(w http.ResponseWriter, r *http.
 	id := chi.URLParam(r, "id")
 	account, err := h.svc.GetInvestmentAccount(r.Context(), userID, id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, account)
@@ -96,7 +96,7 @@ func (h *InvestmentHandler) GetInvestmentAccount(w http.ResponseWriter, r *http.
 // @Security BearerAuth
 // @Param id path string true "Account ID"
 // @Param request body dto.PatchInvestmentAccountRequest true "Update Payload"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Account}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.InvestmentAccountResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /investment-accounts/{id} [patch]
@@ -114,7 +114,7 @@ func (h *InvestmentHandler) UpdateInvestmentAccountSettings(w http.ResponseWrite
 	}
 	account, err := h.svc.UpdateInvestmentAccountSettings(r.Context(), userID, id, req)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, account)
@@ -127,7 +127,7 @@ func (h *InvestmentHandler) UpdateInvestmentAccountSettings(w http.ResponseWrite
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Account ID"
-// @Success 200 {object} response.SuccessEnvelope{data=[]entity.Trade}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.TradeResponse}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /investment-accounts/{id}/trades [get]
 func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
@@ -139,7 +139,7 @@ func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	trades, err := h.svc.ListTrades(r.Context(), userID, id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, trades)
@@ -154,7 +154,7 @@ func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Param id path string true "Account ID"
 // @Param request body dto.CreateTradeRequest true "Trade Payload"
-// @Success 201 {object} response.SuccessEnvelope{data=entity.Trade}
+// @Success 201 {object} response.SuccessEnvelope{data=dto.TradeResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /investment-accounts/{id}/trades [post]
@@ -172,7 +172,7 @@ func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) 
 	}
 	trade, err := h.svc.CreateTrade(r.Context(), userID, id, req)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusCreated, trade)
@@ -188,7 +188,7 @@ func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) 
 // @Param id path string true "Account ID"
 // @Param tradeId path string true "Trade ID"
 // @Param request body dto.CreateTradeRequest true "Trade Payload"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Trade}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.TradeResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /investment-accounts/{id}/trades/{tradeId} [put]
@@ -207,7 +207,7 @@ func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) 
 	}
 	trade, err := h.svc.UpdateTrade(r.Context(), userID, id, tradeID, req)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, trade)
@@ -234,7 +234,7 @@ func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) 
 	tradeID := chi.URLParam(r, "tradeId")
 	err := h.svc.DeleteTrade(r.Context(), userID, id, tradeID)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Trade deleted"})
@@ -247,7 +247,7 @@ func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) 
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Account ID"
-// @Success 200 {object} response.SuccessEnvelope{data=[]object}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.HoldingResponse}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /investment-accounts/{id}/holdings [get]
 func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request) {
@@ -259,7 +259,7 @@ func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request)
 	id := chi.URLParam(r, "id")
 	holdings, err := h.svc.ListHoldings(r.Context(), userID, id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, holdings)
@@ -272,7 +272,7 @@ func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request)
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Account ID"
-// @Success 200 {object} response.SuccessEnvelope{data=object}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.RealizedPNLReport}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /investment-accounts/{id}/reports/realized-pnl [get]
 func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.Request) {
@@ -284,7 +284,7 @@ func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.
 	id := chi.URLParam(r, "id")
 	report, err := h.svc.GetRealizedPNLReport(r.Context(), userID, id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, report)
@@ -295,13 +295,13 @@ func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.
 // @Description Retrieve list of all available securities in the system
 // @Tags Securities
 // @Produce json
-// @Success 200 {object} response.SuccessEnvelope{data=[]entity.Security}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.SecurityResponse}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /securities [get]
 func (h *InvestmentHandler) ListSecurities(w http.ResponseWriter, r *http.Request) {
 	securities, err := h.svc.ListSecurities(r.Context())
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, securities)
@@ -313,14 +313,14 @@ func (h *InvestmentHandler) ListSecurities(w http.ResponseWriter, r *http.Reques
 // @Tags Securities
 // @Produce json
 // @Param securityId path string true "Security ID"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Security}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.SecurityResponse}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /securities/{securityId} [get]
 func (h *InvestmentHandler) GetSecurity(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "securityId")
 	security, err := h.svc.GetSecurity(r.Context(), id)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, security)
@@ -334,7 +334,7 @@ func (h *InvestmentHandler) GetSecurity(w http.ResponseWriter, r *http.Request) 
 // @Param securityId path string true "Security ID"
 // @Param from query string false "From Date (YYYY-MM-DD)"
 // @Param to query string false "To Date (YYYY-MM-DD)"
-// @Success 200 {object} response.SuccessEnvelope{data=[]object}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.SecurityPriceDailyResponse}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /securities/{securityId}/prices-daily [get]
 func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Request) {
@@ -342,12 +342,16 @@ func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Re
 	from := r.URL.Query().Get("from")
 	to := r.URL.Query().Get("to")
 	var fromPtr, toPtr *string
-	if from != "" { fromPtr = &from }
-	if to != "" { toPtr = &to }
-	
+	if from != "" {
+		fromPtr = &from
+	}
+	if to != "" {
+		toPtr = &to
+	}
+
 	prices, err := h.svc.ListSecurityPrices(r.Context(), id, fromPtr, toPtr)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, prices)
@@ -361,7 +365,7 @@ func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Re
 // @Param securityId path string true "Security ID"
 // @Param from query string false "From Date (YYYY-MM-DD)"
 // @Param to query string false "To Date (YYYY-MM-DD)"
-// @Success 200 {object} response.SuccessEnvelope{data=[]object}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.SecurityEventResponse}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /securities/{securityId}/events [get]
 func (h *InvestmentHandler) ListSecurityEvents(w http.ResponseWriter, r *http.Request) {
@@ -369,12 +373,16 @@ func (h *InvestmentHandler) ListSecurityEvents(w http.ResponseWriter, r *http.Re
 	from := r.URL.Query().Get("from")
 	to := r.URL.Query().Get("to")
 	var fromPtr, toPtr *string
-	if from != "" { fromPtr = &from }
-	if to != "" { toPtr = &to }
+	if from != "" {
+		fromPtr = &from
+	}
+	if to != "" {
+		toPtr = &to
+	}
 
 	events, err := h.svc.ListSecurityEvents(r.Context(), id, fromPtr, toPtr)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, events)

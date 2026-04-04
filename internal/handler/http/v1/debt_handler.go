@@ -39,7 +39,7 @@ func (h *DebtHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags Debts
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} response.SuccessEnvelope{data=[]entity.Debt}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.DebtResponse}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /debts [get]
 func (h *DebtHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +60,7 @@ func (h *DebtHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateDebtRequest true "Debt Creation Payload"
-// @Success 201 {object} response.SuccessEnvelope{data=entity.Debt}
+// @Success 201 {object} response.SuccessEnvelope{data=dto.DebtResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /debts [post]
@@ -86,7 +86,7 @@ func (h *DebtHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Debt ID"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Debt}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.DebtResponse}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /debts/{id} [get]
@@ -110,7 +110,7 @@ func (h *DebtHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Param id path string true "Debt ID"
 // @Param request body dto.UpdateDebtRequest true "Debt Update Payload"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Debt}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.DebtResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
@@ -160,7 +160,7 @@ func (h *DebtHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Param id path string true "Debt ID"
 // @Param request body dto.DebtPaymentRequest true "Debt Payment Payload"
-// @Success 200 {object} response.SuccessEnvelope{data=object}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.DebtResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
@@ -188,7 +188,7 @@ func (h *DebtHandler) AddPayment(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Debt ID"
-// @Success 200 {object} response.SuccessEnvelope{data=[]object}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.DebtPaymentLinkResponse}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /debts/{id}/payments [get]

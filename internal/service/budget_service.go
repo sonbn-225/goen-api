@@ -105,10 +105,18 @@ func (s *BudgetService) Update(ctx context.Context, userID string, budgetID stri
 		return nil, err
 	}
 
-	if req.Name != nil { cur.Name = req.Name }
-	if req.Amount != nil { cur.Amount = *req.Amount }
-	if req.AlertThresholdPercent != nil { cur.AlertThresholdPercent = req.AlertThresholdPercent }
-	if req.RolloverMode != nil { cur.RolloverMode = req.RolloverMode }
+	if req.Name != nil {
+		cur.Name = req.Name
+	}
+	if req.Amount != nil {
+		cur.Amount = *req.Amount
+	}
+	if req.AlertThresholdPercent != nil {
+		cur.AlertThresholdPercent = req.AlertThresholdPercent
+	}
+	if req.RolloverMode != nil {
+		cur.RolloverMode = req.RolloverMode
+	}
 	cur.UpdatedAt = time.Now().UTC()
 
 	if err := s.repo.UpdateBudget(ctx, userID, *cur); err != nil {
@@ -123,9 +131,13 @@ func (s *BudgetService) Delete(ctx context.Context, userID string, budgetID stri
 
 func (s *BudgetService) normalizeBudgetPeriod(period string, startIn, endIn *string) (string, string, error) {
 	startStr := ""
-	if startIn != nil { startStr = *startIn }
+	if startIn != nil {
+		startStr = *startIn
+	}
 	endStr := ""
-	if endIn != nil { endStr = *endIn }
+	if endIn != nil {
+		endStr = *endIn
+	}
 
 	if period == "custom" {
 		if startStr == "" || endStr == "" {
@@ -169,24 +181,39 @@ func (s *BudgetService) withStats(ctx context.Context, userID string, b entity.B
 	remaining, percent := s.computeStats(b.Amount, spent)
 
 	return &dto.BudgetWithStatsResponse{
-		Budget:      b,
-		Spent:       spent,
-		Remaining:   remaining,
-		PercentUsed: percent,
+		ID:                    b.ID,
+		UserID:                b.UserID,
+		Name:                  b.Name,
+		Period:                b.Period,
+		PeriodStart:           b.PeriodStart,
+		PeriodEnd:             b.PeriodEnd,
+		Amount:                b.Amount,
+		AlertThresholdPercent: b.AlertThresholdPercent,
+		RolloverMode:          b.RolloverMode,
+		CategoryID:            b.CategoryID,
+		Spent:                 spent,
+		Remaining:             remaining,
+		PercentUsed:           percent,
 	}, nil
 }
 
 func (s *BudgetService) computeStats(amountStr, spentStr string) (string, int) {
 	amt, ok := new(big.Rat).SetString(amountStr)
-	if !ok || amt.Sign() == 0 { return "0", 0 }
+	if !ok || amt.Sign() == 0 {
+		return "0", 0
+	}
 	spt, ok := new(big.Rat).SetString(spentStr)
-	if !ok { spt = big.NewRat(0, 1) }
+	if !ok {
+		spt = big.NewRat(0, 1)
+	}
 
 	rem := new(big.Rat).Sub(amt, spt)
 	pct := new(big.Rat).Mul(new(big.Rat).Quo(spt, amt), big.NewRat(100, 1))
-	
+
 	fPct, _ := pct.Float64()
-	if fPct < 0 { fPct = 0 }
+	if fPct < 0 {
+		fPct = 0
+	}
 
 	return rem.FloatString(2), int(fPct)
 }

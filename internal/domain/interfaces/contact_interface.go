@@ -20,10 +20,10 @@ type ContactRepository interface {
 }
 
 type ContactService interface {
-	Create(ctx context.Context, userID string, req dto.CreateContactRequest) (*entity.Contact, error)
-	Get(ctx context.Context, userID, contactID string) (*entity.Contact, error)
-	List(ctx context.Context, userID string) ([]entity.Contact, error)
-	Update(ctx context.Context, userID, contactID string, req dto.UpdateContactRequest) (*entity.Contact, error)
+	Create(ctx context.Context, userID string, req dto.CreateContactRequest) (*dto.ContactResponse, error)
+	Get(ctx context.Context, userID, contactID string) (*dto.ContactResponse, error)
+	List(ctx context.Context, userID string) ([]dto.ContactResponse, error)
+	Update(ctx context.Context, userID, contactID string, req dto.UpdateContactRequest) (*dto.ContactResponse, error)
 	Delete(ctx context.Context, userID, contactID string) error
 	GetOrCreateByName(ctx context.Context, userID, name string) (string, error)
 }

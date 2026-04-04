@@ -3,6 +3,7 @@ package interfaces
 import (
 	"context"
 
+	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
@@ -12,5 +13,5 @@ type ReportRepository interface {
 }
 
 type ReportService interface {
-	GetDashboardReport(ctx context.Context, userID string) (*entity.DashboardReport, error)
+	GetDashboardReport(ctx context.Context, userID string) (*dto.DashboardReportResponse, error)
 }

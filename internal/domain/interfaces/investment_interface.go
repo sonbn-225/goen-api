@@ -50,24 +50,24 @@ type InvestmentRepository interface {
 }
 
 type InvestmentService interface {
-	GetInvestmentAccount(ctx context.Context, userID, investmentAccountID string) (*entity.InvestmentAccount, error)
-	ListInvestmentAccounts(ctx context.Context, userID string) ([]entity.InvestmentAccount, error)
-	UpdateInvestmentAccountSettings(ctx context.Context, userID, investmentAccountID string, req dto.PatchInvestmentAccountRequest) (*entity.InvestmentAccount, error)
+	GetInvestmentAccount(ctx context.Context, userID, investmentAccountID string) (*dto.InvestmentAccountResponse, error)
+	ListInvestmentAccounts(ctx context.Context, userID string) ([]dto.InvestmentAccountResponse, error)
+	UpdateInvestmentAccountSettings(ctx context.Context, userID, investmentAccountID string, req dto.PatchInvestmentAccountRequest) (*dto.InvestmentAccountResponse, error)
 
-	GetSecurity(ctx context.Context, securityID string) (*entity.Security, error)
-	ListSecurities(ctx context.Context) ([]entity.Security, error)
+	GetSecurity(ctx context.Context, securityID string) (*dto.SecurityResponse, error)
+	ListSecurities(ctx context.Context) ([]dto.SecurityResponse, error)
 
-	CreateTrade(ctx context.Context, userID, brokerAccountID string, req dto.CreateTradeRequest) (*entity.Trade, error)
-	UpdateTrade(ctx context.Context, userID, brokerAccountID, tradeID string, req dto.CreateTradeRequest) (*entity.Trade, error)
+	CreateTrade(ctx context.Context, userID, brokerAccountID string, req dto.CreateTradeRequest) (*dto.TradeResponse, error)
+	UpdateTrade(ctx context.Context, userID, brokerAccountID, tradeID string, req dto.CreateTradeRequest) (*dto.TradeResponse, error)
 	DeleteTrade(ctx context.Context, userID, brokerAccountID, tradeID string) error
-	ListTrades(ctx context.Context, userID, brokerAccountID string) ([]entity.Trade, error)
+	ListTrades(ctx context.Context, userID, brokerAccountID string) ([]dto.TradeResponse, error)
 
-	ListHoldings(ctx context.Context, userID, brokerAccountID string) ([]entity.Holding, error)
-	ListSecurityPrices(ctx context.Context, securityID string, from, to *string) ([]entity.SecurityPriceDaily, error)
-	ListSecurityEvents(ctx context.Context, securityID string, from, to *string) ([]entity.SecurityEvent, error)
+	ListHoldings(ctx context.Context, userID, brokerAccountID string) ([]dto.HoldingResponse, error)
+	ListSecurityPrices(ctx context.Context, securityID string, from, to *string) ([]dto.SecurityPriceDailyResponse, error)
+	ListSecurityEvents(ctx context.Context, securityID string, from, to *string) ([]dto.SecurityEventResponse, error)
 
 	ListEligibleCorporateActions(ctx context.Context, userID, brokerAccountID string) ([]dto.EligibleAction, error)
-	ClaimCorporateAction(ctx context.Context, userID, brokerAccountID, eventID string, req dto.ClaimCorporateActionRequest) (*entity.Trade, error)
+	ClaimCorporateAction(ctx context.Context, userID, brokerAccountID, eventID string, req dto.ClaimCorporateActionRequest) (*dto.TradeResponse, error)
 	GetRealizedPNLReport(ctx context.Context, userID, brokerAccountID string) (*dto.RealizedPNLReport, error)
 	BackfillTradePrincipalTransactions(ctx context.Context, userID, brokerAccountID string) (*dto.BackfillTradePrincipalResponse, error)
 }

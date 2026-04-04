@@ -2,41 +2,85 @@ package service
 
 import (
 	"context"
-	"errors"
-	"strings"
+	"encoding/json"
+	"time"
 
-	"github.com/sonbn-225/goen-api/internal/domain/entity"
+	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/database"
+)
+
+const (
+	CategoryCacheKey = "goen:categories:all"
+	CategoryCacheTTL = 24 * time.Hour
 )
 
 type CategoryService struct {
 	repo interfaces.CategoryRepository
+	rds  *database.Redis
 }
 
-func NewCategoryService(repo interfaces.CategoryRepository) *CategoryService {
-	return &CategoryService{repo: repo}
+func NewCategoryService(repo interfaces.CategoryRepository, rds *database.Redis) *CategoryService {
+	return &CategoryService{
+		repo: repo,
+		rds:  rds,
+	}
 }
 
-func (s *CategoryService) Get(ctx context.Context, userID, categoryID string) (*entity.Category, error) {
-	id := strings.TrimSpace(categoryID)
-	if id == "" {
-		return nil, errors.New("category ID is required")
+func (s *CategoryService) Get(ctx context.Context, userID, categoryID string) (*dto.CategoryResponse, error) {
+	// For Get, we can just fetch all from cache and find the specific one
+	// as the list is small and global.
+	cats, err := s.List(ctx, userID, "")
+	if err != nil {
+		return nil, err
 	}
 
-	return s.repo.GetCategory(ctx, userID, id)
+	for _, c := range cats {
+		if c.ID == categoryID {
+			return &c, nil
+		}
+	}
+
+	return nil, nil
 }
 
-func (s *CategoryService) List(ctx context.Context, userID string, txType string) ([]entity.Category, error) {
+func (s *CategoryService) List(ctx context.Context, userID string, txType string) ([]dto.CategoryResponse, error) {
+	var allCats []dto.CategoryResponse
+
+	// Try cache first
+	if s.rds != nil {
+		cached, err := s.rds.Get(ctx, CategoryCacheKey)
+		if err == nil {
+			if err := json.Unmarshal([]byte(cached), &allCats); err == nil {
+				return s.filterByType(allCats, txType), nil
+			}
+		}
+	}
+
+	// Cache miss or Redis not configured
 	cats, err := s.repo.ListCategories(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	if txType == "" {
-		return cats, nil
+	allCats = dto.NewCategoryResponses(cats)
+
+	// Save to cache (best effort)
+	if s.rds != nil {
+		if data, err := json.Marshal(allCats); err == nil {
+			_ = s.rds.Set(ctx, CategoryCacheKey, string(data), CategoryCacheTTL)
+		}
 	}
 
-	filtered := make([]entity.Category, 0, len(cats))
+	return s.filterByType(allCats, txType), nil
+}
+
+func (s *CategoryService) filterByType(cats []dto.CategoryResponse, txType string) []dto.CategoryResponse {
+	if txType == "" {
+		return cats
+	}
+
+	filtered := make([]dto.CategoryResponse, 0, len(cats))
 	for _, cat := range cats {
 		if cat.Type == nil {
 			filtered = append(filtered, cat)
@@ -49,5 +93,5 @@ func (s *CategoryService) List(ctx context.Context, userID string, txType string
 			filtered = append(filtered, cat)
 		}
 	}
-	return filtered, nil
+	return filtered
 }

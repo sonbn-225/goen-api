@@ -21,7 +21,7 @@ func NewTagService(repo interfaces.TagRepository) *TagService {
 	return &TagService{repo: repo}
 }
 
-func (s *TagService) Create(ctx context.Context, userID string, req dto.CreateTagRequest) (*entity.Tag, error) {
+func (s *TagService) Create(ctx context.Context, userID string, req dto.CreateTagRequest) (*dto.TagResponse, error) {
 	nameVI := utils.NormalizeOptionalString(req.NameVI)
 	nameEN := utils.NormalizeOptionalString(req.NameEN)
 	if nameVI == nil && nameEN == nil {
@@ -45,15 +45,37 @@ func (s *TagService) Create(ctx context.Context, userID string, req dto.CreateTa
 		return nil, err
 	}
 
-	return s.repo.GetTag(ctx, userID, t.ID)
+	it, err := s.repo.GetTag(ctx, userID, t.ID)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+
+	resp := dto.NewTagResponse(*it)
+	return &resp, nil
 }
 
-func (s *TagService) Get(ctx context.Context, userID, tagID string) (*entity.Tag, error) {
-	return s.repo.GetTag(ctx, userID, tagID)
+func (s *TagService) Get(ctx context.Context, userID, tagID string) (*dto.TagResponse, error) {
+	it, err := s.repo.GetTag(ctx, userID, tagID)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+
+	resp := dto.NewTagResponse(*it)
+	return &resp, nil
 }
 
-func (s *TagService) List(ctx context.Context, userID string) ([]entity.Tag, error) {
-	return s.repo.ListTags(ctx, userID)
+func (s *TagService) List(ctx context.Context, userID string) ([]dto.TagResponse, error) {
+	items, err := s.repo.ListTags(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewTagResponses(items), nil
 }
 
 func (s *TagService) GetOrCreateByName(ctx context.Context, userID, name, langHint string) (string, error) {

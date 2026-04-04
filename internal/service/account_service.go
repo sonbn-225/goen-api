@@ -22,15 +22,27 @@ func NewAccountService(repo interfaces.AccountRepository, userRepo interfaces.Us
 	return &AccountService{repo: repo, userRepo: userRepo}
 }
 
-func (s *AccountService) List(ctx context.Context, userID string) ([]entity.Account, error) {
-	return s.repo.ListAccountsForUser(ctx, userID)
+func (s *AccountService) List(ctx context.Context, userID string) ([]dto.AccountResponse, error) {
+	items, err := s.repo.ListAccountsForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewAccountResponses(items), nil
 }
 
-func (s *AccountService) Get(ctx context.Context, userID, accountID string) (*entity.Account, error) {
-	return s.repo.GetAccountForUser(ctx, userID, accountID)
+func (s *AccountService) Get(ctx context.Context, userID, accountID string) (*dto.AccountResponse, error) {
+	it, err := s.repo.GetAccountForUser(ctx, userID, accountID)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewAccountResponse(*it)
+	return &resp, nil
 }
 
-func (s *AccountService) Create(ctx context.Context, userID string, req dto.CreateAccountRequest) (*entity.Account, error) {
+func (s *AccountService) Create(ctx context.Context, userID string, req dto.CreateAccountRequest) (*dto.AccountResponse, error) {
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
 		return nil, errors.New("account name is required")
@@ -76,17 +88,35 @@ func (s *AccountService) Create(ctx context.Context, userID string, req dto.Crea
 		return nil, err
 	}
 
-	return &account, nil
+	resp := dto.NewAccountResponse(account)
+	return &resp, nil
 }
 
-func (s *AccountService) Patch(ctx context.Context, userID, accountID string, patch entity.AccountPatch) (*entity.Account, error) {
-	return s.repo.PatchAccount(ctx, userID, accountID, patch)
+func (s *AccountService) Patch(ctx context.Context, userID, accountID string, req dto.PatchAccountRequest) (*dto.AccountResponse, error) {
+	patch := entity.AccountPatch{
+		Name:   req.Name,
+		Color:  req.Color,
+		Status: req.Status,
+	}
+
+	it, err := s.repo.PatchAccount(ctx, userID, accountID, patch)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewAccountResponse(*it)
+	return &resp, nil
 }
 
 func (s *AccountService) Delete(ctx context.Context, userID, accountID string) error {
 	acc, err := s.repo.GetAccountForUser(ctx, userID, accountID)
 	if err != nil {
 		return err
+	}
+	if acc == nil {
+		return errors.New("account not found")
 	}
 
 	if acc.AccountType == "cash" {
@@ -104,18 +134,30 @@ func (s *AccountService) Delete(ctx context.Context, userID, accountID string) e
 	return s.repo.DeleteAccount(ctx, userID, accountID)
 }
 
-func (s *AccountService) ListBalances(ctx context.Context, userID string) ([]entity.AccountBalance, error) {
-	return s.repo.ListAccountBalancesForUser(ctx, userID)
+func (s *AccountService) ListBalances(ctx context.Context, userID string) ([]dto.AccountBalanceResponse, error) {
+	items, err := s.repo.ListAccountBalancesForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dto.AccountBalanceResponse, len(items))
+	for i, it := range items {
+		out[i] = dto.NewAccountBalanceResponse(it)
+	}
+	return out, nil
 }
 
-func (s *AccountService) ListShares(ctx context.Context, userID, accountID string) ([]entity.AccountShare, error) {
+func (s *AccountService) ListShares(ctx context.Context, userID, accountID string) ([]dto.AccountShareResponse, error) {
 	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
 		return nil, err
 	}
-	return s.repo.ListAccountShares(ctx, userID, accountID)
+	items, err := s.repo.ListAccountShares(ctx, userID, accountID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewAccountShareResponses(items), nil
 }
 
-func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID, login, permission string) (*entity.AccountShare, error) {
+func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID, login, permission string) (*dto.AccountShareResponse, error) {
 	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
 		return nil, err
 	}
@@ -137,7 +179,15 @@ func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID, log
 		return nil, errors.New("cannot share with yourself")
 	}
 
-	return s.repo.UpsertAccountShare(ctx, userID, accountID, target.ID, permission)
+	it, err := s.repo.UpsertAccountShare(ctx, userID, accountID, target.ID, permission)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewAccountShareResponse(*it)
+	return &resp, nil
 }
 
 func (s *AccountService) RevokeShare(ctx context.Context, userID, accountID, targetUserID string) error {
@@ -145,6 +195,25 @@ func (s *AccountService) RevokeShare(ctx context.Context, userID, accountID, tar
 		return err
 	}
 	return s.repo.RevokeAccountShare(ctx, userID, accountID, targetUserID)
+}
+
+func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID string, limit int) ([]dto.AccountAuditEventResponse, error) {
+	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+		return nil, err
+	}
+
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	items, err := s.repo.ListAccountAuditEvents(ctx, userID, accountID, limit)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewAccountAuditEventResponses(items), nil
 }
 
 func (s *AccountService) defaultCurrencyForUser(ctx context.Context, userID string) string {

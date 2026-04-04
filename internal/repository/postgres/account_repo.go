@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -376,6 +377,51 @@ func (r *AccountRepo) RevokeAccountShare(ctx context.Context, actorUserID string
 		`, now, actorUserID, accountID, targetUserID)
 		return err
 	})
+}
+
+func (r *AccountRepo) ListAccountAuditEvents(ctx context.Context, actorUserID string, accountID string, limit int) ([]entity.AccountAuditEvent, error) {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT id, account_id, actor_user_id, action, entity_type, entity_id, occurred_at, diff
+		FROM audit_events
+		WHERE account_id = $1
+		ORDER BY occurred_at DESC
+		LIMIT $2
+	`, accountID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]entity.AccountAuditEvent, 0)
+	for rows.Next() {
+		var it entity.AccountAuditEvent
+		var rawDiff []byte
+
+		if err := rows.Scan(
+			&it.ID, &it.AccountID, &it.ActorUserID, &it.Action, &it.EntityType, &it.EntityID, &it.OccurredAt, &rawDiff,
+		); err != nil {
+			return nil, err
+		}
+
+		if len(rawDiff) > 0 {
+			if err := json.Unmarshal(rawDiff, &it.Diff); err != nil {
+				return nil, err
+			}
+		}
+
+		out = append(out, it)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 func (r *AccountRepo) requireAccountOwner(ctx context.Context, tx pgx.Tx, userID string, accountID string) error {

@@ -31,36 +31,76 @@ func NewInvestmentService(
 	}
 }
 
-func (s *InvestmentService) GetInvestmentAccount(ctx context.Context, userID, investmentAccountID string) (*entity.InvestmentAccount, error) {
-	return s.repo.GetInvestmentAccount(ctx, userID, investmentAccountID)
+func (s *InvestmentService) GetInvestmentAccount(ctx context.Context, userID, investmentAccountID string) (*dto.InvestmentAccountResponse, error) {
+	it, err := s.repo.GetInvestmentAccount(ctx, userID, investmentAccountID)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewInvestmentAccountResponse(*it)
+	return &resp, nil
 }
 
-func (s *InvestmentService) ListInvestmentAccounts(ctx context.Context, userID string) ([]entity.InvestmentAccount, error) {
-	return s.repo.ListInvestmentAccounts(ctx, userID)
+func (s *InvestmentService) ListInvestmentAccounts(ctx context.Context, userID string) ([]dto.InvestmentAccountResponse, error) {
+	items, err := s.repo.ListInvestmentAccounts(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewInvestmentAccountResponses(items), nil
 }
 
-func (s *InvestmentService) GetSecurity(ctx context.Context, securityID string) (*entity.Security, error) {
-	return s.repo.GetSecurity(ctx, securityID)
+func (s *InvestmentService) GetSecurity(ctx context.Context, securityID string) (*dto.SecurityResponse, error) {
+	it, err := s.repo.GetSecurity(ctx, securityID)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewSecurityResponse(*it)
+	return &resp, nil
 }
 
-func (s *InvestmentService) ListSecurities(ctx context.Context) ([]entity.Security, error) {
-	return s.repo.ListSecurities(ctx)
+func (s *InvestmentService) ListSecurities(ctx context.Context) ([]dto.SecurityResponse, error) {
+	items, err := s.repo.ListSecurities(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewSecurityResponses(items), nil
 }
 
-func (s *InvestmentService) ListTrades(ctx context.Context, userID, brokerAccountID string) ([]entity.Trade, error) {
-	return s.repo.ListTrades(ctx, userID, brokerAccountID)
+func (s *InvestmentService) ListTrades(ctx context.Context, userID, brokerAccountID string) ([]dto.TradeResponse, error) {
+	items, err := s.repo.ListTrades(ctx, userID, brokerAccountID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewTradeResponses(items), nil
 }
 
-func (s *InvestmentService) ListHoldings(ctx context.Context, userID, brokerAccountID string) ([]entity.Holding, error) {
-	return s.repo.ListHoldings(ctx, userID, brokerAccountID)
+func (s *InvestmentService) ListHoldings(ctx context.Context, userID, brokerAccountID string) ([]dto.HoldingResponse, error) {
+	items, err := s.repo.ListHoldings(ctx, userID, brokerAccountID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewHoldingResponses(items), nil
 }
 
-func (s *InvestmentService) ListSecurityPrices(ctx context.Context, securityID string, from, to *string) ([]entity.SecurityPriceDaily, error) {
-	return s.repo.ListSecurityPrices(ctx, securityID, from, to)
+func (s *InvestmentService) ListSecurityPrices(ctx context.Context, securityID string, from, to *string) ([]dto.SecurityPriceDailyResponse, error) {
+	items, err := s.repo.ListSecurityPrices(ctx, securityID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewSecurityPriceDailyResponses(items), nil
 }
 
-func (s *InvestmentService) ListSecurityEvents(ctx context.Context, securityID string, from, to *string) ([]entity.SecurityEvent, error) {
-	return s.repo.ListSecurityEvents(ctx, securityID, from, to)
+func (s *InvestmentService) ListSecurityEvents(ctx context.Context, securityID string, from, to *string) ([]dto.SecurityEventResponse, error) {
+	items, err := s.repo.ListSecurityEvents(ctx, securityID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewSecurityEventResponses(items), nil
 }
 
 func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, investmentAccountID, tradeID string) error {
@@ -142,14 +182,14 @@ func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, investmentA
 	return s.upsertHoldingFromLots(ctx, userID, bid, tr.SecurityID)
 }
 
-func (s *InvestmentService) UpdateTrade(ctx context.Context, userID, brokerAccountID, tradeID string, req dto.CreateTradeRequest) (*entity.Trade, error) {
+func (s *InvestmentService) UpdateTrade(ctx context.Context, userID, brokerAccountID, tradeID string, req dto.CreateTradeRequest) (*dto.TradeResponse, error) {
 	if err := s.DeleteTrade(ctx, userID, brokerAccountID, tradeID); err != nil {
 		return nil, err
 	}
 	return s.CreateTrade(ctx, userID, brokerAccountID, req)
 }
 
-func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccountID string, req dto.CreateTradeRequest) (*entity.Trade, error) {
+func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccountID string, req dto.CreateTradeRequest) (*dto.TradeResponse, error) {
 	bid := strings.TrimSpace(brokerAccountID)
 	ia, err := s.repo.GetInvestmentAccount(ctx, userID, bid)
 	if err != nil {
@@ -270,11 +310,20 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 
 	_ = s.upsertHoldingFromLots(ctx, userID, bid, req.SecurityID)
 
-	return &trade, nil
+	resp := dto.NewTradeResponse(trade)
+	return &resp, nil
 }
 
-func (s *InvestmentService) UpdateInvestmentAccountSettings(ctx context.Context, userID, investmentAccountID string, req dto.PatchInvestmentAccountRequest) (*entity.InvestmentAccount, error) {
-	return s.repo.UpdateInvestmentAccountSettings(ctx, userID, investmentAccountID, req.FeeSettings, req.TaxSettings)
+func (s *InvestmentService) UpdateInvestmentAccountSettings(ctx context.Context, userID, investmentAccountID string, req dto.PatchInvestmentAccountRequest) (*dto.InvestmentAccountResponse, error) {
+	it, err := s.repo.UpdateInvestmentAccountSettings(ctx, userID, investmentAccountID, req.FeeSettings, req.TaxSettings)
+	if err != nil {
+		return nil, err
+	}
+	if it == nil {
+		return nil, nil
+	}
+	resp := dto.NewInvestmentAccountResponse(*it)
+	return &resp, nil
 }
 
 func (s *InvestmentService) ListEligibleCorporateActions(ctx context.Context, userID, brokerAccountID string) ([]dto.EligibleAction, error) {
@@ -282,7 +331,7 @@ func (s *InvestmentService) ListEligibleCorporateActions(ctx context.Context, us
 	return []dto.EligibleAction{}, nil
 }
 
-func (s *InvestmentService) ClaimCorporateAction(ctx context.Context, userID, brokerAccountID, eventID string, req dto.ClaimCorporateActionRequest) (*entity.Trade, error) {
+func (s *InvestmentService) ClaimCorporateAction(ctx context.Context, userID, brokerAccountID, eventID string, req dto.ClaimCorporateActionRequest) (*dto.TradeResponse, error) {
 	return nil, errors.New("not implemented")
 }
 

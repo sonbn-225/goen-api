@@ -206,7 +206,7 @@ func (s *GroupExpenseService) Create(ctx context.Context, userID string, req dto
 
 		principal := s.formatRatDecimalScale(share, 2)
 		interest := "0"
-		
+
 		_, _ = s.debtSvc.Create(ctx, userID, dto.CreateDebtRequest{
 			AccountID:    accountID,
 			Direction:    "lent",
@@ -230,15 +230,19 @@ func (s *GroupExpenseService) Create(ctx context.Context, userID string, req dto
 
 	return &dto.CreateGroupExpenseResponse{
 		Transaction:  *createdTx,
-		Participants: createdParticipants,
+		Participants: dto.NewGroupExpenseParticipantResponses(createdParticipants),
 	}, nil
 }
 
-func (s *GroupExpenseService) ListByTransaction(ctx context.Context, userID, transactionID string) ([]entity.GroupExpenseParticipant, error) {
-	return s.repo.ListParticipantsByTransaction(ctx, userID, transactionID)
+func (s *GroupExpenseService) ListByTransaction(ctx context.Context, userID, transactionID string) ([]dto.GroupExpenseParticipantResponse, error) {
+	items, err := s.repo.ListParticipantsByTransaction(ctx, userID, transactionID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewGroupExpenseParticipantResponses(items), nil
 }
 
-func (s *GroupExpenseService) Settle(ctx context.Context, userID, participantID string, req dto.GroupExpenseSettleRequest) (*entity.Transaction, error) {
+func (s *GroupExpenseService) Settle(ctx context.Context, userID, participantID string, req dto.GroupExpenseSettleRequest) (*dto.TransactionResponse, error) {
 	occurredAt, occurredDate, err := s.normalizeOccurredAt(req.OccurredAt, req.OccurredDate, req.OccurredTime)
 	if err != nil {
 		return nil, err

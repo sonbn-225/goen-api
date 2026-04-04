@@ -33,7 +33,7 @@ func (h *CategoryHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Produce json
 // @Security BearerAuth
 // @Param type query string false "Transaction type filter (INCOME/EXPENSE)"
-// @Success 200 {object} response.SuccessEnvelope{data=[]entity.Category}
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.CategoryResponse}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /categories [get]
 func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +60,7 @@ func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param categoryId path string true "Category ID"
-// @Success 200 {object} response.SuccessEnvelope{data=entity.Category}
+// @Success 200 {object} response.SuccessEnvelope{data=dto.CategoryResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
@@ -81,6 +81,11 @@ func (h *CategoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 	item, err := h.svc.Get(r.Context(), userID, id)
 	if err != nil {
 		response.WriteInternalError(w, err)
+		return
+	}
+
+	if item == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "category not found", nil)
 		return
 	}
 

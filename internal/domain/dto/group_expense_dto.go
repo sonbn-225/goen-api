@@ -1,6 +1,8 @@
 package dto
 
-import "github.com/sonbn-225/goen-api/internal/domain/entity"
+import (
+	"github.com/sonbn-225/goen-api/internal/domain/entity"
+)
 
 type GroupExpenseParticipantRequest struct {
 	Name           string `json:"name"`
@@ -25,8 +27,19 @@ type CreateGroupExpenseRequest struct {
 }
 
 type CreateGroupExpenseResponse struct {
-	Transaction  entity.Transaction               `json:"transaction"`
-	Participants []entity.GroupExpenseParticipant `json:"participants"`
+	Transaction  TransactionResponse               `json:"transaction"`
+	Participants []GroupExpenseParticipantResponse `json:"participants"`
+}
+
+type GroupExpenseParticipantResponse struct {
+	ID                      string  `json:"id"`
+	UserID                  string  `json:"user_id"`
+	TransactionID           string  `json:"transaction_id"`
+	ParticipantName         string  `json:"participant_name"`
+	OriginalAmount          string  `json:"original_amount"`
+	ShareAmount             string  `json:"share_amount"`
+	IsSettled               bool    `json:"is_settled"`
+	SettlementTransactionID *string `json:"settlement_transaction_id,omitempty"`
 }
 
 type GroupExpenseSettleRequest struct {
@@ -34,4 +47,25 @@ type GroupExpenseSettleRequest struct {
 	OccurredDate *string `json:"occurred_date,omitempty"`
 	OccurredTime *string `json:"occurred_time,omitempty"`
 	AccountID    string  `json:"account_id"`
+}
+
+func NewGroupExpenseParticipantResponse(p entity.GroupExpenseParticipant) GroupExpenseParticipantResponse {
+	return GroupExpenseParticipantResponse{
+		ID:                      p.ID,
+		UserID:                  p.UserID,
+		TransactionID:           p.TransactionID,
+		ParticipantName:         p.ParticipantName,
+		OriginalAmount:          p.OriginalAmount,
+		ShareAmount:             p.ShareAmount,
+		IsSettled:               p.IsSettled,
+		SettlementTransactionID: p.SettlementTransactionID,
+	}
+}
+
+func NewGroupExpenseParticipantResponses(items []entity.GroupExpenseParticipant) []GroupExpenseParticipantResponse {
+	out := make([]GroupExpenseParticipantResponse, len(items))
+	for i, it := range items {
+		out[i] = NewGroupExpenseParticipantResponse(it)
+	}
+	return out
 }

@@ -71,7 +71,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, refreshRepo, s3, cfg)
-	categorySvc := service.NewCategoryService(categoryRepo)
+	categorySvc := service.NewCategoryService(categoryRepo, rds)
 	tagSvc := service.NewTagService(tagRepo)
 	accountSvc := service.NewAccountService(accountRepo, userRepo)
 	transactionSvc := service.NewTransactionService(transactionRepo, tagSvc)

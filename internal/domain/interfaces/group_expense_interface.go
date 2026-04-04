@@ -19,7 +19,7 @@ type GroupExpenseRepository interface {
 
 type GroupExpenseService interface {
 	Create(ctx context.Context, userID string, req dto.CreateGroupExpenseRequest) (*dto.CreateGroupExpenseResponse, error)
-	ListByTransaction(ctx context.Context, userID, transactionID string) ([]entity.GroupExpenseParticipant, error)
-	Settle(ctx context.Context, userID, participantID string, req dto.GroupExpenseSettleRequest) (*entity.Transaction, error)
+	ListByTransaction(ctx context.Context, userID, transactionID string) ([]dto.GroupExpenseParticipantResponse, error)
+	Settle(ctx context.Context, userID, participantID string, req dto.GroupExpenseSettleRequest) (*dto.TransactionResponse, error)
 	ListUniqueParticipantNames(ctx context.Context, userID string, limit int) ([]string, error)
 }
