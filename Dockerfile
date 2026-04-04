@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.25-alpine AS dev
+FROM golang:1.26.1-alpine AS dev
 WORKDIR /app
 
 RUN apk add --no-cache ca-certificates git
@@ -26,7 +26,7 @@ COPY . ./
 EXPOSE 8080
 CMD ["air", "-c", ".air.toml"]
 
-FROM golang:1.25-alpine AS build
+FROM golang:1.26.1-alpine AS build
 WORKDIR /src
 
 ARG TARGETOS

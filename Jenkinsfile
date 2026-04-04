@@ -32,12 +32,6 @@ pipeline {
     }
 
     stages {
-        stage('Quality Gate') {
-            steps {
-                echo 'Quality Gate is temporarily skipped'
-            }
-        }
-
         stage('Deploy') {
             steps {
                 echo 'Building and deploying goen-api...'
