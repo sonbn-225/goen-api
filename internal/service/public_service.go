@@ -82,6 +82,24 @@ func (s *PublicService) GetPaymentInfo(ctx context.Context, userRef string) (*en
 	}, nil
 }
 
+func (s *PublicService) GetParticipants(ctx context.Context, userRef string) ([]string, error) {
+	u, err := s.resolvePublicUser(ctx, userRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.groupExpenseRepo.ListPublicParticipants(ctx, u.ID)
+}
+
+func (s *PublicService) GetDebts(ctx context.Context, userRef string, participantName string) ([]entity.PublicDebt, error) {
+	u, err := s.resolvePublicUser(ctx, userRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.groupExpenseRepo.ListPublicDebtsByParticipant(ctx, u.ID, participantName)
+}
+
 func (s *PublicService) resolvePublicUser(ctx context.Context, userRef string) (*entity.User, error) {
 	ref := strings.TrimSpace(userRef)
 	if ref == "" {

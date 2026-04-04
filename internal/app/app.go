@@ -13,6 +13,9 @@ import (
 	"github.com/sonbn-225/goen-api/internal/pkg/storage"
 	"github.com/sonbn-225/goen-api/internal/repository/postgres"
 	"github.com/sonbn-225/goen-api/internal/service"
+	"github.com/rs/cors"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
+	_ "github.com/sonbn-225/goen-api/docs"
 )
 
 type App struct {
@@ -58,7 +61,6 @@ func New(cfg *config.Config) *App {
 	investmentRepo := postgres.NewInvestmentRepo(db)
 	marketDataRepo := postgres.NewMarketDataRepo(db)
 	savingsRepo := postgres.NewSavingsRepo(db)
-	rotatingSavingsRepo := postgres.NewRotatingSavingsRepo(db)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, s3, cfg)
@@ -74,7 +76,7 @@ func New(cfg *config.Config) *App {
 	investmentSvc := service.NewInvestmentService(investmentRepo, accountSvc, transactionSvc)
 	marketDataSvc := service.NewMarketDataService(cfg, marketDataRepo, rds, investmentSvc)
 	savingsSvc := service.NewSavingsService(savingsRepo)
-	rotatingSavingsSvc := service.NewRotatingSavingsService(rotatingSavingsRepo, accountSvc, transactionSvc)
+	rotatingSavingsSvc := service.NewRotatingSavingsService(savingsRepo, accountSvc, transactionSvc)
 	publicSvc := service.NewPublicService(userRepo, accountRepo, groupExpenseRepo)
 	diagnosticsSvc := service.NewDiagnosticsService(db)
 
@@ -101,6 +103,24 @@ func New(cfg *config.Config) *App {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	// CORS
+	c := cors.New(cors.Options{
+		AllowedOrigins:   cfg.CORSOrigins,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	})
+	r.Use(c.Handler)
+
+	r.Get("/swagger", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/swagger/index.html", http.StatusMovedPermanently)
+	})
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"), //The url pointing to API definition
+	))
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {

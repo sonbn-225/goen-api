@@ -36,6 +36,15 @@ func (h *AccountHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	})
 }
 
+// List godoc
+// @Summary List Accounts
+// @Description Retrieve a list of accounts for the current user
+// @Tags Accounts
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} entity.Account
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /accounts [get]
 func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -52,6 +61,18 @@ func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, items)
 }
 
+// Create godoc
+// @Summary Create Account
+// @Description Create a new banking or manual account for the user
+// @Tags Accounts
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.CreateAccountRequest true "Account Creation Payload"
+// @Success 201 {object} entity.Account
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /accounts [post]
 func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -74,6 +95,17 @@ func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusCreated, account)
 }
 
+// Get godoc
+// @Summary Get Account
+// @Description Retrieve specific account properties by ID
+// @Tags Accounts
+// @Produce json
+// @Security BearerAuth
+// @Param accountId path string true "Account ID"
+// @Success 200 {object} entity.Account
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /accounts/{accountId} [get]
 func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -91,6 +123,19 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, acc)
 }
 
+// Patch godoc
+// @Summary Update Account
+// @Description Partially update account information
+// @Tags Accounts
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param accountId path string true "Account ID"
+// @Param request body entity.AccountPatch true "Account Patch Payload"
+// @Success 200 {object} entity.Account
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /accounts/{accountId} [patch]
 func (h *AccountHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -114,6 +159,16 @@ func (h *AccountHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, acc)
 }
 
+// Delete godoc
+// @Summary Delete Account
+// @Description Delete an account (and its associated dependencies according to business rules)
+// @Tags Accounts
+// @Security BearerAuth
+// @Param accountId path string true "Account ID"
+// @Success 204 "No Content"
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /accounts/{accountId} [delete]
 func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -130,6 +185,15 @@ func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ListBalances godoc
+// @Summary List Account Balances
+// @Description Get current financial balance calculations for each account
+// @Tags Accounts
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} object
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /accounts/balances [get]
 func (h *AccountHandler) ListBalances(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -146,6 +210,16 @@ func (h *AccountHandler) ListBalances(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, items)
 }
 
+// ListShares godoc
+// @Summary List Account Shares
+// @Description List active sharing links provided to other users for this account
+// @Tags Accounts
+// @Produce json
+// @Security BearerAuth
+// @Param accountId path string true "Account ID"
+// @Success 200 {array} object
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /accounts/{accountId}/shares [get]
 func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -163,6 +237,19 @@ func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, items)
 }
 
+// UpsertShare godoc
+// @Summary Upsert Account Share
+// @Description Add or update view/admin permissions for another user on an account
+// @Tags Accounts
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param accountId path string true "Account ID"
+// @Param request body dto.UpsertShareRequest true "Upsert Share Payload"
+// @Success 200 {object} object
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /accounts/{accountId}/shares [put]
 func (h *AccountHandler) UpsertShare(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -186,6 +273,16 @@ func (h *AccountHandler) UpsertShare(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, item)
 }
 
+// RevokeShare godoc
+// @Summary Revoke Account Share
+// @Description Remove access permissions given to another user for this account
+// @Tags Accounts
+// @Security BearerAuth
+// @Param accountId path string true "Account ID"
+// @Param userId path string true "Target User ID or Username"
+// @Success 204 "No Content"
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /accounts/{accountId}/shares/{userId} [delete]
 func (h *AccountHandler) RevokeShare(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

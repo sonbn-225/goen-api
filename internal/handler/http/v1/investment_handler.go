@@ -38,6 +38,15 @@ func (h *InvestmentHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Get("/securities/{securityId}/events", h.ListSecurityEvents)
 }
 
+// ListInvestmentAccounts godoc
+// @Summary List Investment Accounts
+// @Description Retrieve a list of investment accounts for the current user
+// @Tags Investments
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} entity.Account
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /investment-accounts [get]
 func (h *InvestmentHandler) ListInvestmentAccounts(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	accounts, err := h.svc.ListInvestmentAccounts(r.Context(), userID)
@@ -48,6 +57,16 @@ func (h *InvestmentHandler) ListInvestmentAccounts(w http.ResponseWriter, r *htt
 	response.WriteJSON(w, http.StatusOK, accounts)
 }
 
+// GetInvestmentAccount godoc
+// @Summary Get Investment Account
+// @Description Retrieve a specific investment account by ID
+// @Tags Investments
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Account ID"
+// @Success 200 {object} entity.Account
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /investment-accounts/{id} [get]
 func (h *InvestmentHandler) GetInvestmentAccount(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	id := chi.URLParam(r, "id")
@@ -59,6 +78,19 @@ func (h *InvestmentHandler) GetInvestmentAccount(w http.ResponseWriter, r *http.
 	response.WriteJSON(w, http.StatusOK, account)
 }
 
+// UpdateInvestmentAccountSettings godoc
+// @Summary Update Investment Account Settings
+// @Description Partially update settings like automated tracking for an investment account
+// @Tags Investments
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Account ID"
+// @Param request body dto.PatchInvestmentAccountRequest true "Update Payload"
+// @Success 200 {object} entity.Account
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /investment-accounts/{id} [patch]
 func (h *InvestmentHandler) UpdateInvestmentAccountSettings(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	id := chi.URLParam(r, "id")
@@ -75,6 +107,16 @@ func (h *InvestmentHandler) UpdateInvestmentAccountSettings(w http.ResponseWrite
 	response.WriteJSON(w, http.StatusOK, account)
 }
 
+// ListTrades godoc
+// @Summary List Trades
+// @Description Retrieve trades associated with an investment account
+// @Tags Investments
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Account ID"
+// @Success 200 {array} entity.Trade
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /investment-accounts/{id}/trades [get]
 func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	id := chi.URLParam(r, "id")
@@ -86,6 +128,19 @@ func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, trades)
 }
 
+// CreateTrade godoc
+// @Summary Create Trade
+// @Description Create a new trade for an investment account
+// @Tags Investments
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Account ID"
+// @Param request body dto.CreateTradeRequest true "Trade Payload"
+// @Success 201 {object} entity.Trade
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /investment-accounts/{id}/trades [post]
 func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	id := chi.URLParam(r, "id")
@@ -102,6 +157,20 @@ func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) 
 	response.WriteJSON(w, http.StatusCreated, trade)
 }
 
+// UpdateTrade godoc
+// @Summary Update Trade
+// @Description Update an existing trade record
+// @Tags Investments
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Account ID"
+// @Param tradeId path string true "Trade ID"
+// @Param request body dto.CreateTradeRequest true "Trade Payload"
+// @Success 200 {object} entity.Trade
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /investment-accounts/{id}/trades/{tradeId} [put]
 func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	id := chi.URLParam(r, "id")
@@ -119,6 +188,17 @@ func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) 
 	response.WriteJSON(w, http.StatusOK, trade)
 }
 
+// DeleteTrade godoc
+// @Summary Delete Trade
+// @Description Delete a trade from an investment account
+// @Tags Investments
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Account ID"
+// @Param tradeId path string true "Trade ID"
+// @Success 200 {object} map[string]string
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /investment-accounts/{id}/trades/{tradeId} [delete]
 func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	id := chi.URLParam(r, "id")
@@ -131,6 +211,16 @@ func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) 
 	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Trade deleted"})
 }
 
+// ListHoldings godoc
+// @Summary List Holdings
+// @Description Retrieve current holdings for an investment account
+// @Tags Investments
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Account ID"
+// @Success 200 {array} object
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /investment-accounts/{id}/holdings [get]
 func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	id := chi.URLParam(r, "id")
@@ -142,6 +232,16 @@ func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request)
 	response.WriteJSON(w, http.StatusOK, holdings)
 }
 
+// GetRealizedPNLReport godoc
+// @Summary Get Realized P&L Report
+// @Description Realized profit/loss report for an investment account
+// @Tags Investments
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Account ID"
+// @Success 200 {object} object
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /investment-accounts/{id}/reports/realized-pnl [get]
 func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	id := chi.URLParam(r, "id")
@@ -153,6 +253,14 @@ func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.
 	response.WriteJSON(w, http.StatusOK, report)
 }
 
+// ListSecurities godoc
+// @Summary List Securities
+// @Description Retrieve list of all available securities in the system
+// @Tags Securities
+// @Produce json
+// @Success 200 {array} entity.Security
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /securities [get]
 func (h *InvestmentHandler) ListSecurities(w http.ResponseWriter, r *http.Request) {
 	securities, err := h.svc.ListSecurities(r.Context())
 	if err != nil {
@@ -162,6 +270,15 @@ func (h *InvestmentHandler) ListSecurities(w http.ResponseWriter, r *http.Reques
 	response.WriteJSON(w, http.StatusOK, securities)
 }
 
+// GetSecurity godoc
+// @Summary Get Security
+// @Description Retrieve details of a specific security by ID
+// @Tags Securities
+// @Produce json
+// @Param securityId path string true "Security ID"
+// @Success 200 {object} entity.Security
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /securities/{securityId} [get]
 func (h *InvestmentHandler) GetSecurity(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "securityId")
 	security, err := h.svc.GetSecurity(r.Context(), id)
@@ -172,6 +289,17 @@ func (h *InvestmentHandler) GetSecurity(w http.ResponseWriter, r *http.Request) 
 	response.WriteJSON(w, http.StatusOK, security)
 }
 
+// ListSecurityPrices godoc
+// @Summary List Security Prices
+// @Description Retrieve historical/daily prices for a security between dates
+// @Tags Securities
+// @Produce json
+// @Param securityId path string true "Security ID"
+// @Param from query string false "From Date (YYYY-MM-DD)"
+// @Param to query string false "To Date (YYYY-MM-DD)"
+// @Success 200 {array} object
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /securities/{securityId}/prices-daily [get]
 func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "securityId")
 	from := r.URL.Query().Get("from")
@@ -188,6 +316,17 @@ func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Re
 	response.WriteJSON(w, http.StatusOK, prices)
 }
 
+// ListSecurityEvents godoc
+// @Summary List Security Events
+// @Description Retrieve events (dividends, splits, etc) mapping to a security
+// @Tags Securities
+// @Produce json
+// @Param securityId path string true "Security ID"
+// @Param from query string false "From Date (YYYY-MM-DD)"
+// @Param to query string false "To Date (YYYY-MM-DD)"
+// @Success 200 {array} object
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /securities/{securityId}/events [get]
 func (h *InvestmentHandler) ListSecurityEvents(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "securityId")
 	from := r.URL.Query().Get("from")

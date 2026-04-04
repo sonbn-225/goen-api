@@ -13,6 +13,8 @@ type GroupExpenseRepository interface {
 	SettleParticipant(ctx context.Context, userID, participantID string, settlementTx entity.Transaction, settlementLineItems []entity.TransactionLineItem, settlementTagIDs []string) (settlementTransactionID string, err error)
 	ListUniqueParticipantNames(ctx context.Context, userID string, limit int) ([]string, error)
 	ListUnsettledParticipantsByName(ctx context.Context, userID string, name string) ([]entity.GroupExpenseParticipant, error)
+	ListPublicParticipants(ctx context.Context, userID string) ([]string, error)
+	ListPublicDebtsByParticipant(ctx context.Context, userID string, name string) ([]entity.PublicDebt, error)
 }
 
 type GroupExpenseService interface {

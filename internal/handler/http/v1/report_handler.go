@@ -25,7 +25,16 @@ func (h *ReportHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	})
 }
 
-// GetDashboard handles GET /reports/dashboard
+// GetDashboard godoc
+// @Summary Get Dashboard Report
+// @Description Retrieve aggregated analytics, total wealth, and other dashboard indicators for the user
+// @Tags Reports
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} object
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /reports/dashboard [get]
 func (h *ReportHandler) GetDashboard(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

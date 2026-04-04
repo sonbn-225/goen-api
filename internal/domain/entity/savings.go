@@ -4,8 +4,8 @@ import (
 	"time"
 )
 
-// SavingsInstrument represents a simple savings product like a Term Deposit or Goal.
-type SavingsInstrument struct {
+// Savings represents a simple savings product like a Term Deposit or Goal.
+type Savings struct {
 	ID               string     `json:"id"`
 	SavingsAccountID string     `json:"savings_account_id"`
 	ParentAccountID  string     `json:"parent_account_id"`

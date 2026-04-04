@@ -32,6 +32,15 @@ func (h *TransactionHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	})
 }
 
+// List godoc
+// @Summary List Transactions
+// @Description Retrieve a paginated list of transactions for the authenticated user
+// @Tags Transactions
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} object "items, next_cursor, total"
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /transactions [get]
 func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -58,6 +67,18 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Create godoc
+// @Summary Create Transaction
+// @Description Create a new financial transaction with optional line items and tags
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.CreateTransactionRequest true "Transaction Creation Payload"
+// @Success 201 {object} entity.Transaction
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /transactions [post]
 func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -80,6 +101,17 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusCreated, tx)
 }
 
+// Get godoc
+// @Summary Get Transaction
+// @Description Retrieve details of a specific transaction by its ID
+// @Tags Transactions
+// @Produce json
+// @Security BearerAuth
+// @Param transactionId path string true "Transaction ID"
+// @Success 200 {object} entity.Transaction
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /transactions/{transactionId} [get]
 func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -97,6 +129,19 @@ func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, tx)
 }
 
+// Patch godoc
+// @Summary Update Transaction
+// @Description Partially update properties of a transaction
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param transactionId path string true "Transaction ID"
+// @Param request body dto.TransactionPatchRequest true "Transaction Patch Payload"
+// @Success 200 {object} entity.Transaction
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /transactions/{transactionId} [patch]
 func (h *TransactionHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -120,6 +165,18 @@ func (h *TransactionHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, tx)
 }
 
+// BatchPatch godoc
+// @Summary Batch Patch Transactions
+// @Description Update multiple transactions at once (e.g. recategorize, retag)
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.BatchPatchRequest true "Batch Patch Payload"
+// @Success 200 {object} object
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /transactions/batch-patch [post]
 func (h *TransactionHandler) BatchPatch(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -142,6 +199,16 @@ func (h *TransactionHandler) BatchPatch(w http.ResponseWriter, r *http.Request) 
 	response.WriteJSON(w, http.StatusOK, res)
 }
 
+// Delete godoc
+// @Summary Delete Transaction
+// @Description Delete a specific transaction by its ID
+// @Tags Transactions
+// @Security BearerAuth
+// @Param transactionId path string true "Transaction ID"
+// @Success 204 "No Content"
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /transactions/{transactionId} [delete]
 func (h *TransactionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

@@ -42,6 +42,12 @@ type Transaction struct {
 	LineItems       []TransactionLineItem `json:"line_items,omitempty"`
 	TagIDs          []string              `json:"tag_ids,omitempty"`
 	CategoryIDs     []string              `json:"category_ids,omitempty"`
+
+	// Wrapper fields (enriched)
+	CategoryNames  []string `json:"category_names,omitempty"`
+	TagNames       []string `json:"tag_names,omitempty"`
+	CategoryColors []string `json:"category_colors,omitempty"`
+	TagColors      []string `json:"tag_colors,omitempty"`
 }
 
 type TransactionListFilter struct {

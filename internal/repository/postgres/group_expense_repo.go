@@ -191,3 +191,62 @@ func (r *GroupExpenseRepo) ListUnsettledParticipantsByName(ctx context.Context, 
 	}
 	return results, nil
 }
+
+func (r *GroupExpenseRepo) ListPublicParticipants(ctx context.Context, userID string) ([]string, error) {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT DISTINCT participant_name
+		FROM group_expense_participants
+		WHERE user_id = $1 AND is_settled = false
+		ORDER BY participant_name ASC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, nil
+}
+
+func (r *GroupExpenseRepo) ListPublicDebtsByParticipant(ctx context.Context, userID string, name string) ([]entity.PublicDebt, error) {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT id, to_char(created_at, 'YYYY-MM-DD'), share_amount::text,
+		       CASE WHEN is_settled THEN 'settled' ELSE 'pending' END as status
+		FROM group_expense_participants
+		WHERE user_id = $1 AND LOWER(participant_name) = LOWER($2)
+		ORDER BY created_at DESC
+	`, userID, strings.TrimSpace(name))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []entity.PublicDebt
+	for rows.Next() {
+		var d entity.PublicDebt
+		var status string
+		if err := rows.Scan(&d.ID, &d.CreatedAt, &d.ShareAmount, &status); err != nil {
+			return nil, err
+		}
+		d.Status = &status
+		results = append(results, d)
+	}
+	return results, nil
+}

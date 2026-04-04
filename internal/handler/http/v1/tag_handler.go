@@ -29,6 +29,15 @@ func (h *TagHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	})
 }
 
+// List godoc
+// @Summary List Tags
+// @Description Retrieve all tags owned by the current user
+// @Tags Tags
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} entity.Tag
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /tags [get]
 func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -45,6 +54,18 @@ func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, items)
 }
 
+// Create godoc
+// @Summary Create Tag
+// @Description Create a new tag for labeling transactions
+// @Tags Tags
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.CreateTagRequest true "Tag Creation Payload"
+// @Success 201 {object} entity.Tag
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /tags [post]
 func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -67,6 +88,18 @@ func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusCreated, t)
 }
 
+// Get godoc
+// @Summary Get Tag
+// @Description Retrieve a specific tag by its ID
+// @Tags Tags
+// @Produce json
+// @Security BearerAuth
+// @Param tagId path string true "Tag ID"
+// @Success 200 {object} entity.Tag
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /tags/{tagId} [get]
 func (h *TagHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

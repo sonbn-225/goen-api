@@ -58,6 +58,7 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, id 
 	`, id, userID)
 
 	var t entity.Transaction
+	var catNames, catColors, tagNames, tagColors []string
 	err = row.Scan(
 		&t.ID, &t.ClientID, &t.ExternalRef, &t.Type, &t.OccurredAt, &t.OccurredDate,
 		&t.Amount, &t.FromAmount, &t.ToAmount, &t.Description, &t.AccountID, &t.FromAccountID, &t.ToAccountID,
@@ -70,6 +71,25 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, id 
 		}
 		return nil, err
 	}
+
+	// Enrichment
+	_ = pool.QueryRow(ctx, `
+		SELECT 
+			COALESCE(array_agg(DISTINCT c.name), '{}'::text[]),
+			COALESCE(array_agg(DISTINCT c.color), '{}'::text[]),
+			COALESCE(array_agg(DISTINCT tg.name), '{}'::text[]),
+			COALESCE(array_agg(DISTINCT tg.color), '{}'::text[])
+		FROM transaction_line_items li
+		LEFT JOIN categories c ON c.id = li.category_id
+		LEFT JOIN transaction_tags tt ON tt.transaction_id = li.transaction_id
+		LEFT JOIN tags tg ON tg.id = tt.tag_id
+		WHERE li.transaction_id = $1
+	`, t.ID).Scan(&catNames, &catColors, &tagNames, &tagColors)
+	
+	t.CategoryNames = catNames
+	t.CategoryColors = catColors
+	t.TagNames = tagNames
+	t.TagColors = tagColors
 
 	// Line Items
 	rows, err := pool.Query(ctx, `
@@ -208,6 +228,21 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 		if err != nil {
 			return nil, nil, 0, err
 		}
+
+		// Quick enrichment join per item (or could use a larger join above, but array_agg per item is safer for complex many-to-many)
+		_ = pool.QueryRow(ctx, `
+			SELECT 
+				COALESCE(array_agg(DISTINCT c.name), '{}'::text[]),
+				COALESCE(array_agg(DISTINCT c.color), '{}'::text[]),
+				COALESCE(array_agg(DISTINCT tg.name), '{}'::text[]),
+				COALESCE(array_agg(DISTINCT tg.color), '{}'::text[])
+			FROM transaction_line_items li
+			LEFT JOIN categories c ON c.id = li.category_id
+			LEFT JOIN transaction_tags tt ON tt.transaction_id = li.transaction_id
+			LEFT JOIN tags tg ON tg.id = tt.tag_id
+			WHERE li.transaction_id = $1
+		`, t.ID).Scan(&t.CategoryNames, &t.CategoryColors, &t.TagNames, &t.TagColors)
+
 		results = append(results, t)
 	}
 

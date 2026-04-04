@@ -31,6 +31,15 @@ func (h *BudgetHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	})
 }
 
+// List godoc
+// @Summary List Budgets
+// @Description Retrieve a list of budgets for the current user
+// @Tags Budgets
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} entity.Budget
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /budgets [get]
 func (h *BudgetHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -46,6 +55,18 @@ func (h *BudgetHandler) List(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, items)
 }
 
+// Create godoc
+// @Summary Create Budget
+// @Description Create a new budget limit for specific categories
+// @Tags Budgets
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.CreateBudgetRequest true "Budget Creation Payload"
+// @Success 201 {object} entity.Budget
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /budgets [post]
 func (h *BudgetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -67,6 +88,17 @@ func (h *BudgetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusCreated, res)
 }
 
+// Get godoc
+// @Summary Get Budget
+// @Description Retrieve a specific budget by ID
+// @Tags Budgets
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Budget ID"
+// @Success 200 {object} entity.Budget
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /budgets/{id} [get]
 func (h *BudgetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -83,6 +115,19 @@ func (h *BudgetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, res)
 }
 
+// Update godoc
+// @Summary Update Budget
+// @Description Partially update budget properties
+// @Tags Budgets
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Budget ID"
+// @Param request body dto.UpdateBudgetRequest true "Budget Update Payload"
+// @Success 200 {object} entity.Budget
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /budgets/{id} [patch]
 func (h *BudgetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -105,6 +150,16 @@ func (h *BudgetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, res)
 }
 
+// Delete godoc
+// @Summary Delete Budget
+// @Description Delete a specific budget by ID
+// @Tags Budgets
+// @Security BearerAuth
+// @Param id path string true "Budget ID"
+// @Success 204 "No Content"
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /budgets/{id} [delete]
 func (h *BudgetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

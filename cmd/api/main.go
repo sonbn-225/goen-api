@@ -1,5 +1,14 @@
 package main
 
+// @title Goen API
+// @version 1.0
+// @description REST API for Goen Project
+// @host api.goen.wisteria.local
+// @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
 import (
 	"context"
 	"fmt"
@@ -14,6 +23,17 @@ import (
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/logger"
 )
+
+// HealthCheck handles the basic health check endpoint
+// @Summary System Health Check
+// @Description Returns the health status of the API
+// @Tags System
+// @Produce plain
+// @Success 200 {string} string "ok"
+// @Router /health [get]
+func HealthCheck(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("ok"))
+}
 
 func main() {
 	cfg, err := config.Load()

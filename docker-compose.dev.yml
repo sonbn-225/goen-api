@@ -33,7 +33,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=${TRAEFIK_NETWORK:-proxy_network}"
-      - "traefik.http.routers.goen-api.rule=Host(`${GOEN_DOMAIN:-api.localhost}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.goen-api.rule=Host(`${GOEN_DOMAIN:-api.localhost}`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`))"
       - "traefik.http.routers.goen-api.entrypoints=web"
       - "traefik.http.routers.goen-api.priority=10"
       - "traefik.http.services.goen-api.loadbalancer.server.port=8080"

@@ -27,6 +27,7 @@ type Config struct {
 	MigrationDir        string
 	MigrateOnStart      bool
 	MarketDataStatusURL string
+	CORSOrigins         []string
 }
 
 func Load() (*Config, error) {
@@ -47,6 +48,13 @@ func Load() (*Config, error) {
 	cfg.MigrationDir = getenvDefault("MIGRATION_DIR", "scripts")
 	cfg.MigrateOnStart = getenvBoolDefault("MIGRATE_ON_START", true)
 	cfg.MarketDataStatusURL = os.Getenv("MARKET_DATA_STATUS_URL")
+
+	corsStr := getenvDefault("CORS_ORIGINS", "*")
+	if corsStr == "*" {
+		cfg.CORSOrigins = []string{"*"}
+	} else {
+		cfg.CORSOrigins = strings.Split(corsStr, ",")
+	}
 
 	levelStr := strings.ToLower(getenvDefault("LOG_LEVEL", "info"))
 	switch levelStr {
