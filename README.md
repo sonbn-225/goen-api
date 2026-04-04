@@ -1,286 +1,150 @@
-# goen-api
+# goen-api-v2
 
-Personal finance REST API for the Goen ecosystem.
+goen-api-v2 is the clean architecture implementation for the next generation of goen-api.
+
+## Goals
+
+- Keep operational baseline stable (Docker, Jenkins, migrations)
+- Move from all-in-one wiring to clean domain modules
+- Separate concerns clearly: transport, usecase, domain ports, infrastructure adapters
+- Keep API path stable on v1 during development
+
+## Current scope
+
+Wave 1 implementation includes:
+
+- Core platform foundation (config, error mapping, response helpers, auth middleware)
+- Auth domain
+- Account domain
+- Transaction domain
+- Category domain
+- Tag domain
+- Budget domain
+- Contact domain
+- Debt domain
+- Investment domain
+- Rotating savings domain
+- Report domain
+- Savings domain
 
 ## Architecture
 
-This project uses **Clean Architecture** with **feature-based modules**:
-
-```
-goen-api/
-├── cmd/api/              # Application entry point
-├── internal/
-│   ├── app/              # Application wiring & dependency injection
-│   ├── apperrors/        # Unified error handling
-│   ├── config/           # Environment configuration
-│   ├── domain/           # Domain entities & repository interfaces
-│   ├── httpapi/          # HTTP middleware (auth, cors, logging)
-│   ├── modules/          # Feature modules (vertical slices)
-│   │   ├── account/      # Bank accounts & wallets
-│   │   ├── auth/         # Authentication (register, login, JWT)
-│   │   ├── budget/       # Budget management
-│   │   ├── category/     # Transaction categories
-│   │   ├── debt/         # Debt tracking
-│   │   ├── diagnostics/  # Health checks (healthz, readyz, ping)
-│   │   ├── investment/   # Investment portfolio
-│   │   ├── marketdata/   # Stock/crypto market data
-│   │   ├── rotating_savings/ # Rotating savings (hui, arisan)
-│   │   ├── savings/      # Savings goals
-│   │   ├── tag/          # Transaction tags
-│   │   └── transaction/  # Income/expense transactions
-│   ├── response/         # HTTP response utilities
-│   └── storage/          # PostgreSQL repositories
-├── migrations/           # Database migrations (goose)
-└── docs/                 # Swagger documentation
+```text
+cmd/api                 -> process bootstrap
+internal/app            -> composition root and route registration
+internal/core           -> shared platform concerns (config/httpx/errors/response/security)
+internal/domains/*      -> domain modules (handler + usecase + ports + entities)
+internal/infra/*        -> infrastructure clients and adapters (postgres pool, migrations)
+internal/repository/*   -> repository implementations by data source
+migrations              -> preserved SQL migrations from v1
 ```
 
-### Package Responsibilities
+## Run locally
 
-| Package | Purpose |
-|---------|---------|
-| **cmd/api** | `main.go` - bootstrap config, database, start HTTP server |
-| **internal/app** | Wire dependencies, create modules, setup router |
-| **internal/apperrors** | Sentinel errors (`ErrNotFound`), error kinds, HTTP status mapping |
-| **internal/config** | Load & validate env vars (DB URLs, JWT secrets, ports) |
-| **internal/domain** | Pure domain entities & repository interfaces (no dependencies) |
-| **internal/httpapi** | Middleware: `AuthMiddleware`, `CORSMiddleware`, `RequestLogger` |
-| **internal/modules** | Feature modules - each contains `module.go`, `service.go`, `handler.go` |
-| **internal/response** | `WriteJSON()`, `WriteError()` - HTTP response helpers |
-| **internal/storage** | Repository implementations using pgx/v5 for PostgreSQL |
-
-### Module Structure
-
-Each module follows the same pattern:
-
-```
-modules/account/
-├── module.go      # New() constructor, RegisterRoutes()
-├── service.go     # Business logic, validation, orchestration
-└── handler.go     # HTTP handlers (parse request → call service → write response)
+```bash
+go mod tidy
+go run ./cmd/api
 ```
 
-### Data Flow
+Server defaults to `:8080`.
 
-```
-Request → Middleware → Handler → Service → Storage → PostgreSQL
-                          ↓
-                       Domain (entities)
-                          ↓
-Response ← Middleware ← Handler ← Service ← Storage
-```
+Health endpoint:
 
-### File Naming Conventions
+- `GET /healthz`
 
-| Layer | Convention | Example |
-|-------|------------|---------|
-| **domain/** | Singular | `user.go`, `account.go`, `transaction.go` |
-| **storage/** | Plural | `users.go`, `accounts.go`, `transactions.go` |
-| **modules/** | Folder per feature | `account/`, `auth/`, `transaction/` |
+Swagger:
 
----
+- Generate docs: `make swagger`
+- Swagger UI: `GET /swagger/`
 
-## What’s included
+v1 endpoints:
 
-- Go HTTP server with routes:
-  - `GET /api/v1/healthz`
-  - `GET /api/v1/readyz` (checks Postgres + Redis if configured)
-  - `GET /api/v1/ping` (for goen-web browser test)
-  - `GET /api/v1/connectivity` (probes Postgres + Redis and returns details)
-- Dockerfile (builds a static-ish Linux binary)
-- `docker-compose.dev.yml` (Traefik HTTP only)
-- `docker-compose.prod.yml` (Traefik HTTPS via `le` resolver)
-
-## Investment fees & taxes (V2-only)
-
-Investment accounts support JSONB configuration for auto-calculating fees and taxes.
-
-- Endpoint: `PATCH /api/v1/investment-accounts/{investmentAccountId}`
-- Fields: `fee_settings`, `tax_settings`
-- Schema (V2 only): `{ "version": 2, "fees": [ ... ] }`
-
-Each config item supports:
-
-- `name` (string), `enabled` (bool)
-- `trigger_event`: `BUY_SECURITY` | `SELL_SECURITY` | `STOCK_DIVIDEND` | `CASH_DIVIDEND` | `CASH_WITHDRAWAL` | `MONTHLY_CUSTODY`
-- `calculation_method`: `PERCENTAGE` | `FIXED_AMOUNT` | `PER_SHARE`
-- `value` (decimal string)
-- optional: `min_fee`, `max_fee`, `base_price_per_share` (used for `STOCK_DIVIDEND` base)
-
-Trade behavior:
-
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/signup`
+- `POST /api/v1/auth/signin`
+- `POST /api/v1/auth/refresh`
+- `GET /api/v1/auth/me`
+- `PATCH /api/v1/auth/me/profile`
+- `PATCH /api/v1/auth/me/settings`
+- `POST /api/v1/auth/me/change-password`
+- `GET /api/v1/accounts`
+- `POST /api/v1/accounts`
+- `GET /api/v1/categories`
+- `GET /api/v1/categories/{categoryId}`
+- `GET /api/v1/tags`
+- `POST /api/v1/tags`
+- `GET /api/v1/tags/{tagId}`
+- `GET /api/v1/budgets`
+- `POST /api/v1/budgets`
+- `GET /api/v1/budgets/{budgetId}`
+- `GET /api/v1/contacts`
+- `POST /api/v1/contacts`
+- `GET /api/v1/contacts/{contactId}`
+- `PATCH /api/v1/contacts/{contactId}`
+- `DELETE /api/v1/contacts/{contactId}`
+- `GET /api/v1/debts`
+- `POST /api/v1/debts`
+- `GET /api/v1/debts/{debtId}`
+- `GET /api/v1/debts/{debtId}/payments`
+- `POST /api/v1/debts/{debtId}/payments`
+- `GET /api/v1/debts/{debtId}/installments`
+- `POST /api/v1/debts/{debtId}/installments`
+- `GET /api/v1/rotating-savings/groups`
+- `POST /api/v1/rotating-savings/groups`
+- `GET /api/v1/rotating-savings/groups/{groupId}`
+- `PATCH /api/v1/rotating-savings/groups/{groupId}`
+- `DELETE /api/v1/rotating-savings/groups/{groupId}`
+- `GET /api/v1/rotating-savings/groups/{groupId}/contributions`
+- `POST /api/v1/rotating-savings/groups/{groupId}/contributions`
+- `DELETE /api/v1/rotating-savings/groups/{groupId}/contributions/{contributionId}`
+- `GET /api/v1/savings/instruments`
+- `POST /api/v1/savings/instruments`
+- `GET /api/v1/savings/instruments/{instrumentId}`
+- `PATCH /api/v1/savings/instruments/{instrumentId}`
+- `DELETE /api/v1/savings/instruments/{instrumentId}`
+- `GET /api/v1/reports/dashboard`
+- `GET /api/v1/transactions/{transactionId}/debt-links`
+- `GET /api/v1/investment-accounts`
+- `GET /api/v1/investment-accounts/{investmentAccountId}`
+- `PATCH /api/v1/investment-accounts/{investmentAccountId}`
 - `POST /api/v1/investment-accounts/{investmentAccountId}/trades`
-  - If `fees`/`taxes` are omitted, server computes them from settings (if configured).
-  - If `fees`/`taxes` are provided, server uses the provided values.
-  - When `fees > 0` or `taxes > 0`, server creates linked expense transactions.
+- `GET /api/v1/investment-accounts/{investmentAccountId}/trades`
+- `GET /api/v1/investment-accounts/{investmentAccountId}/holdings`
+- `GET /api/v1/securities`
+- `GET /api/v1/securities/{securityId}`
+- `GET /api/v1/securities/{securityId}/prices-daily`
+- `GET /api/v1/securities/{securityId}/events`
+- `GET /api/v1/transactions`
+- `POST /api/v1/transactions`
+- `PATCH /api/v1/transactions/{transactionId}`
+- `GET /api/v1/transactions/{transactionId}/group-expense-participants`
 
-## Run (dev)
+Transaction group expense extension (same `POST /api/v1/transactions` endpoint):
 
-Prereqs:
-- Traefik dev stack running on the same Docker network (`proxy_network` by default).
-- Postgres/Redis stacks running if you want `/readyz` to pass.
+1. `group_participants` and `owner_original_amount` are optional extension fields for `expense` transactions.
+2. For non-`expense` types, sending these extension fields returns validation errors.
+3. When `group_participants[].share_amount` is omitted, service calculates share values proportionally from `original_amount`.
+4. Transaction and group expense participants are created atomically in one repository transaction.
 
-Steps:
-- Copy env: `cp .env.example .env` (on Windows: duplicate file in Explorer)
-- Start: `docker compose --env-file .env -f docker-compose.dev.yml up -d --build`
+Transaction line items extension (same `POST /api/v1/transactions` endpoint):
 
-Then:
+1. `line_items` is required for non-transfer transaction types.
+2. For `transfer`, `line_items` must be empty.
+3. Each `line_items[]` item requires `category_id` and `amount > 0`.
+4. Transaction amount is normalized from sum of `line_items[].amount` (legacy parity behavior).
+5. `transaction_line_items` and `transaction_line_item_tags` are persisted atomically with the transaction row.
 
-- Pick a domain for Traefik routing by setting `GOEN_DOMAIN` in `.env`.
-  - Example (dev): `GOEN_DOMAIN=api.your-dev-domain.localhost`
+## Notes
 
-- Endpoints (replace `<GOEN_DOMAIN>` with your configured value):
-  - `http://<GOEN_DOMAIN>/api/v1/healthz`
-  - `http://<GOEN_DOMAIN>/api/v1/readyz`
-  - `http://<GOEN_DOMAIN>/api/v1/ping`
-  - `http://<GOEN_DOMAIN>/api/v1/connectivity`
-  - Swagger UI: `http://<GOEN_DOMAIN>/swagger/`
+- Database migrations are still preserved and can be executed with `MIGRATE_ON_START=true` and `DATABASE_URL` configured.
+- Auth/Account/Transaction currently use Postgres-backed repository implementations in `internal/repository`.
+- The infra layer is intentionally limited to external systems connectivity (for example Postgres pool and migrations).
+- Air dev mode auto-runs Swagger generation before rebuild (`swag init ... -o docs`).
+- `PATCH /api/v1/transactions/{transactionId}` now supports `group_participants` replacement for unsettled participants on expense transactions.
 
-PowerShell note (Windows): if `<GOEN_DOMAIN>` does not resolve in PowerShell, call through `http://localhost` and set the `Host` header:
+## Domain Discipline
 
-```powershell
-$apiDomain = "api.your-dev-domain.localhost" # set to your GOEN_DOMAIN
-Invoke-RestMethod -Uri "http://localhost/api/v1/ping" -Headers @{ Host = $apiDomain }
-```
-
-## Add a new API endpoint (Module Pattern)
-
-This repo uses **feature-based modules**. Each feature is a self-contained module in `internal/modules/`.
-
-### Steps to add a new module:
-
-1. **Create module folder**
-   ```
-   internal/modules/yourfeature/
-   ├── module.go
-   ├── service.go
-   └── handler.go
-   ```
-
-2. **Define the module** (`module.go`)
-   ```go
-   package yourfeature
-
-   import (
-       "github.com/go-chi/chi/v5"
-       "github.com/user/goen-api/internal/storage"
-   )
-
-   type Module struct {
-       service *Service
-       handler *Handler
-   }
-
-   func New(store *storage.YourStore) *Module {
-       svc := NewService(store)
-       return &Module{
-           service: svc,
-           handler: NewHandler(svc),
-       }
-   }
-
-   func (m *Module) RegisterRoutes(r chi.Router) {
-       r.Route("/yourfeature", func(r chi.Router) {
-           r.Get("/", m.handler.List)
-           r.Post("/", m.handler.Create)
-           r.Get("/{id}", m.handler.Get)
-       })
-   }
-   ```
-
-3. **Implement service** (`service.go`) - business logic
-4. **Implement handlers** (`handler.go`) - HTTP request/response
-
-5. **Register in app** (`internal/app/app.go`)
-   ```go
-   yourMod := yourfeature.New(yourStore)
-   yourMod.RegisterRoutes(r)
-   ```
-
-6. **(Optional) Add Swagger docs**
-   - Add Swaggo annotations above your handlers
-   - Dev mode auto-regenerates Swagger docs on rebuild
-
-7. **Rebuild/restart**
-   - Dev: container auto-rebuilds on `.go` changes (Air)
-   - Prod: `docker compose --env-file .env -f docker-compose.prod.yml up -d --build`
-
-## Run (prod)
-
-- Configure `.env` (set `GOEN_DOMAIN`, `JWT_SECRET`, `DATABASE_URL`, `REDIS_URL`)
-- Start: `docker compose --env-file .env -f docker-compose.prod.yml up -d --build`
-
-## CI/CD (Jenkins)
-
-Repository supports Jenkins pipeline deployment via `Jenkinsfile` (same pattern as `bewithyou`).
-
-### Required Jenkins credentials
-
-- `GOEN_API_CONTAINER_NAME`
-- `PLATFORM`
-- `SUNFLOWER_TZ`
-- `GOEN_V2_DOMAIN`
-- `TRAEFIK_NETWORK`
-- `DATA_NETWORK`
-- `GOEN_API_JWT_SECRET`
-- `POSTGRES_CONTAINER_NAME`
-- `POSTGRES_PORT`
-- `POSTGRES_DEFAULT`
-- `POSTGRES_PASSWORD`
-- `REDIS_CONTAINER_NAME`
-- `REDIS_PORT`
-- `REDIS_USERNAME`
-- `REDIS_PASSWORD`
-- `GOEN_MARKET_DATA_CONTAINER_NAME`
-- `GOEN_MARKET_DATA_STATUS_PORT`
-
-### Pipeline behavior
-
-- Deploy stage runs: `docker compose -f docker-compose.prod.yml up -d --build`
-- Jenkins maps `GOEN_V2_DOMAIN` credential to `GOEN_DOMAIN` env before running compose.
-- `GOEN_V2_DOMAIN` should be a bare host only (example: `goen-dev.sonbn.xyz`), without `http://`, `https://`, or path.
-- Health check stage waits for `${CONTAINER_NAME}` to reach running status
-- Post stage prunes dangling images: `docker image prune -f`
-
-## Database Migrations
-
-This project uses [goose](https://github.com/pressly/goose) for database migrations. Goose is installed in the Docker container.
-
-At runtime, the API also auto-runs migrations on startup by default:
-
-- `MIGRATE_ON_START=true` (default)
-- `MIGRATION_DIR=migrations` (default)
-
-### Baseline (squashed) migration for DB resets
-
-For fresh installs / local database resets, this repo keeps a single baseline migration:
-
-- `migrations/20260315000000_baseline_schema.sql`
-
-This baseline also initializes TimescaleDB (creates the extension if available) and converts selected time-series tables into hypertables.
-
-Notes:
-
-- The baseline is intended for an empty database.
-- If you already have a database with `goose_db_version` populated, do not apply the baseline on top. Drop/recreate the database (or clear the goose version table) first.
-
-### Create a new migration
-
-```bash
-docker exec goen-api goose -dir ./migrations create migration_name sql
-```
-
-This will create a new SQL file in the `migrations/` directory.
-
-### Run migrations
-
-To apply all available migrations:
-
-```bash
-docker exec goen-api sh -c 'export GOOSE_DRIVER=postgres && export GOOSE_DBSTRING=$DATABASE_URL && goose -dir ./migrations up'
-```
-
-### Check migration status
-
-```bash
-docker exec goen-api sh -c 'export GOOSE_DRIVER=postgres && export GOOSE_DBSTRING=$DATABASE_URL && goose -dir ./migrations status'
-```
+- Read and follow `docs/DOMAIN_DISCIPLINE.md` before adding or refactoring any domain module.
+- Enforce interface naming and service-layer wiring via `docs/DOMAIN_INTERFACE_NAMING_CONVENTION.md`.
+- Track migrated/pending domain compliance in `docs/DOMAIN_COMPLIANCE_MATRIX.md`.
