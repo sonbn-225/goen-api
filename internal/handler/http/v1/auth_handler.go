@@ -22,10 +22,12 @@ func NewAuthHandler(svc interfaces.AuthService) *AuthHandler {
 }
 
 func (h *AuthHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
-	r.Post("/auth/signup", h.Signup)
-	r.Post("/auth/signin", h.Signin)
-	r.Post("/auth/refresh", h.Refresh)
-	r.Post("/auth/logout", h.Logout)
+	r.Route("/auth", func(r chi.Router) {
+		r.Post("/signup", h.Signup)
+		r.Post("/signin", h.Signin)
+		r.Post("/refresh", h.Refresh)
+		r.Post("/logout", h.Logout)
+	})
 }
 
 // Signup godoc
@@ -45,13 +47,13 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "failed to decode request", nil)
 		return
 	}
-	
+
 	res, err := h.svc.Signup(r.Context(), req)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	
+
 	response.WriteSuccess(w, http.StatusCreated, res)
 }
 
@@ -72,13 +74,13 @@ func (h *AuthHandler) Signin(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "failed to decode request", nil)
 		return
 	}
-	
+
 	res, err := h.svc.Signin(r.Context(), req)
 	if err != nil {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", err.Error(), nil)
 		return
 	}
-	
+
 	response.WriteSuccess(w, http.StatusOK, res)
 }
 

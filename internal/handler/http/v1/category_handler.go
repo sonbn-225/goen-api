@@ -21,8 +21,11 @@ func NewCategoryHandler(svc interfaces.CategoryService) *CategoryHandler {
 func (h *CategoryHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-		r.Get("/categories", h.List)
-		r.Get("/categories/{categoryId}", h.Get)
+
+		r.Route("/categories", func(r chi.Router) {
+			r.Get("/", h.List)
+			r.Get("/{categoryId}", h.Get)
+		})
 	})
 }
 

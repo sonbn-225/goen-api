@@ -134,18 +134,6 @@ func (s *AccountService) Delete(ctx context.Context, userID, accountID string) e
 	return s.repo.DeleteAccount(ctx, userID, accountID)
 }
 
-func (s *AccountService) ListBalances(ctx context.Context, userID string) ([]dto.AccountBalanceResponse, error) {
-	items, err := s.repo.ListAccountBalancesForUser(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]dto.AccountBalanceResponse, len(items))
-	for i, it := range items {
-		out[i] = dto.NewAccountBalanceResponse(it)
-	}
-	return out, nil
-}
-
 func (s *AccountService) ListShares(ctx context.Context, userID, accountID string) ([]dto.AccountShareResponse, error) {
 	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
 		return nil, err

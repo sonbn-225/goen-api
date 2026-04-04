@@ -24,10 +24,13 @@ func NewGroupExpenseHandler(svc interfaces.GroupExpenseService) *GroupExpenseHan
 func (h *GroupExpenseHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-		r.Post("/group-expenses", h.Create)
-		r.Get("/group-expenses/participants/{transactionId}", h.ListByTransaction)
-		r.Post("/group-expenses/settle/{participantId}", h.Settle)
-		r.Get("/group-expenses/names", h.ListNames)
+
+		r.Route("/group-expenses", func(r chi.Router) {
+			r.Post("/", h.Create)
+			r.Get("/participants/{transactionId}", h.ListByTransaction)
+			r.Post("/settle/{participantId}", h.Settle)
+			r.Get("/names", h.ListNames)
+		})
 	})
 }
 

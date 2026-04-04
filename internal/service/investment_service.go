@@ -14,20 +14,17 @@ import (
 )
 
 type InvestmentService struct {
-	repo       interfaces.InvestmentRepository
-	accountSvc interfaces.AccountService
-	txSvc      interfaces.TransactionService
+	repo  interfaces.InvestmentRepository
+	txSvc interfaces.TransactionService
 }
 
 func NewInvestmentService(
 	repo interfaces.InvestmentRepository,
-	accountSvc interfaces.AccountService,
 	txSvc interfaces.TransactionService,
 ) *InvestmentService {
 	return &InvestmentService{
-		repo:       repo,
-		accountSvc: accountSvc,
-		txSvc:      txSvc,
+		repo:  repo,
+		txSvc: txSvc,
 	}
 }
 
@@ -207,7 +204,7 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 	}
 
 	side := strings.ToLower(strings.TrimSpace(req.Side))
-	
+
 	// Sell logic FIFO
 	var sellPlan []lotConsumptionPlan
 	if side == "sell" {
@@ -224,9 +221,13 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 
 	// Fees & Taxes (legacy logic simplification for migration)
 	fees := "0"
-	if req.Fees != nil { fees = *req.Fees }
+	if req.Fees != nil {
+		fees = *req.Fees
+	}
 	taxes := "0"
-	if req.Taxes != nil { taxes = *req.Taxes }
+	if req.Taxes != nil {
+		taxes = *req.Taxes
+	}
 
 	tradeID := uuid.NewString()
 
@@ -238,14 +239,22 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 		if notional.Sign() > 0 {
 			amt := notional.FloatString(2)
 			kind := "expense"
-			if side == "sell" { kind = "income" }
+			if side == "sell" {
+				kind = "income"
+			}
 			desc := "Trade " + side + " " + req.SecurityID
-			if req.PrincipalDescription != nil { desc = *req.PrincipalDescription }
+			if req.PrincipalDescription != nil {
+				desc = *req.PrincipalDescription
+			}
 
 			extRef := "trade:" + tradeID + ":principal"
 			catID := "cat_sys_invest_buy"
-			if side == "sell" { catID = "cat_sys_invest_sell" }
-			if req.PrincipalCategoryID != nil { catID = *req.PrincipalCategoryID }
+			if side == "sell" {
+				catID = "cat_sys_invest_sell"
+			}
+			if req.PrincipalCategoryID != nil {
+				catID = *req.PrincipalCategoryID
+			}
 
 			_, _ = s.txSvc.Create(ctx, userID, dto.CreateTransactionRequest{
 				Type:         kind,
@@ -268,7 +277,9 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 		tx, _ := s.txSvc.Create(ctx, userID, dto.CreateTransactionRequest{
 			Type: "expense", OccurredDate: &occDate, Amount: fees, Description: &fDesc, AccountID: &ia.AccountID, ExternalRef: &fExtRef, CategoryID: &fCat,
 		})
-		if tx != nil { feeTxID = &tx.ID }
+		if tx != nil {
+			feeTxID = &tx.ID
+		}
 	}
 	if tAmt, _ := new(big.Rat).SetString(taxes); tAmt.Sign() > 0 {
 		tDesc := "Trade Tax " + req.SecurityID
@@ -277,7 +288,9 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 		tx, _ := s.txSvc.Create(ctx, userID, dto.CreateTransactionRequest{
 			Type: "expense", OccurredDate: &occDate, Amount: taxes, Description: &tDesc, AccountID: &ia.AccountID, ExternalRef: &tExtRef, CategoryID: &tCat,
 		})
-		if tx != nil { taxTxID = &tx.ID }
+		if tx != nil {
+			taxTxID = &tx.ID
+		}
 	}
 
 	trade := entity.Trade{
@@ -343,7 +356,7 @@ func (s *InvestmentService) GetRealizedPNLReport(ctx context.Context, userID, br
 
 	report := &dto.RealizedPNLReport{Items: []dto.RealizedPNLReportItem{}}
 	totalNet := new(big.Rat)
-	
+
 	// Group by security
 	bySec := map[string]*dto.RealizedPNLReportItem{}
 	for _, l := range logs {
@@ -404,11 +417,15 @@ func (s *InvestmentService) planFIFOSell(lots []entity.ShareLot, sellQty string)
 	toSell, _ := new(big.Rat).SetString(sellQty)
 	remaining := new(big.Rat).Set(toSell)
 	var plan []lotConsumptionPlan
-	
+
 	for _, l := range lots {
-		if remaining.Sign() <= 0 { break }
+		if remaining.Sign() <= 0 {
+			break
+		}
 		lotQ, _ := new(big.Rat).SetString(l.Quantity)
-		if lotQ.Sign() <= 0 { continue }
+		if lotQ.Sign() <= 0 {
+			continue
+		}
 
 		consume := new(big.Rat)
 		if lotQ.Cmp(remaining) >= 0 {

@@ -23,7 +23,10 @@ func NewSettingsHandler(svc interfaces.AuthService) *SettingsHandler {
 func (h *SettingsHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-		r.Patch("/settings/me", h.PatchMySettings)
+
+		r.Route("/settings/me", func(r chi.Router) {
+			r.Patch("/", h.PatchMySettings)
+		})
 	})
 }
 

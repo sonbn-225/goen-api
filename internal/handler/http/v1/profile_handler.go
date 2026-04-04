@@ -22,10 +22,13 @@ func NewProfileHandler(svc interfaces.AuthService) *ProfileHandler {
 func (h *ProfileHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-		r.Get("/profile/me", h.Me)
-		r.Patch("/profile/me", h.PatchMyProfile)
-		r.Post("/profile/me/avatar", h.UploadAvatar)
-		r.Post("/profile/me/change-password", h.ChangePassword)
+
+		r.Route("/profile/me", func(r chi.Router) {
+			r.Get("/", h.Me)
+			r.Patch("/", h.PatchMyProfile)
+			r.Post("/avatar", h.UploadAvatar)
+			r.Post("/change-password", h.ChangePassword)
+		})
 	})
 }
 

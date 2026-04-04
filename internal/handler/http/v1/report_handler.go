@@ -21,7 +21,10 @@ func NewReportHandler(reportSvc interfaces.ReportService) *ReportHandler {
 func (h *ReportHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-		r.Get("/reports/dashboard", h.GetDashboard)
+
+		r.Route("/reports", func(r chi.Router) {
+			r.Get("/dashboard", h.GetDashboard)
+		})
 	})
 }
 

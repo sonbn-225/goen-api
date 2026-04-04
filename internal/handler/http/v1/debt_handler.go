@@ -23,13 +23,18 @@ func NewDebtHandler(svc interfaces.DebtService) *DebtHandler {
 func (h *DebtHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-		r.Get("/debts", h.List)
-		r.Post("/debts", h.Create)
-		r.Get("/debts/{id}", h.Get)
-		r.Patch("/debts/{id}", h.Update)
-		r.Delete("/debts/{id}", h.Delete)
-		r.Post("/debts/{id}/payments", h.AddPayment)
-		r.Get("/debts/{id}/payments", h.ListPayments)
+
+		r.Route("/debts", func(r chi.Router) {
+			r.Get("/", h.List)
+			r.Post("/", h.Create)
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", h.Get)
+				r.Patch("/", h.Update)
+				r.Delete("/", h.Delete)
+				r.Post("/payments", h.AddPayment)
+				r.Get("/payments", h.ListPayments)
+			})
+		})
 	})
 }
 

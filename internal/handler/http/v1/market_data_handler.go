@@ -2,7 +2,10 @@ package v1
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
@@ -21,13 +24,22 @@ func NewMarketDataHandler(svc interfaces.MarketDataService) *MarketDataHandler {
 }
 
 func (h *MarketDataHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
-	r.Get("/market-data/status", h.GetGlobalStatus)
-	r.Post("/market-data/sync", h.MarketSync)
-	r.Post("/market-data/refresh-symbols", h.RefreshSymbols)
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(cfg))
 
-	r.Get("/securities/{id}/status", h.GetSecurityStatus)
-	r.Post("/securities/{id}/refresh-prices", h.RefreshPrices)
-	r.Post("/securities/{id}/refresh-events", h.RefreshEvents)
+		r.Route("/investments/market-data", func(r chi.Router) {
+			r.Get("/status", h.GetGlobalStatus)
+			r.Post("/sync", h.MarketSync)
+			r.Post("/sync-catalog", h.SyncCatalog)
+			r.Post("/sync-symbols", h.RefreshSymbols)
+		})
+
+		r.Route("/investments/securities/{id}", func(r chi.Router) {
+			r.Get("/status", h.GetSecurityStatus)
+			r.Post("/prices-daily/refresh", h.RefreshPrices)
+			r.Post("/events/refresh", h.RefreshEvents)
+		})
+	})
 }
 
 // GetGlobalStatus godoc
@@ -38,7 +50,7 @@ func (h *MarketDataHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Security BearerAuth
 // @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /market-data/status [get]
+// @Router /investments/market-data/status [get]
 func (h *MarketDataHandler) GetGlobalStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := h.svc.GetGlobalStatus(r.Context())
 	if err != nil {
@@ -59,7 +71,7 @@ func (h *MarketDataHandler) GetGlobalStatus(w http.ResponseWriter, r *http.Reque
 // @Success 202 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /market-data/sync [post]
+// @Router /investments/market-data/sync [post]
 func (h *MarketDataHandler) MarketSync(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -67,9 +79,49 @@ func (h *MarketDataHandler) MarketSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req dto.MarketSyncRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
 		return
+	}
+
+	if includePrices, ok := queryBool(r, "prices"); ok {
+		req.IncludePrices = includePrices
+	}
+	if includeEvents, ok := queryBool(r, "events"); ok {
+		req.IncludeEvents = includeEvents
+	}
+	if !req.IncludePrices && !req.IncludeEvents {
+		req.IncludePrices = true
+		req.IncludeEvents = true
+	}
+	if force := strings.TrimSpace(r.URL.Query().Get("force")); force != "" {
+		req.Force = &force
+	}
+	if full, ok := queryBool(r, "full"); ok {
+		req.Full = full
+	}
+
+	res, err := h.svc.EnqueueMarketSync(r.Context(), userID, req)
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		return
+	}
+	response.WriteSuccess(w, http.StatusAccepted, res)
+}
+
+func (h *MarketDataHandler) SyncCatalog(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
+
+	req := dto.MarketSyncRequest{
+		IncludePrices: true,
+		IncludeEvents: true,
+	}
+	if force := strings.TrimSpace(r.URL.Query().Get("force")); force != "" {
+		req.Force = &force
 	}
 
 	res, err := h.svc.EnqueueMarketSync(r.Context(), userID, req)
@@ -91,7 +143,7 @@ func (h *MarketDataHandler) MarketSync(w http.ResponseWriter, r *http.Request) {
 // @Success 202 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /market-data/refresh-symbols [post]
+// @Router /investments/market-data/sync-symbols [post]
 func (h *MarketDataHandler) RefreshSymbols(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -99,9 +151,22 @@ func (h *MarketDataHandler) RefreshSymbols(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	var req dto.RefreshSymbolsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
 		return
+	}
+	if includePrices, ok := queryBool(r, "prices"); ok {
+		req.IncludePrices = includePrices
+	}
+	if includeEvents, ok := queryBool(r, "events"); ok {
+		req.IncludeEvents = includeEvents
+	}
+	if !req.IncludePrices && !req.IncludeEvents {
+		req.IncludePrices = true
+		req.IncludeEvents = true
+	}
+	if force := strings.TrimSpace(r.URL.Query().Get("force")); force != "" {
+		req.Force = &force
 	}
 
 	res, err := h.svc.EnqueueBySymbols(r.Context(), userID, req)
@@ -121,7 +186,7 @@ func (h *MarketDataHandler) RefreshSymbols(w http.ResponseWriter, r *http.Reques
 // @Param id path string true "Security ID"
 // @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /securities/{id}/status [get]
+// @Router /investments/securities/{id}/status [get]
 func (h *MarketDataHandler) GetSecurityStatus(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -149,7 +214,7 @@ func (h *MarketDataHandler) GetSecurityStatus(w http.ResponseWriter, r *http.Req
 // @Success 202 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /securities/{id}/refresh-prices [post]
+// @Router /investments/securities/{id}/prices-daily/refresh [post]
 func (h *MarketDataHandler) RefreshPrices(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -158,11 +223,23 @@ func (h *MarketDataHandler) RefreshPrices(w http.ResponseWriter, r *http.Request
 	}
 	id := chi.URLParam(r, "id")
 	var req dto.RefreshPriceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
 		return
 	}
 	req.SecurityID = id
+	if force := strings.TrimSpace(r.URL.Query().Get("force")); force != "" {
+		req.Force = &force
+	}
+	if full := strings.TrimSpace(r.URL.Query().Get("full")); full != "" {
+		req.Full = &full
+	}
+	if from := strings.TrimSpace(r.URL.Query().Get("from")); from != "" {
+		req.From = &from
+	}
+	if to := strings.TrimSpace(r.URL.Query().Get("to")); to != "" {
+		req.To = &to
+	}
 
 	res, err := h.svc.EnqueueSecurityPricesDaily(r.Context(), userID, req)
 	if err != nil {
@@ -184,7 +261,7 @@ func (h *MarketDataHandler) RefreshPrices(w http.ResponseWriter, r *http.Request
 // @Success 202 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
-// @Router /securities/{id}/refresh-events [post]
+// @Router /investments/securities/{id}/events/refresh [post]
 func (h *MarketDataHandler) RefreshEvents(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -193,11 +270,14 @@ func (h *MarketDataHandler) RefreshEvents(w http.ResponseWriter, r *http.Request
 	}
 	id := chi.URLParam(r, "id")
 	var req dto.RefreshEventRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
 		return
 	}
 	req.SecurityID = id
+	if force := strings.TrimSpace(r.URL.Query().Get("force")); force != "" {
+		req.Force = &force
+	}
 
 	res, err := h.svc.EnqueueSecurityEvents(r.Context(), userID, req)
 	if err != nil {
@@ -205,4 +285,12 @@ func (h *MarketDataHandler) RefreshEvents(w http.ResponseWriter, r *http.Request
 		return
 	}
 	response.WriteSuccess(w, http.StatusAccepted, res)
+}
+
+func queryBool(r *http.Request, key string) (bool, bool) {
+	v := strings.TrimSpace(strings.ToLower(r.URL.Query().Get(key)))
+	if v == "" {
+		return false, false
+	}
+	return v == "1" || v == "true" || v == "yes" || v == "on", true
 }

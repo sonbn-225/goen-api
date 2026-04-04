@@ -23,9 +23,12 @@ func NewTagHandler(svc interfaces.TagService) *TagHandler {
 func (h *TagHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-		r.Get("/tags", h.List)
-		r.Post("/tags", h.Create)
-		r.Get("/tags/{tagId}", h.Get)
+
+		r.Route("/tags", func(r chi.Router) {
+			r.Get("/", h.List)
+			r.Post("/", h.Create)
+			r.Get("/{tagId}", h.Get)
+		})
 	})
 }
 

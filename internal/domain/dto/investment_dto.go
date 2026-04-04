@@ -12,11 +12,13 @@ type PatchInvestmentAccountRequest struct {
 }
 
 type InvestmentAccountResponse struct {
-	ID          string `json:"id"`
-	AccountID   string `json:"account_id"`
-	Currency    string `json:"currency"`
-	FeeSettings any    `json:"fee_settings,omitempty"`
-	TaxSettings any    `json:"tax_settings,omitempty"`
+	ID          string    `json:"id"`
+	AccountID   string    `json:"account_id"`
+	Currency    string    `json:"currency"`
+	FeeSettings any       `json:"fee_settings,omitempty"`
+	TaxSettings any       `json:"tax_settings,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 func NewInvestmentAccountResponse(a entity.InvestmentAccount) InvestmentAccountResponse {
@@ -26,6 +28,8 @@ func NewInvestmentAccountResponse(a entity.InvestmentAccount) InvestmentAccountR
 		Currency:    a.Currency,
 		FeeSettings: a.FeeSettings,
 		TaxSettings: a.TaxSettings,
+		CreatedAt:   a.CreatedAt,
+		UpdatedAt:   a.UpdatedAt,
 	}
 }
 

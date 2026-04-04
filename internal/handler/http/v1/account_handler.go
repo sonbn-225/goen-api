@@ -24,16 +24,20 @@ func NewAccountHandler(svc interfaces.AccountService) *AccountHandler {
 func (h *AccountHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-		r.Get("/accounts", h.List)
-		r.Post("/accounts", h.Create)
-		r.Get("/accounts/balances", h.ListBalances)
-		r.Get("/accounts/{accountId}", h.Get)
-		r.Patch("/accounts/{accountId}", h.Patch)
-		r.Delete("/accounts/{accountId}", h.Delete)
-		r.Get("/accounts/{accountId}/shares", h.ListShares)
-		r.Get("/accounts/{accountId}/audit-events", h.ListAuditEvents)
-		r.Put("/accounts/{accountId}/shares", h.UpsertShare)
-		r.Delete("/accounts/{accountId}/shares/{userId}", h.RevokeShare)
+
+		r.Route("/accounts", func(r chi.Router) {
+			r.Get("/", h.List)
+			r.Post("/", h.Create)
+			r.Route("/{accountId}", func(r chi.Router) {
+				r.Get("/", h.Get)
+				r.Patch("/", h.Patch)
+				r.Delete("/", h.Delete)
+				r.Get("/shares", h.ListShares)
+				r.Get("/audit-events", h.ListAuditEvents)
+				r.Put("/shares", h.UpsertShare)
+				r.Delete("/shares/{userId}", h.RevokeShare)
+			})
+		})
 	})
 }
 
@@ -193,29 +197,6 @@ func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// ListBalances godoc
-// @Summary List Account Balances
-// @Description Get current financial balance calculations for each account
-// @Tags Accounts
-// @Produce json
-// @Security BearerAuth
-// @Router /accounts/balances [get]
-func (h *AccountHandler) ListBalances(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
-		return
-	}
-
-	items, err := h.svc.ListBalances(r.Context(), userID)
-	if err != nil {
-		response.WriteInternalError(w, err)
-		return
-	}
-
-	response.WriteSuccess(w, http.StatusOK, items)
 }
 
 // ListShares godoc
