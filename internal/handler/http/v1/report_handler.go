@@ -31,7 +31,7 @@ func (h *ReportHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags Reports
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} object
+// @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /reports/dashboard [get]
@@ -48,5 +48,5 @@ func (h *ReportHandler) GetDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, reportData)
+	response.WriteSuccess(w, http.StatusOK, reportData)
 }

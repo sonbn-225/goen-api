@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
 )
@@ -57,17 +58,21 @@ func (h *SavingsHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags Savings
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {array} entity.Savings
+// @Success 200 {object} response.SuccessEnvelope{data=[]entity.Savings}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /savings [get]
 func (h *SavingsHandler) ListSavings(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	items, err := h.savingsSvc.ListSavings(r.Context(), userID)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, items)
+	response.WriteSuccess(w, http.StatusOK, items)
 }
 
 // CreateSavings godoc
@@ -78,12 +83,16 @@ func (h *SavingsHandler) ListSavings(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateSavingsRequest true "Savings Creation Payload"
-// @Success 201 {object} entity.Savings
+// @Success 201 {object} response.SuccessEnvelope{data=entity.Savings}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /savings [post]
 func (h *SavingsHandler) CreateSavings(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	var req dto.CreateSavingsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
@@ -94,7 +103,7 @@ func (h *SavingsHandler) CreateSavings(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusCreated, item)
+	response.WriteSuccess(w, http.StatusCreated, item)
 }
 
 // GetSavings godoc
@@ -104,18 +113,22 @@ func (h *SavingsHandler) CreateSavings(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Savings ID"
-// @Success 200 {object} entity.Savings
+// @Success 200 {object} response.SuccessEnvelope{data=entity.Savings}
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /savings/{id} [get]
 func (h *SavingsHandler) GetSavings(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	item, err := h.savingsSvc.GetSavings(r.Context(), userID, id)
 	if err != nil {
 		response.WriteError(w, http.StatusNotFound, "not_found", "Savings not found", nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, item)
+	response.WriteSuccess(w, http.StatusOK, item)
 }
 
 // PatchSavings godoc
@@ -127,12 +140,16 @@ func (h *SavingsHandler) GetSavings(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Param id path string true "Savings ID"
 // @Param request body dto.PatchSavingsRequest true "Savings Update Payload"
-// @Success 200 {object} entity.Savings
+// @Success 200 {object} response.SuccessEnvelope{data=entity.Savings}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /savings/{id} [patch]
 func (h *SavingsHandler) PatchSavings(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	var req dto.PatchSavingsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -144,7 +161,7 @@ func (h *SavingsHandler) PatchSavings(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, item)
+	response.WriteSuccess(w, http.StatusOK, item)
 }
 
 // DeleteSavings godoc
@@ -154,17 +171,21 @@ func (h *SavingsHandler) PatchSavings(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Savings ID"
-// @Success 200 {object} map[string]string
+// @Success 200 {object} response.SuccessEnvelope{data=map[string]string}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /savings/{id} [delete]
 func (h *SavingsHandler) DeleteSavings(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	if err := h.savingsSvc.DeleteSavings(r.Context(), userID, id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Savings deleted"})
+	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Savings deleted"})
 }
 
 // Rotating Savings Handlers
@@ -174,17 +195,21 @@ func (h *SavingsHandler) DeleteSavings(w http.ResponseWriter, r *http.Request) {
 // @Tags RotatingSavings
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {array} object
+// @Success 200 {object} response.SuccessEnvelope{data=[]object}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings [get]
 func (h *SavingsHandler) ListRotatingGroups(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	groups, err := h.rotatingSvc.ListGroups(r.Context(), userID)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, groups)
+	response.WriteSuccess(w, http.StatusOK, groups)
 }
 
 // CreateRotatingGroup godoc
@@ -195,12 +220,16 @@ func (h *SavingsHandler) ListRotatingGroups(w http.ResponseWriter, r *http.Reque
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateRotatingSavingsGroupRequest true "Rotating Group Payload"
-// @Success 201 {object} object
+// @Success 201 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings [post]
 func (h *SavingsHandler) CreateRotatingGroup(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	var req dto.CreateRotatingSavingsGroupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
@@ -211,7 +240,7 @@ func (h *SavingsHandler) CreateRotatingGroup(w http.ResponseWriter, r *http.Requ
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusCreated, group)
+	response.WriteSuccess(w, http.StatusCreated, group)
 }
 
 // GetRotatingGroupDetail godoc
@@ -221,18 +250,22 @@ func (h *SavingsHandler) CreateRotatingGroup(w http.ResponseWriter, r *http.Requ
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Rotating Savings Group ID"
-// @Success 200 {object} object
+// @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/{id} [get]
 func (h *SavingsHandler) GetRotatingGroupDetail(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	detail, err := h.rotatingSvc.GetGroupDetail(r.Context(), userID, id)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, detail)
+	response.WriteSuccess(w, http.StatusOK, detail)
 }
 
 // UpdateRotatingGroup godoc
@@ -244,12 +277,16 @@ func (h *SavingsHandler) GetRotatingGroupDetail(w http.ResponseWriter, r *http.R
 // @Security BearerAuth
 // @Param id path string true "Rotating Savings Group ID"
 // @Param request body dto.UpdateRotatingSavingsGroupRequest true "Update Group Payload"
-// @Success 200 {object} object
+// @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/{id} [patch]
 func (h *SavingsHandler) UpdateRotatingGroup(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	var req dto.UpdateRotatingSavingsGroupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -261,7 +298,7 @@ func (h *SavingsHandler) UpdateRotatingGroup(w http.ResponseWriter, r *http.Requ
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, group)
+	response.WriteSuccess(w, http.StatusOK, group)
 }
 
 // DeleteRotatingGroup godoc
@@ -271,17 +308,21 @@ func (h *SavingsHandler) UpdateRotatingGroup(w http.ResponseWriter, r *http.Requ
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Rotating Savings Group ID"
-// @Success 200 {object} map[string]string
+// @Success 200 {object} response.SuccessEnvelope{data=map[string]string}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/{id} [delete]
 func (h *SavingsHandler) DeleteRotatingGroup(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	if err := h.rotatingSvc.DeleteGroup(r.Context(), userID, id); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Rotating savings group deleted"})
+	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Rotating savings group deleted"})
 }
 
 // CreateContribution godoc
@@ -293,12 +334,16 @@ func (h *SavingsHandler) DeleteRotatingGroup(w http.ResponseWriter, r *http.Requ
 // @Security BearerAuth
 // @Param id path string true "Rotating Savings Group ID"
 // @Param request body dto.RotatingSavingsContributionRequest true "Contribution Payload"
-// @Success 201 {object} object
+// @Success 201 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/{id}/contributions [post]
 func (h *SavingsHandler) CreateContribution(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	var req dto.RotatingSavingsContributionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -310,7 +355,7 @@ func (h *SavingsHandler) CreateContribution(w http.ResponseWriter, r *http.Reque
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusCreated, contrib)
+	response.WriteSuccess(w, http.StatusCreated, contrib)
 }
 
 // DeleteContribution godoc
@@ -321,16 +366,20 @@ func (h *SavingsHandler) CreateContribution(w http.ResponseWriter, r *http.Reque
 // @Security BearerAuth
 // @Param id path string true "Rotating Savings Group ID"
 // @Param contributionId path string true "Contribution ID"
-// @Success 200 {object} map[string]string
+// @Success 200 {object} response.SuccessEnvelope{data=map[string]string}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /rotating-savings/{id}/contributions/{contributionId} [delete]
 func (h *SavingsHandler) DeleteContribution(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	contribID := chi.URLParam(r, "contributionId")
 	if err := h.rotatingSvc.DeleteContribution(r.Context(), userID, id, contribID); err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Contribution deleted"})
+	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Contribution deleted"})
 }

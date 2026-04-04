@@ -35,7 +35,7 @@ func (h *TagHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags Tags
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {array} entity.Tag
+// @Success 200 {object} response.SuccessEnvelope{data=[]entity.Tag}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /tags [get]
 func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +51,7 @@ func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, items)
+	response.WriteSuccess(w, http.StatusOK, items)
 }
 
 // Create godoc
@@ -62,7 +62,7 @@ func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateTagRequest true "Tag Creation Payload"
-// @Success 201 {object} entity.Tag
+// @Success 201 {object} response.SuccessEnvelope{data=entity.Tag}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /tags [post]
@@ -85,7 +85,7 @@ func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusCreated, t)
+	response.WriteSuccess(w, http.StatusCreated, t)
 }
 
 // Get godoc
@@ -95,7 +95,7 @@ func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param tagId path string true "Tag ID"
-// @Success 200 {object} entity.Tag
+// @Success 200 {object} response.SuccessEnvelope{data=entity.Tag}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
@@ -119,5 +119,5 @@ func (h *TagHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, t)
+	response.WriteSuccess(w, http.StatusOK, t)
 }

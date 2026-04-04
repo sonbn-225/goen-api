@@ -2,20 +2,21 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/rs/cors"
+	_ "github.com/sonbn-225/goen-api/docs"
 	v1 "github.com/sonbn-225/goen-api/internal/handler/http/v1"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/storage"
 	"github.com/sonbn-225/goen-api/internal/repository/postgres"
 	"github.com/sonbn-225/goen-api/internal/service"
-	"github.com/rs/cors"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
-	_ "github.com/sonbn-225/goen-api/docs"
 )
 
 type App struct {
@@ -26,9 +27,14 @@ type App struct {
 	Router *chi.Mux
 }
 
-func New(cfg *config.Config) *App {
+func New(cfg *config.Config) (*App, error) {
 	db := database.NewPostgres(cfg.DatabaseURL)
-	
+	if cfg.MigrateOnStart {
+		if err := database.Migrate(context.Background(), db, cfg.MigrationDir); err != nil {
+			return nil, fmt.Errorf("failed to run migrations: %w", err)
+		}
+	}
+
 	var rds *database.Redis
 	if cfg.RedisURL != "" {
 		var err error
@@ -49,6 +55,7 @@ func New(cfg *config.Config) *App {
 
 	// Repositories
 	userRepo := postgres.NewUserRepo(db)
+	refreshRepo := postgres.NewRefreshTokenRepo(db)
 	categoryRepo := postgres.NewCategoryRepo(db)
 	tagRepo := postgres.NewTagRepo(db)
 	accountRepo := postgres.NewAccountRepo(db)
@@ -63,7 +70,7 @@ func New(cfg *config.Config) *App {
 	savingsRepo := postgres.NewSavingsRepo(db)
 
 	// Services
-	authSvc := service.NewAuthService(userRepo, s3, cfg)
+	authSvc := service.NewAuthService(userRepo, refreshRepo, s3, cfg)
 	categorySvc := service.NewCategoryService(categoryRepo)
 	tagSvc := service.NewTagService(tagRepo)
 	accountSvc := service.NewAccountService(accountRepo, userRepo)
@@ -84,7 +91,10 @@ func New(cfg *config.Config) *App {
 	transactionSvc.SetDebtService(debtSvc)
 
 	// Handlers
-	authHandler := v1.NewAuthHandler(authSvc, s3)
+	authHandler := v1.NewAuthHandler(authSvc)
+	profileHandler := v1.NewProfileHandler(authSvc)
+	settingsHandler := v1.NewSettingsHandler(authSvc)
+	mediaHandler := v1.NewMediaHandler(s3)
 	categoryHandler := v1.NewCategoryHandler(categorySvc)
 	tagHandler := v1.NewTagHandler(tagSvc)
 	accountHandler := v1.NewAccountHandler(accountSvc)
@@ -101,19 +111,36 @@ func New(cfg *config.Config) *App {
 	diagnosticsHandler := v1.NewDiagnosticsHandler(diagnosticsSvc)
 
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-
+ 
 	// CORS
-	c := cors.New(cors.Options{
-		AllowedOrigins:   cfg.CORSOrigins,
+	corsOpts := cors.Options{
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedHeaders:   []string{"*"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
-	})
-	r.Use(c.Handler)
+	}
+	// Wildcard "*" is incompatible with AllowCredentials=true per CORS spec.
+	// Use AllowOriginFunc to dynamically mirror the request Origin header instead.
+	if len(cfg.CORSOrigins) == 1 && cfg.CORSOrigins[0] == "*" {
+		corsOpts.AllowOriginFunc = func(origin string) bool {
+			return true
+		}
+	} else {
+		corsOpts.AllowedOrigins = cfg.CORSOrigins
+		corsOpts.AllowOriginFunc = func(origin string) bool {
+			for _, o := range cfg.CORSOrigins {
+				if o == origin || o == "*" {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	r.Use(cors.New(corsOpts).Handler)
+
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
 
 	r.Get("/swagger", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/swagger/index.html", http.StatusMovedPermanently)
@@ -128,6 +155,9 @@ func New(cfg *config.Config) *App {
 		})
 
 		authHandler.RegisterRoutes(r, cfg)
+		profileHandler.RegisterRoutes(r, cfg)
+		settingsHandler.RegisterRoutes(r, cfg)
+		mediaHandler.RegisterRoutes(r, cfg)
 		categoryHandler.RegisterRoutes(r, cfg)
 		tagHandler.RegisterRoutes(r, cfg)
 		accountHandler.RegisterRoutes(r, cfg)
@@ -150,7 +180,7 @@ func New(cfg *config.Config) *App {
 		Redis:  rds,
 		S3:     s3,
 		Router: r,
-	}
+	}, nil
 }
 
 func (a *App) Close(ctx context.Context) {

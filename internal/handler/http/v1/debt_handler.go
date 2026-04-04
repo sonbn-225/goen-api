@@ -39,7 +39,7 @@ func (h *DebtHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags Debts
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {array} entity.Debt
+// @Success 200 {object} response.SuccessEnvelope{data=[]entity.Debt}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /debts [get]
 func (h *DebtHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +49,7 @@ func (h *DebtHandler) List(w http.ResponseWriter, r *http.Request) {
 		response.WriteInternalError(w, err)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, items)
+	response.WriteSuccess(w, http.StatusOK, items)
 }
 
 // Create godoc
@@ -60,7 +60,7 @@ func (h *DebtHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateDebtRequest true "Debt Creation Payload"
-// @Success 201 {object} entity.Debt
+// @Success 201 {object} response.SuccessEnvelope{data=entity.Debt}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /debts [post]
@@ -76,7 +76,7 @@ func (h *DebtHandler) Create(w http.ResponseWriter, r *http.Request) {
 		response.WriteInternalError(w, err)
 		return
 	}
-	response.WriteJSON(w, http.StatusCreated, res)
+	response.WriteSuccess(w, http.StatusCreated, res)
 }
 
 // Get godoc
@@ -86,7 +86,7 @@ func (h *DebtHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Debt ID"
-// @Success 200 {object} entity.Debt
+// @Success 200 {object} response.SuccessEnvelope{data=entity.Debt}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /debts/{id} [get]
@@ -98,7 +98,7 @@ func (h *DebtHandler) Get(w http.ResponseWriter, r *http.Request) {
 		response.WriteInternalError(w, err)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, res)
+	response.WriteSuccess(w, http.StatusOK, res)
 }
 
 // Update godoc
@@ -110,7 +110,7 @@ func (h *DebtHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Param id path string true "Debt ID"
 // @Param request body dto.UpdateDebtRequest true "Debt Update Payload"
-// @Success 200 {object} entity.Debt
+// @Success 200 {object} response.SuccessEnvelope{data=entity.Debt}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
@@ -128,7 +128,7 @@ func (h *DebtHandler) Update(w http.ResponseWriter, r *http.Request) {
 		response.WriteInternalError(w, err)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, res)
+	response.WriteSuccess(w, http.StatusOK, res)
 }
 
 // Delete godoc
@@ -160,7 +160,7 @@ func (h *DebtHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Param id path string true "Debt ID"
 // @Param request body dto.DebtPaymentRequest true "Debt Payment Payload"
-// @Success 200 {object} object
+// @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
@@ -178,7 +178,7 @@ func (h *DebtHandler) AddPayment(w http.ResponseWriter, r *http.Request) {
 		response.WriteInternalError(w, err)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, res)
+	response.WriteSuccess(w, http.StatusOK, res)
 }
 
 // ListPayments godoc
@@ -188,7 +188,7 @@ func (h *DebtHandler) AddPayment(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Debt ID"
-// @Success 200 {array} object
+// @Success 200 {object} response.SuccessEnvelope{data=[]object}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /debts/{id}/payments [get]
@@ -200,5 +200,5 @@ func (h *DebtHandler) ListPayments(w http.ResponseWriter, r *http.Request) {
 		response.WriteInternalError(w, err)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, items)
+	response.WriteSuccess(w, http.StatusOK, items)
 }

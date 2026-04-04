@@ -1,9 +1,5 @@
 package dto
 
-import (
-	"github.com/sonbn-225/goen-api/internal/domain/entity"
-)
-
 type SignupRequest struct {
 	Email       string `json:"email"`
 	Phone       string `json:"phone"`
@@ -13,13 +9,18 @@ type SignupRequest struct {
 }
 
 type SigninRequest struct {
-	Login    string `json:"login"`
-	Password string `json:"password"`
+	Login    string `json:"login" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
 type AuthResponse struct {
-	AccessToken string      `json:"access_token"`
-	TokenType   string      `json:"token_type"`
-	ExpiresIn   int         `json:"expires_in"`
-	User        entity.User `json:"user"`
+	AccessToken  string       `json:"access_token"`
+	RefreshToken string       `json:"refresh_token"`
+	TokenType    string       `json:"token_type"`
+	ExpiresIn    int          `json:"expires_in"`
+	User         UserResponse `json:"user"`
 }

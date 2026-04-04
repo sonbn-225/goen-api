@@ -33,7 +33,7 @@ func (h *CategoryHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Produce json
 // @Security BearerAuth
 // @Param type query string false "Transaction type filter (INCOME/EXPENSE)"
-// @Success 200 {array} entity.Category
+// @Success 200 {object} response.SuccessEnvelope{data=[]entity.Category}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /categories [get]
 func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +50,7 @@ func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, items)
+	response.WriteSuccess(w, http.StatusOK, items)
 }
 
 // Get godoc
@@ -60,7 +60,7 @@ func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param categoryId path string true "Category ID"
-// @Success 200 {object} entity.Category
+// @Success 200 {object} response.SuccessEnvelope{data=entity.Category}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
@@ -84,5 +84,5 @@ func (h *CategoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, item)
+	response.WriteSuccess(w, http.StatusOK, item)
 }

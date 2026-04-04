@@ -19,16 +19,23 @@ import (
 )
 
 type AuthService struct {
-	userRepo interfaces.UserRepository
-	s3       *storage.S3Client
-	cfg      *config.Config
+	userRepo    interfaces.UserRepository
+	refreshRepo interfaces.RefreshTokenRepository
+	s3          *storage.S3Client
+	cfg         *config.Config
 }
 
-func NewAuthService(userRepo interfaces.UserRepository, s3 *storage.S3Client, cfg *config.Config) *AuthService {
+func NewAuthService(
+	userRepo interfaces.UserRepository,
+	refreshRepo interfaces.RefreshTokenRepository,
+	s3 *storage.S3Client,
+	cfg *config.Config,
+) *AuthService {
 	return &AuthService{
-		userRepo: userRepo,
-		s3:       s3,
-		cfg:      cfg,
+		userRepo:    userRepo,
+		refreshRepo: refreshRepo,
+		s3:          s3,
+		cfg:         cfg,
 	}
 }
 
@@ -67,16 +74,22 @@ func (s *AuthService) Signup(ctx context.Context, req dto.SignupRequest) (*dto.A
 		return nil, err
 	}
 
-	token, exp, err := s.generateToken(u.User)
+	accessToken, expiresIn, err := s.generateAccessToken(u.User)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := s.generateAndSaveRefreshToken(ctx, u.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &dto.AuthResponse{
-		AccessToken: token,
-		TokenType:   "Bearer",
-		ExpiresIn:   exp,
-		User:        u.User,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    expiresIn,
+		User:         s.mapToUserResponse(u.User),
 	}, nil
 }
 
@@ -102,47 +115,89 @@ func (s *AuthService) Signin(ctx context.Context, req dto.SigninRequest) (*dto.A
 		return nil, errors.New("invalid credentials")
 	}
 
-	token, exp, err := s.generateToken(u.User)
+	accessToken, expiresIn, err := s.generateAccessToken(u.User)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := s.generateAndSaveRefreshToken(ctx, u.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &dto.AuthResponse{
-		AccessToken: token,
-		TokenType:   "Bearer",
-		ExpiresIn:   exp,
-		User:        u.User,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    expiresIn,
+		User:         s.mapToUserResponse(u.User),
 	}, nil
 }
 
-func (s *AuthService) Refresh(ctx context.Context, userID string) (*dto.AuthResponse, error) {
+func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*dto.AuthResponse, error) {
+	// 1. Verify refresh token exists in DB
+	rt, err := s.refreshRepo.GetByToken(ctx, refreshToken)
+	if err != nil {
+		return nil, errors.New("invalid refresh token")
+	}
+
+	// 2. Check expiry
+	if time.Now().After(rt.ExpiresAt) {
+		_ = s.refreshRepo.DeleteByToken(ctx, refreshToken)
+		return nil, errors.New("refresh token expired")
+	}
+
+	// 3. Get user
+	u, err := s.userRepo.FindUserByID(ctx, rt.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Generate new pair (Rotation)
+	_ = s.refreshRepo.DeleteByToken(ctx, refreshToken)
+
+	newAccessToken, expiresIn, err := s.generateAccessToken(*u)
+	if err != nil {
+		return nil, err
+	}
+
+	newRefreshToken, err := s.generateAndSaveRefreshToken(ctx, u.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.AuthResponse{
+		AccessToken:  newAccessToken,
+		RefreshToken: newRefreshToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    expiresIn,
+		User:         s.mapToUserResponse(*u),
+	}, nil
+}
+
+func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
+	return s.refreshRepo.DeleteByToken(ctx, refreshToken)
+}
+
+func (s *AuthService) GetMe(ctx context.Context, userID string) (*dto.UserResponse, error) {
 	u, err := s.userRepo.FindUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
+	res := s.mapToUserResponse(*u)
+	return &res, nil
+}
 
-	token, exp, err := s.generateToken(*u)
+func (s *AuthService) UpdateMySettings(ctx context.Context, userID string, patch map[string]any) (*dto.UserResponse, error) {
+	u, err := s.userRepo.UpdateUserSettings(ctx, userID, patch)
 	if err != nil {
 		return nil, err
 	}
-
-	return &dto.AuthResponse{
-		AccessToken: token,
-		TokenType:   "Bearer",
-		ExpiresIn:   exp,
-		User:        *u,
-	}, nil
+	res := s.mapToUserResponse(*u)
+	return &res, nil
 }
 
-func (s *AuthService) GetMe(ctx context.Context, userID string) (*entity.User, error) {
-	return s.userRepo.FindUserByID(ctx, userID)
-}
-
-func (s *AuthService) UpdateMySettings(ctx context.Context, userID string, patch map[string]any) (*entity.User, error) {
-	return s.userRepo.UpdateUserSettings(ctx, userID, patch)
-}
-
-func (s *AuthService) UploadAvatar(ctx context.Context, userID string, file *multipart.FileHeader) (*entity.User, error) {
+func (s *AuthService) UploadAvatar(ctx context.Context, userID string, file *multipart.FileHeader) (*dto.UserResponse, error) {
 	if s.s3 == nil {
 		return nil, errors.New("storage not configured")
 	}
@@ -153,12 +208,17 @@ func (s *AuthService) UploadAvatar(ctx context.Context, userID string, file *mul
 	}
 
 	url := s.s3.AvatarURL(s.cfg.PublicBaseURL, key)
-	return s.userRepo.UpdateUserProfile(ctx, userID, entity.UpdateUserParams{
+	u, err := s.userRepo.UpdateUserProfile(ctx, userID, entity.UpdateUserParams{
 		AvatarURL: &url,
 	})
+	if err != nil {
+		return nil, err
+	}
+	res := s.mapToUserResponse(*u)
+	return &res, nil
 }
 
-func (s *AuthService) UpdateMyProfile(ctx context.Context, userID string, displayName, email, phone, username *string) (*entity.User, error) {
+func (s *AuthService) UpdateMyProfile(ctx context.Context, userID string, displayName, email, phone, username *string) (*dto.UserResponse, error) {
 	params := entity.UpdateUserParams{}
 	if displayName != nil {
 		v := strings.TrimSpace(*displayName)
@@ -177,7 +237,12 @@ func (s *AuthService) UpdateMyProfile(ctx context.Context, userID string, displa
 		params.Username = &v
 	}
 
-	return s.userRepo.UpdateUserProfile(ctx, userID, params)
+	u, err := s.userRepo.UpdateUserProfile(ctx, userID, params)
+	if err != nil {
+		return nil, err
+	}
+	res := s.mapToUserResponse(*u)
+	return &res, nil
 }
 
 func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
@@ -215,7 +280,8 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPasswor
 	return err
 }
 
-func (s *AuthService) generateToken(user entity.User) (string, int, error) {
+func (s *AuthService) generateAccessToken(user entity.User) (string, int, error) {
+	// Access tokens are short-lived
 	exp := time.Now().Add(time.Duration(s.cfg.JWTAccessTTL) * time.Minute)
 	claims := jwt.MapClaims{
 		"sub": user.ID,
@@ -230,6 +296,42 @@ func (s *AuthService) generateToken(user entity.User) (string, int, error) {
 	}
 
 	return signedToken, s.cfg.JWTAccessTTL * 60, nil
+}
+
+func (s *AuthService) mapToUserResponse(user entity.User) dto.UserResponse {
+	return dto.UserResponse{
+		ID:             user.ID,
+		Email:          user.Email,
+		Phone:          user.Phone,
+		DisplayName:    user.DisplayName,
+		AvatarURL:      user.AvatarURL,
+		Username:       user.Username,
+		PublicShareURL: user.PublicShareURL,
+		Settings:       user.Settings,
+		Status:         user.Status,
+		CreatedAt:      user.CreatedAt,
+		UpdatedAt:      user.UpdatedAt,
+	}
+}
+
+func (s *AuthService) generateAndSaveRefreshToken(ctx context.Context, userID string) (string, error) {
+	token := uuid.NewString()
+	// Refresh tokens are long-lived (e.g. 7 days)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	rt := &entity.RefreshToken{
+		ID:        uuid.NewString(),
+		UserID:    userID,
+		Token:     token,
+		ExpiresAt: expiresAt,
+		CreatedAt: time.Now(),
+	}
+
+	if err := s.refreshRepo.Create(ctx, rt); err != nil {
+		return "", err
+	}
+
+	return token, nil
 }
 
 func (s *AuthService) generatePublicShareURL(username string) *string {

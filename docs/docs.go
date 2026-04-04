@@ -34,10 +34,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/entity.Account"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.AccountResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -55,9 +67,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Create a new banking or manual account for the user",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -80,7 +89,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Account"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.AccountResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -117,10 +138,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.AccountBalanceResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -160,7 +193,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Account"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.AccountResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -254,7 +299,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Account"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.AccountResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -300,10 +357,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.AccountShareResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -353,7 +422,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -412,94 +493,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/me": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Retrieve the profile of the currently authenticated user",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "Get Current User",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/entity.User"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/me/avatar": {
+        "/auth/logout": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Upload a new avatar image for the user",
-                "consumes": [
-                    "multipart/form-data"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "Upload Avatar",
-                "parameters": [
-                    {
-                        "type": "file",
-                        "description": "Avatar image file",
-                        "name": "avatar",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/entity.User"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/me/change-password": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Change the password for the current user",
+                "description": "Logout current user session on the server side",
                 "consumes": [
                     "application/json"
                 ],
@@ -509,15 +505,15 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Change Password",
+                "summary": "User Logout",
                 "parameters": [
                     {
-                        "description": "Password Change Body",
+                        "description": "Logout request",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "type": "object"
+                            "$ref": "#/definitions/dto.RefreshRequest"
                         }
                     }
                 ],
@@ -525,123 +521,26 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
                         "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/me/profile": {
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Update user information such as email, phone, displayName, or username",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "Update User Profile",
-                "parameters": [
-                    {
-                        "description": "Profile Update Body",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/entity.User"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/me/settings": {
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Update the settings for the currently authenticated user",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "Update User Settings",
-                "parameters": [
-                    {
-                        "description": "Settings mappings",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/entity.User"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorEnvelope"
                         }
@@ -651,12 +550,10 @@ const docTemplate = `{
         },
         "/auth/refresh": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Get a new access token using an existing session",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -664,11 +561,40 @@ const docTemplate = `{
                     "Auth"
                 ],
                 "summary": "Refresh Token",
+                "parameters": [
+                    {
+                        "description": "Refresh request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.RefreshRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.AuthResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.AuthResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     },
                     "401": {
@@ -708,7 +634,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.AuthResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.AuthResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -754,7 +692,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.AuthResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.AuthResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -791,10 +741,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/entity.Budget"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/entity.Budget"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -837,7 +799,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Budget"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Budget"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -883,7 +857,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Budget"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Budget"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -977,7 +963,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Budget"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Budget"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -1022,10 +1020,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/entity.Category"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/entity.Category"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -1065,7 +1075,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Category"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Category"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -1108,10 +1130,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/entity.Contact"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/entity.Contact"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -1154,7 +1188,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Contact"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Contact"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -1200,7 +1246,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Contact"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Contact"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -1294,7 +1352,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Contact"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Contact"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -1337,10 +1407,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/entity.Debt"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/entity.Debt"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -1383,7 +1465,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Debt"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Debt"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -1429,7 +1523,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Debt"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Debt"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -1523,7 +1629,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Debt"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Debt"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -1575,10 +1693,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -1634,7 +1764,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -1672,7 +1814,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -1717,7 +1871,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Transaction"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Transaction"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -1762,10 +1928,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -1805,10 +1983,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -1866,7 +2056,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Transaction"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Transaction"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -1923,10 +2125,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/entity.Account"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/entity.Account"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -1966,7 +2180,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Account"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Account"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -2016,7 +2242,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Account"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Account"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -2062,10 +2300,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -2105,7 +2355,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -2145,10 +2407,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/entity.Trade"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/entity.Trade"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -2198,7 +2472,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Trade"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Trade"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -2263,7 +2549,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Trade"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Trade"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -2314,10 +2612,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -2362,7 +2672,19 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -2399,7 +2721,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -2444,7 +2778,19 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -2516,6 +2862,237 @@ const docTemplate = `{
                 }
             }
         },
+        "/profile/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve the profile of the currently authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Get Current User",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.UserResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update user information such as email, phone, displayName, or username",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Update User Profile",
+                "parameters": [
+                    {
+                        "description": "Profile Update Body",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.UserResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/me/avatar": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Upload a new avatar image for the user",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Upload Avatar",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Avatar image file",
+                        "name": "avatar",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.UserResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/profile/me/change-password": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Change the password for the current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Profile"
+                ],
+                "summary": "Change Password",
+                "parameters": [
+                    {
+                        "description": "Password Change Body",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/public/u/{username}/debts": {
             "get": {
                 "description": "Retrieve publicly visible debts for a specific participant linked to the username",
@@ -2546,10 +3123,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -2590,10 +3179,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -2628,7 +3229,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "404": {
@@ -2663,7 +3276,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "404": {
@@ -2694,7 +3319,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -2731,10 +3368,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -2777,7 +3426,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -2823,7 +3484,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -2861,10 +3534,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -2914,7 +3599,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -2972,7 +3669,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -3025,10 +3734,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -3059,10 +3780,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/entity.Savings"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/entity.Savings"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -3105,7 +3838,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Savings"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Savings"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -3151,7 +3896,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Savings"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Savings"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "404": {
@@ -3189,10 +3946,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -3242,7 +4011,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Savings"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Savings"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -3274,10 +4055,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/entity.Security"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/entity.Security"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -3329,7 +4122,19 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -3387,7 +4192,19 @@ const docTemplate = `{
                     "202": {
                         "description": "Accepted",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -3433,7 +4250,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -3468,7 +4297,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Security"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Security"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -3515,10 +4356,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
@@ -3565,14 +4418,90 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "object"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/me": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the settings for the currently authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Update User Settings",
+                "parameters": [
+                    {
+                        "description": "Settings mappings",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.UserResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorEnvelope"
                         }
@@ -3599,10 +4528,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/entity.Tag"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/entity.Tag"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -3645,7 +4586,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Tag"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Tag"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -3691,7 +4644,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Tag"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/entity.Tag"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -3732,9 +4697,27 @@ const docTemplate = `{
                 "summary": "List Transactions",
                 "responses": {
                     "200": {
-                        "description": "items, next_cursor, total",
+                        "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.TransactionResponse"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -3777,7 +4760,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Transaction"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.TransactionResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -3802,7 +4797,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update multiple transactions at once (e.g. recategorize, retag)",
+                "description": "Update multiple transactions at once (e.g. category assignment)",
                 "consumes": [
                     "application/json"
                 ],
@@ -3812,7 +4807,7 @@ const docTemplate = `{
                 "tags": [
                     "Transactions"
                 ],
-                "summary": "Batch Patch Transactions",
+                "summary": "Batch Update Transactions",
                 "parameters": [
                     {
                         "description": "Batch Patch Payload",
@@ -3828,7 +4823,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.BatchPatchResult"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -3874,7 +4881,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Transaction"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.TransactionResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -3897,7 +4916,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Delete a specific transaction by its ID",
+                "description": "Remove a transaction record permanently",
                 "tags": [
                     "Transactions"
                 ],
@@ -3935,7 +4954,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Partially update properties of a transaction",
+                "description": "Update fields of an existing transaction",
                 "consumes": [
                     "application/json"
                 ],
@@ -3968,7 +4987,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Transaction"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.TransactionResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -3988,6 +5019,105 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "dto.AccountBalanceResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "balance": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.AccountResponse": {
+            "type": "object",
+            "properties": {
+                "account_number": {
+                    "type": "string"
+                },
+                "account_type": {
+                    "type": "string"
+                },
+                "balance": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "closed_at": {
+                    "type": "string"
+                },
+                "color": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "investment_account_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_account_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.AccountShareResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "permission": {
+                    "type": "string"
+                },
+                "revoked_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_display_name": {
+                    "type": "string"
+                },
+                "user_email": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "user_phone": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.AuthResponse": {
             "type": "object",
             "properties": {
@@ -3997,11 +5127,14 @@ const docTemplate = `{
                 "expires_in": {
                     "type": "integer"
                 },
+                "refresh_token": {
+                    "type": "string"
+                },
                 "token_type": {
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/entity.User"
+                    "$ref": "#/definitions/dto.UserResponse"
                 }
             }
         },
@@ -4015,6 +5148,32 @@ const docTemplate = `{
                     "$ref": "#/definitions/dto.TransactionPatchRequest"
                 },
                 "transaction_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "dto.BatchPatchResult": {
+            "type": "object",
+            "properties": {
+                "failed_count": {
+                    "type": "integer"
+                },
+                "failed_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "updated_count": {
+                    "type": "integer"
+                },
+                "updated_ids": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -4587,6 +5746,17 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.RefreshRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.RefreshSymbolsRequest": {
             "type": "object",
             "properties": {
@@ -4645,6 +5815,10 @@ const docTemplate = `{
         },
         "dto.SigninRequest": {
             "type": "object",
+            "required": [
+                "login",
+                "password"
+            ],
             "properties": {
                 "login": {
                     "type": "string"
@@ -4671,6 +5845,29 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.TransactionLineItemResponse": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "tag_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -4715,6 +5912,113 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "dto.TransactionResponse": {
+            "type": "object",
+            "properties": {
+                "account_currency": {
+                    "type": "string"
+                },
+                "account_id": {
+                    "type": "string"
+                },
+                "amount": {
+                    "type": "string"
+                },
+                "category_colors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category_names": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "exchange_rate": {
+                    "type": "string"
+                },
+                "external_ref": {
+                    "type": "string"
+                },
+                "from_account_id": {
+                    "type": "string"
+                },
+                "from_amount": {
+                    "type": "string"
+                },
+                "from_currency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "line_items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.TransactionLineItemResponse"
+                    }
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "occurred_date": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tag_colors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "tag_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "tag_names": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "to_account_id": {
+                    "type": "string"
+                },
+                "to_amount": {
+                    "type": "string"
+                },
+                "to_currency": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -4802,6 +6106,42 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "permission": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.UserResponse": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "public_share_url": {
+                    "type": "string"
+                },
+                "settings": {},
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }
@@ -5370,42 +6710,6 @@ const docTemplate = `{
                 }
             }
         },
-        "entity.User": {
-            "type": "object",
-            "properties": {
-                "avatar_url": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "display_name": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "phone": {
-                    "type": "string"
-                },
-                "public_share_url": {
-                    "type": "string"
-                },
-                "settings": {},
-                "status": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
         "response.ErrorBody": {
             "type": "object",
             "properties": {
@@ -5427,6 +6731,13 @@ const docTemplate = `{
                 "error": {
                     "$ref": "#/definitions/response.ErrorBody"
                 }
+            }
+        },
+        "response.SuccessEnvelope": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "meta": {}
             }
         }
     },

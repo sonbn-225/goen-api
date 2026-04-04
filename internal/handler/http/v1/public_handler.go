@@ -32,7 +32,7 @@ func (h *PublicHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags Public
 // @Produce json
 // @Param username path string true "Username"
-// @Success 200 {object} object
+// @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /public/u/{username}/profile [get]
 func (h *PublicHandler) GetPublicProfile(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +42,7 @@ func (h *PublicHandler) GetPublicProfile(w http.ResponseWriter, r *http.Request)
 		response.WriteError(w, http.StatusNotFound, "user_not_found", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, profile)
+	response.WriteSuccess(w, http.StatusOK, profile)
 }
 
 // GetParticipants godoc
@@ -51,7 +51,7 @@ func (h *PublicHandler) GetPublicProfile(w http.ResponseWriter, r *http.Request)
 // @Tags Public
 // @Produce json
 // @Param username path string true "Username"
-// @Success 200 {array} object
+// @Success 200 {object} response.SuccessEnvelope{data=[]object}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /public/u/{username}/participants [get]
 func (h *PublicHandler) GetParticipants(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +61,7 @@ func (h *PublicHandler) GetParticipants(w http.ResponseWriter, r *http.Request) 
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, participants)
+	response.WriteSuccess(w, http.StatusOK, participants)
 }
 
 // GetDebts godoc
@@ -71,7 +71,7 @@ func (h *PublicHandler) GetParticipants(w http.ResponseWriter, r *http.Request) 
 // @Produce json
 // @Param username path string true "Username"
 // @Param name query string true "Participant Name"
-// @Success 200 {array} object
+// @Success 200 {object} response.SuccessEnvelope{data=[]object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /public/u/{username}/debts [get]
@@ -87,7 +87,7 @@ func (h *PublicHandler) GetDebts(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, debts)
+	response.WriteSuccess(w, http.StatusOK, debts)
 }
 
 // GetPaymentInfo godoc
@@ -96,7 +96,7 @@ func (h *PublicHandler) GetDebts(w http.ResponseWriter, r *http.Request) {
 // @Tags Public
 // @Produce json
 // @Param username path string true "Username"
-// @Success 200 {object} object
+// @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /public/u/{username}/payment-info [get]
 func (h *PublicHandler) GetPaymentInfo(w http.ResponseWriter, r *http.Request) {
@@ -106,5 +106,5 @@ func (h *PublicHandler) GetPaymentInfo(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusNotFound, "not_found", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, info)
+	response.WriteSuccess(w, http.StatusOK, info)
 }
