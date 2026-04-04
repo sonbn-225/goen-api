@@ -2,164 +2,142 @@ package app
 
 import (
 	"context"
-	"io"
+	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	_ "github.com/sonbn-225/goen-api-v2/docs"
-	"github.com/sonbn-225/goen-api-v2/internal/core/config"
-	"github.com/sonbn-225/goen-api-v2/internal/core/httpx"
-	"github.com/sonbn-225/goen-api-v2/internal/core/response"
-	"github.com/sonbn-225/goen-api-v2/internal/core/security"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/account"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/auth"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/budget"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/category"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/contact"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/debt"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/investment"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/media"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/profile"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/report"
-	rotatingsavings "github.com/sonbn-225/goen-api-v2/internal/domains/rotating_savings"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/savings"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/setting"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/tag"
-	"github.com/sonbn-225/goen-api-v2/internal/domains/transaction"
-	"github.com/sonbn-225/goen-api-v2/internal/infra/objectstorage"
-	"github.com/sonbn-225/goen-api-v2/internal/infra/postgres"
-	repository "github.com/sonbn-225/goen-api-v2/internal/repository"
-	httpSwagger "github.com/swaggo/http-swagger/v2"
+	v1 "github.com/sonbn-225/goen-api/internal/handler/http/v1"
+	"github.com/sonbn-225/goen-api/internal/pkg/config"
+	"github.com/sonbn-225/goen-api/internal/pkg/database"
+	"github.com/sonbn-225/goen-api/internal/pkg/storage"
+	"github.com/sonbn-225/goen-api/internal/repository/postgres"
+	"github.com/sonbn-225/goen-api/internal/service"
 )
 
 type App struct {
-	Handler http.Handler
-	cleanup func(context.Context)
-}
-
-func (a *App) Close(ctx context.Context) {
-	if a == nil || a.cleanup == nil {
-		return
-	}
-	a.cleanup(ctx)
+	Config *config.Config
+	DB     *database.Postgres
+	Redis  *database.Redis
+	S3     *storage.S3Client
+	Router *chi.Mux
 }
 
 func New(cfg *config.Config) *App {
-	db, err := postgres.NewPool(cfg.DatabaseURL)
-	if err != nil {
-		panic(err)
+	db := database.NewPostgres(cfg.DatabaseURL)
+	
+	var rds *database.Redis
+	if cfg.RedisURL != "" {
+		var err error
+		rds, err = database.NewRedis(cfg.RedisURL)
+		if err != nil {
+			slog.Error("failed to connect to redis", "error", err)
+		}
 	}
 
-	userRepo := repository.NewUserRepository(db)
-	accountRepo := repository.NewAccountRepository(db)
-	budgetRepo := repository.NewBudgetRepository(db)
-	categoryRepo := repository.NewCategoryRepository(db)
-	contactRepo := repository.NewContactRepository(db)
-	debtRepo := repository.NewDebtRepository(db)
-	investmentRepo := repository.NewInvestmentRepository(db)
-	reportRepo := repository.NewReportRepository(db)
-	rotatingSavingsRepo := repository.NewRotatingSavingsRepository(db)
-	savingsRepo := repository.NewSavingsRepository(db)
-	tagRepo := repository.NewTagRepository(db)
-	txRepo := repository.NewTransactionRepository(db)
-	hasher := security.NewPasswordHasher()
-	avatarStorage := objectstorage.NewSeaweedClient(objectstorage.Config{
+	s3 := storage.NewS3Client(storage.S3Config{
 		Endpoint:      cfg.S3Endpoint,
 		AccessKey:     cfg.S3AccessKey,
 		SecretKey:     cfg.S3SecretKey,
 		Bucket:        cfg.S3Bucket,
 		UseSSL:        cfg.S3UseSSL,
-		PublicBaseURL: cfg.S3PublicBaseURL,
+		PublicBaseURL: cfg.PublicBaseURL,
 	})
 
-	authMod := auth.NewModule(auth.ModuleDeps{
-		UserRepo:         userRepo,
-		Hasher:           hasher,
-		Issuer:           security.NewTokenIssuer(cfg.JWTSecret, time.Duration(cfg.JWTAccessTTLMinutes)*time.Minute),
-		AccessTTLMinutes: cfg.JWTAccessTTLMinutes,
-	})
-	mediaMod := media.NewModule(media.ModuleDeps{Storage: newMediaStorageAdapter(avatarStorage)})
-	profileSvc := profile.NewService(userRepo, hasher, avatarStorage)
-	settingSvc := setting.NewService(userRepo)
-	profileMod := profile.NewModule(profile.ModuleDeps{Service: profileSvc})
-	settingMod := setting.NewModule(setting.ModuleDeps{Service: settingSvc})
+	// Repositories
+	userRepo := postgres.NewUserRepo(db)
+	categoryRepo := postgres.NewCategoryRepo(db)
+	tagRepo := postgres.NewTagRepo(db)
+	accountRepo := postgres.NewAccountRepo(db)
+	transactionRepo := postgres.NewTransactionRepo(db)
+	contactRepo := postgres.NewContactRepo(db)
+	debtRepo := postgres.NewDebtRepo(db)
+	budgetRepo := postgres.NewBudgetRepo(db)
+	reportRepo := postgres.NewReportRepo(db)
+	groupExpenseRepo := postgres.NewGroupExpenseRepo(db)
+	investmentRepo := postgres.NewInvestmentRepo(db)
+	marketDataRepo := postgres.NewMarketDataRepo(db)
+	savingsRepo := postgres.NewSavingsRepo(db)
+	rotatingSavingsRepo := postgres.NewRotatingSavingsRepo(db)
 
-	accountMod := account.NewModule(account.ModuleDeps{Repo: accountRepo})
-	budgetMod := budget.NewModule(budget.ModuleDeps{Repo: budgetRepo, CategoryRepo: categoryRepo})
-	categoryMod := category.NewModule(category.ModuleDeps{Repo: categoryRepo})
-	contactMod := contact.NewModule(contact.ModuleDeps{Repo: contactRepo})
-	tagMod := tag.NewModule(tag.ModuleDeps{Repo: tagRepo})
-	txMod := transaction.NewModule(transaction.ModuleDeps{Repo: txRepo})
-	savingsMod := savings.NewModule(savings.ModuleDeps{Repo: savingsRepo, TxService: txMod.Service})
-	debtMod := debt.NewModule(debt.ModuleDeps{Repo: debtRepo, TxService: txMod.Service, ContactService: contactMod.Service})
-	investmentMod := investment.NewModule(investment.ModuleDeps{Repo: investmentRepo})
-	rotatingSavingsMod := rotatingsavings.NewModule(rotatingsavings.ModuleDeps{Repo: rotatingSavingsRepo, TxService: txMod.Service})
-	reportMod := report.NewModule(report.ModuleDeps{Repo: reportRepo})
+	// Services
+	authSvc := service.NewAuthService(userRepo, s3, cfg)
+	categorySvc := service.NewCategoryService(categoryRepo)
+	tagSvc := service.NewTagService(tagRepo)
+	accountSvc := service.NewAccountService(accountRepo, userRepo)
+	transactionSvc := service.NewTransactionService(transactionRepo, tagSvc)
+	contactSvc := service.NewContactService(contactRepo)
+	debtSvc := service.NewDebtService(debtRepo, contactSvc)
+	budgetSvc := service.NewBudgetService(budgetRepo, categoryRepo)
+	reportSvc := service.NewReportService(reportRepo, accountRepo)
+	groupExpenseSvc := service.NewGroupExpenseService(transactionSvc, debtSvc, groupExpenseRepo)
+	investmentSvc := service.NewInvestmentService(investmentRepo, accountSvc, transactionSvc)
+	marketDataSvc := service.NewMarketDataService(cfg, marketDataRepo, rds, investmentSvc)
+	savingsSvc := service.NewSavingsService(savingsRepo)
+	rotatingSavingsSvc := service.NewRotatingSavingsService(rotatingSavingsRepo, accountSvc, transactionSvc)
+	publicSvc := service.NewPublicService(userRepo, accountRepo, groupExpenseRepo)
+	diagnosticsSvc := service.NewDiagnosticsService(db)
+
+	// Cross-inject
+	transactionSvc.SetDebtService(debtSvc)
+
+	// Handlers
+	authHandler := v1.NewAuthHandler(authSvc, s3)
+	categoryHandler := v1.NewCategoryHandler(categorySvc)
+	tagHandler := v1.NewTagHandler(tagSvc)
+	accountHandler := v1.NewAccountHandler(accountSvc)
+	transactionHandler := v1.NewTransactionHandler(transactionSvc)
+	contactHandler := v1.NewContactHandler(contactSvc)
+	debtHandler := v1.NewDebtHandler(debtSvc)
+	budgetHandler := v1.NewBudgetHandler(budgetSvc)
+	reportHandler := v1.NewReportHandler(reportSvc)
+	groupExpenseHandler := v1.NewGroupExpenseHandler(groupExpenseSvc)
+	investmentHandler := v1.NewInvestmentHandler(investmentSvc)
+	marketDataHandler := v1.NewMarketDataHandler(marketDataSvc)
+	savingsHandler := v1.NewSavingsHandler(savingsSvc, rotatingSavingsSvc)
+	publicHandler := v1.NewPublicHandler(publicSvc)
+	diagnosticsHandler := v1.NewDiagnosticsHandler(diagnosticsSvc)
 
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(httpx.RequestLogger())
-	r.Use(middleware.Heartbeat("/healthz"))
 
-	r.Get("/swagger", func(w http.ResponseWriter, req *http.Request) {
-		http.Redirect(w, req, "/swagger/", http.StatusMovedPermanently)
-	})
-	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL("/swagger/doc.json"),
-	))
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
-			response.WriteData(w, http.StatusOK, map[string]string{"message": "ok"})
+		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("ok"))
 		})
 
-		authMod.RegisterPublicRoutes(r)
-		r.Group(func(r chi.Router) {
-			r.Use(httpx.AuthMiddleware(cfg.JWTSecret))
-			authMod.RegisterProtectedRoutes(r)
-			mediaMod.RegisterRoutes(r)
-			profileMod.RegisterRoutes(r)
-			settingMod.RegisterRoutes(r)
-			accountMod.RegisterRoutes(r)
-			budgetMod.RegisterRoutes(r)
-			categoryMod.RegisterRoutes(r)
-			contactMod.RegisterRoutes(r)
-			debtMod.RegisterRoutes(r)
-			investmentMod.RegisterRoutes(r)
-			rotatingSavingsMod.RegisterRoutes(r)
-			savingsMod.RegisterRoutes(r)
-			reportMod.RegisterRoutes(r)
-			tagMod.RegisterRoutes(r)
-			txMod.RegisterRoutes(r)
-		})
+		authHandler.RegisterRoutes(r, cfg)
+		categoryHandler.RegisterRoutes(r, cfg)
+		tagHandler.RegisterRoutes(r, cfg)
+		accountHandler.RegisterRoutes(r, cfg)
+		transactionHandler.RegisterRoutes(r, cfg)
+		contactHandler.RegisterRoutes(r, cfg)
+		debtHandler.RegisterRoutes(r, cfg)
+		budgetHandler.RegisterRoutes(r, cfg)
+		reportHandler.RegisterRoutes(r, cfg)
+		groupExpenseHandler.RegisterRoutes(r, cfg)
+		investmentHandler.RegisterRoutes(r, cfg)
+		marketDataHandler.RegisterRoutes(r, cfg)
+		savingsHandler.RegisterRoutes(r, cfg)
+		publicHandler.RegisterRoutes(r, cfg)
+		diagnosticsHandler.RegisterRoutes(r, cfg)
 	})
 
 	return &App{
-		Handler: r,
-		cleanup: func(_ context.Context) {
-			db.Close()
-		},
+		Config: cfg,
+		DB:     db,
+		Redis:  rds,
+		S3:     s3,
+		Router: r,
 	}
 }
 
-type mediaStorageAdapter struct {
-	client *objectstorage.SeaweedClient
-}
-
-func newMediaStorageAdapter(client *objectstorage.SeaweedClient) media.Storage {
-	if client == nil {
-		return nil
+func (a *App) Close(ctx context.Context) {
+	if a.DB != nil {
+		a.DB.Close()
 	}
-	return mediaStorageAdapter{client: client}
-}
-
-func (a mediaStorageAdapter) GetObject(ctx context.Context, bucket, key string) (io.ReadCloser, media.ObjectInfo, error) {
-	obj, info, err := a.client.GetObject(ctx, bucket, key)
-	if err != nil {
-		return nil, media.ObjectInfo{}, err
+	if a.Redis != nil {
+		a.Redis.Close()
 	}
-	return obj, media.ObjectInfo{ContentType: info.ContentType}, nil
 }
