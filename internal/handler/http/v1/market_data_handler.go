@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
 )
@@ -35,7 +36,7 @@ func (h *MarketDataHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags MarketData
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} object
+// @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /market-data/status [get]
 func (h *MarketDataHandler) GetGlobalStatus(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +45,7 @@ func (h *MarketDataHandler) GetGlobalStatus(w http.ResponseWriter, r *http.Reque
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, status)
+	response.WriteSuccess(w, http.StatusOK, status)
 }
 
 // MarketSync godoc
@@ -55,12 +56,16 @@ func (h *MarketDataHandler) GetGlobalStatus(w http.ResponseWriter, r *http.Reque
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.MarketSyncRequest true "Market Sync Payload"
-// @Success 202 {object} object
+// @Success 202 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /market-data/sync [post]
 func (h *MarketDataHandler) MarketSync(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	var req dto.MarketSyncRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
@@ -72,7 +77,7 @@ func (h *MarketDataHandler) MarketSync(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusAccepted, res)
+	response.WriteSuccess(w, http.StatusAccepted, res)
 }
 
 // RefreshSymbols godoc
@@ -83,12 +88,16 @@ func (h *MarketDataHandler) MarketSync(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.RefreshSymbolsRequest true "Symbols payload"
-// @Success 202 {object} object
+// @Success 202 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /market-data/refresh-symbols [post]
 func (h *MarketDataHandler) RefreshSymbols(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	var req dto.RefreshSymbolsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
@@ -100,7 +109,7 @@ func (h *MarketDataHandler) RefreshSymbols(w http.ResponseWriter, r *http.Reques
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusAccepted, res)
+	response.WriteSuccess(w, http.StatusAccepted, res)
 }
 
 // GetSecurityStatus godoc
@@ -110,18 +119,22 @@ func (h *MarketDataHandler) RefreshSymbols(w http.ResponseWriter, r *http.Reques
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Security ID"
-// @Success 200 {object} object
+// @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /securities/{id}/status [get]
 func (h *MarketDataHandler) GetSecurityStatus(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	status, err := h.svc.GetSecurityStatus(r.Context(), userID, id)
 	if err != nil {
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, status)
+	response.WriteSuccess(w, http.StatusOK, status)
 }
 
 // RefreshPrices godoc
@@ -133,12 +146,16 @@ func (h *MarketDataHandler) GetSecurityStatus(w http.ResponseWriter, r *http.Req
 // @Security BearerAuth
 // @Param id path string true "Security ID"
 // @Param request body dto.RefreshPriceRequest true "Refresh Payload"
-// @Success 202 {object} object
+// @Success 202 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /securities/{id}/refresh-prices [post]
 func (h *MarketDataHandler) RefreshPrices(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	var req dto.RefreshPriceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -152,7 +169,7 @@ func (h *MarketDataHandler) RefreshPrices(w http.ResponseWriter, r *http.Request
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusAccepted, res)
+	response.WriteSuccess(w, http.StatusAccepted, res)
 }
 
 // RefreshEvents godoc
@@ -164,12 +181,16 @@ func (h *MarketDataHandler) RefreshPrices(w http.ResponseWriter, r *http.Request
 // @Security BearerAuth
 // @Param id path string true "Security ID"
 // @Param request body dto.RefreshEventRequest true "Refresh Event Payload"
-// @Success 202 {object} object
+// @Success 202 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /securities/{id}/refresh-events [post]
 func (h *MarketDataHandler) RefreshEvents(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
 	id := chi.URLParam(r, "id")
 	var req dto.RefreshEventRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -183,5 +204,5 @@ func (h *MarketDataHandler) RefreshEvents(w http.ResponseWriter, r *http.Request
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusAccepted, res)
+	response.WriteSuccess(w, http.StatusAccepted, res)
 }

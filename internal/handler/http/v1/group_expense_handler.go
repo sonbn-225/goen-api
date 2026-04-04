@@ -39,7 +39,7 @@ func (h *GroupExpenseHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateGroupExpenseRequest true "Group Expense Creation Payload"
-// @Success 201 {object} entity.Transaction
+// @Success 201 {object} response.SuccessEnvelope{data=entity.Transaction}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /group-expenses [post]
@@ -62,7 +62,7 @@ func (h *GroupExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusCreated, res)
+	response.WriteSuccess(w, http.StatusCreated, res)
 }
 
 // ListByTransaction godoc
@@ -72,7 +72,7 @@ func (h *GroupExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param transactionId path string true "Transaction ID"
-// @Success 200 {array} object
+// @Success 200 {object} response.SuccessEnvelope{data=[]object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /group-expenses/participants/{transactionId} [get]
@@ -95,7 +95,7 @@ func (h *GroupExpenseHandler) ListByTransaction(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, items)
+	response.WriteSuccess(w, http.StatusOK, items)
 }
 
 // Settle godoc
@@ -107,7 +107,7 @@ func (h *GroupExpenseHandler) ListByTransaction(w http.ResponseWriter, r *http.R
 // @Security BearerAuth
 // @Param participantId path string true "Participant ID"
 // @Param request body dto.GroupExpenseSettleRequest true "Settlement details"
-// @Success 200 {object} entity.Transaction
+// @Success 200 {object} response.SuccessEnvelope{data=entity.Transaction}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /group-expenses/settle/{participantId} [post]
@@ -136,7 +136,7 @@ func (h *GroupExpenseHandler) Settle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, tx)
+	response.WriteSuccess(w, http.StatusOK, tx)
 }
 
 // ListNames godoc
@@ -146,7 +146,7 @@ func (h *GroupExpenseHandler) Settle(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param limit query integer false "Limit"
-// @Success 200 {array} string
+// @Success 200 {object} response.SuccessEnvelope{data=[]string}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /group-expenses/names [get]
 func (h *GroupExpenseHandler) ListNames(w http.ResponseWriter, r *http.Request) {
@@ -169,5 +169,5 @@ func (h *GroupExpenseHandler) ListNames(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, names)
+	response.WriteSuccess(w, http.StatusOK, names)
 }

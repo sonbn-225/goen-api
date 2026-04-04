@@ -42,7 +42,7 @@ func (h *AccountHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags Accounts
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {array} entity.Account
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.AccountResponse}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts [get]
 func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -58,18 +58,17 @@ func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, items)
+	response.WriteSuccess(w, http.StatusOK, items)
 }
 
 // Create godoc
 // @Summary Create Account
 // @Description Create a new banking or manual account for the user
 // @Tags Accounts
-// @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateAccountRequest true "Account Creation Payload"
-// @Success 201 {object} entity.Account
+// @Success 201 {object} response.SuccessEnvelope{data=dto.AccountResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts [post]
@@ -92,7 +91,7 @@ func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusCreated, account)
+	response.WriteSuccess(w, http.StatusCreated, account)
 }
 
 // Get godoc
@@ -102,7 +101,7 @@ func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param accountId path string true "Account ID"
-// @Success 200 {object} entity.Account
+// @Success 200 {object} response.SuccessEnvelope{data=dto.AccountResponse}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId} [get]
@@ -120,7 +119,7 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, acc)
+	response.WriteSuccess(w, http.StatusOK, acc)
 }
 
 // Patch godoc
@@ -132,7 +131,7 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Param accountId path string true "Account ID"
 // @Param request body entity.AccountPatch true "Account Patch Payload"
-// @Success 200 {object} entity.Account
+// @Success 200 {object} response.SuccessEnvelope{data=dto.AccountResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId} [patch]
@@ -156,7 +155,7 @@ func (h *AccountHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, acc)
+	response.WriteSuccess(w, http.StatusOK, acc)
 }
 
 // Delete godoc
@@ -191,7 +190,7 @@ func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // @Tags Accounts
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {array} object
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.AccountBalanceResponse}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts/balances [get]
 func (h *AccountHandler) ListBalances(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +206,7 @@ func (h *AccountHandler) ListBalances(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, items)
+	response.WriteSuccess(w, http.StatusOK, items)
 }
 
 // ListShares godoc
@@ -217,7 +216,7 @@ func (h *AccountHandler) ListBalances(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param accountId path string true "Account ID"
-// @Success 200 {array} object
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.AccountShareResponse}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId}/shares [get]
 func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +233,7 @@ func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, items)
+	response.WriteSuccess(w, http.StatusOK, items)
 }
 
 // UpsertShare godoc
@@ -246,7 +245,7 @@ func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Param accountId path string true "Account ID"
 // @Param request body dto.UpsertShareRequest true "Upsert Share Payload"
-// @Success 200 {object} object
+// @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId}/shares [put]
@@ -270,7 +269,7 @@ func (h *AccountHandler) UpsertShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, item)
+	response.WriteSuccess(w, http.StatusOK, item)
 }
 
 // RevokeShare godoc

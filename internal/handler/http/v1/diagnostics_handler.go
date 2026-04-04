@@ -26,7 +26,7 @@ func (h *DiagnosticsHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Description Retrieve metrics, configurations, and connectivity health (internal use docs)
 // @Tags System
 // @Produce json
-// @Success 200 {object} object
+// @Success 200 {object} response.SuccessEnvelope{data=object}
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /diagnostics [get]
 func (h *DiagnosticsHandler) GetDiagnostics(w http.ResponseWriter, r *http.Request) {
@@ -35,5 +35,5 @@ func (h *DiagnosticsHandler) GetDiagnostics(w http.ResponseWriter, r *http.Reque
 		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
 		return
 	}
-	response.WriteJSON(w, http.StatusOK, diag)
+	response.WriteSuccess(w, http.StatusOK, diag)
 }

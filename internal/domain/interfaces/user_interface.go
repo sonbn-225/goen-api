@@ -18,13 +18,21 @@ type UserRepository interface {
 	UpdateUserProfile(ctx context.Context, userID string, params entity.UpdateUserParams) (*entity.User, error)
 }
 
+type RefreshTokenRepository interface {
+	Create(ctx context.Context, token *entity.RefreshToken) error
+	GetByToken(ctx context.Context, token string) (*entity.RefreshToken, error)
+	DeleteByToken(ctx context.Context, token string) error
+	DeleteAllByUserID(ctx context.Context, userID string) error
+}
+
 type AuthService interface {
 	Signup(ctx context.Context, req dto.SignupRequest) (*dto.AuthResponse, error)
 	Signin(ctx context.Context, req dto.SigninRequest) (*dto.AuthResponse, error)
-	Refresh(ctx context.Context, userID string) (*dto.AuthResponse, error)
-	GetMe(ctx context.Context, userID string) (*entity.User, error)
-	UpdateMySettings(ctx context.Context, userID string, patch map[string]any) (*entity.User, error)
-	UploadAvatar(ctx context.Context, userID string, file *multipart.FileHeader) (*entity.User, error)
-	UpdateMyProfile(ctx context.Context, userID string, displayName, email, phone, username *string) (*entity.User, error)
+	Refresh(ctx context.Context, refreshToken string) (*dto.AuthResponse, error)
+	Logout(ctx context.Context, refreshToken string) error
+	GetMe(ctx context.Context, userID string) (*dto.UserResponse, error)
+	UpdateMySettings(ctx context.Context, userID string, patch map[string]any) (*dto.UserResponse, error)
+	UploadAvatar(ctx context.Context, userID string, file *multipart.FileHeader) (*dto.UserResponse, error)
+	UpdateMyProfile(ctx context.Context, userID string, displayName, email, phone, username *string) (*dto.UserResponse, error)
 	ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error
 }

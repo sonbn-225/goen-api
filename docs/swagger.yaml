@@ -1,15 +1,82 @@
 basePath: /api/v1
 definitions:
+  dto.AccountBalanceResponse:
+    properties:
+      account_id:
+        type: string
+      balance:
+        type: string
+      currency:
+        type: string
+    type: object
+  dto.AccountResponse:
+    properties:
+      account_number:
+        type: string
+      account_type:
+        type: string
+      balance:
+        type: string
+      client_id:
+        type: string
+      closed_at:
+        type: string
+      color:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      investment_account_id:
+        type: string
+      name:
+        type: string
+      parent_account_id:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  dto.AccountShareResponse:
+    properties:
+      account_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      permission:
+        type: string
+      revoked_at:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user_display_name:
+        type: string
+      user_email:
+        type: string
+      user_id:
+        type: string
+      user_phone:
+        type: string
+    type: object
   dto.AuthResponse:
     properties:
       access_token:
         type: string
       expires_in:
         type: integer
+      refresh_token:
+        type: string
       token_type:
         type: string
       user:
-        $ref: '#/definitions/entity.User'
+        $ref: '#/definitions/dto.UserResponse'
     type: object
   dto.BatchPatchRequest:
     properties:
@@ -18,6 +85,23 @@ definitions:
       patch:
         $ref: '#/definitions/dto.TransactionPatchRequest'
       transaction_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  dto.BatchPatchResult:
+    properties:
+      failed_count:
+        type: integer
+      failed_ids:
+        items:
+          type: string
+        type: array
+      mode:
+        type: string
+      updated_count:
+        type: integer
+      updated_ids:
         items:
           type: string
         type: array
@@ -396,6 +480,13 @@ definitions:
       to:
         type: string
     type: object
+  dto.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
   dto.RefreshSymbolsRequest:
     properties:
       force:
@@ -439,6 +530,9 @@ definitions:
         type: string
       password:
         type: string
+    required:
+    - login
+    - password
     type: object
   dto.SignupRequest:
     properties:
@@ -452,6 +546,21 @@ definitions:
         type: string
       username:
         type: string
+    type: object
+  dto.TransactionLineItemResponse:
+    properties:
+      amount:
+        type: string
+      category_id:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      tag_ids:
+        items:
+          type: string
+        type: array
     type: object
   dto.TransactionPatchRequest:
     properties:
@@ -481,6 +590,77 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  dto.TransactionResponse:
+    properties:
+      account_currency:
+        type: string
+      account_id:
+        type: string
+      amount:
+        type: string
+      category_colors:
+        items:
+          type: string
+        type: array
+      category_ids:
+        items:
+          type: string
+        type: array
+      category_names:
+        items:
+          type: string
+        type: array
+      client_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      exchange_rate:
+        type: string
+      external_ref:
+        type: string
+      from_account_id:
+        type: string
+      from_amount:
+        type: string
+      from_currency:
+        type: string
+      id:
+        type: string
+      line_items:
+        items:
+          $ref: '#/definitions/dto.TransactionLineItemResponse'
+        type: array
+      occurred_at:
+        type: string
+      occurred_date:
+        type: string
+      status:
+        type: string
+      tag_colors:
+        items:
+          type: string
+        type: array
+      tag_ids:
+        items:
+          type: string
+        type: array
+      tag_names:
+        items:
+          type: string
+        type: array
+      to_account_id:
+        type: string
+      to_amount:
+        type: string
+      to_currency:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
     type: object
   dto.UpdateBudgetRequest:
     properties:
@@ -537,6 +717,30 @@ definitions:
       login:
         type: string
       permission:
+        type: string
+    type: object
+  dto.UserResponse:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      phone:
+        type: string
+      public_share_url:
+        type: string
+      settings: {}
+      status:
+        type: string
+      updated_at:
+        type: string
+      username:
         type: string
     type: object
   entity.Account:
@@ -915,30 +1119,6 @@ definitions:
           type: string
         type: array
     type: object
-  entity.User:
-    properties:
-      avatar_url:
-        type: string
-      created_at:
-        type: string
-      display_name:
-        type: string
-      email:
-        type: string
-      id:
-        type: string
-      phone:
-        type: string
-      public_share_url:
-        type: string
-      settings: {}
-      status:
-        type: string
-      updated_at:
-        type: string
-      username:
-        type: string
-    type: object
   response.ErrorBody:
     properties:
       code:
@@ -953,6 +1133,11 @@ definitions:
     properties:
       error:
         $ref: '#/definitions/response.ErrorBody'
+    type: object
+  response.SuccessEnvelope:
+    properties:
+      data: {}
+      meta: {}
     type: object
 host: api.goen.wisteria.local
 info:
@@ -970,9 +1155,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/entity.Account'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.AccountResponse'
+                  type: array
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -983,8 +1173,6 @@ paths:
       tags:
       - Accounts
     post:
-      consumes:
-      - application/json
       description: Create a new banking or manual account for the user
       parameters:
       - description: Account Creation Payload
@@ -999,7 +1187,12 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Account'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AccountResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1053,7 +1246,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Account'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AccountResponse'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1089,7 +1287,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Account'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AccountResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1118,9 +1321,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.AccountShareResponse'
+                  type: array
               type: object
-            type: array
         "401":
           description: Unauthorized
           schema:
@@ -1152,7 +1360,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1201,9 +1414,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.AccountBalanceResponse'
+                  type: array
               type: object
-            type: array
         "401":
           description: Unauthorized
           schema:
@@ -1213,171 +1431,71 @@ paths:
       summary: List Account Balances
       tags:
       - Accounts
-  /auth/me:
-    get:
-      description: Retrieve the profile of the currently authenticated user
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/entity.User'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Get Current User
-      tags:
-      - Auth
-  /auth/me/avatar:
-    post:
-      consumes:
-      - multipart/form-data
-      description: Upload a new avatar image for the user
-      parameters:
-      - description: Avatar image file
-        in: formData
-        name: avatar
-        required: true
-        type: file
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/entity.User'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Upload Avatar
-      tags:
-      - Auth
-  /auth/me/change-password:
+  /auth/logout:
     post:
       consumes:
       - application/json
-      description: Change the password for the current user
+      description: Logout current user session on the server side
       parameters:
-      - description: Password Change Body
+      - description: Logout request
         in: body
         name: request
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/dto.RefreshRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Change Password
-      tags:
-      - Auth
-  /auth/me/profile:
-    patch:
-      consumes:
-      - application/json
-      description: Update user information such as email, phone, displayName, or username
-      parameters:
-      - description: Profile Update Body
-        in: body
-        name: request
-        required: true
-        schema:
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/entity.User'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Update User Profile
-      tags:
-      - Auth
-  /auth/me/settings:
-    patch:
-      consumes:
-      - application/json
-      description: Update the settings for the currently authenticated user
-      parameters:
-      - description: Settings mappings
-        in: body
-        name: request
-        required: true
-        schema:
-          additionalProperties: true
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/entity.User'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Update User Settings
+      summary: User Logout
       tags:
       - Auth
   /auth/refresh:
     post:
+      consumes:
+      - application/json
       description: Get a new access token using an existing session
+      parameters:
+      - description: Refresh request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.AuthResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      security:
-      - BearerAuth: []
       summary: Refresh Token
       tags:
       - Auth
@@ -1399,7 +1517,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.AuthResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AuthResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1429,7 +1552,12 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.AuthResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AuthResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1450,9 +1578,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/entity.Budget'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entity.Budget'
+                  type: array
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1479,7 +1612,12 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Budget'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Budget'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1532,7 +1670,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Budget'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Budget'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1568,7 +1711,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Budget'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Budget'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1596,9 +1744,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/entity.Category'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entity.Category'
+                  type: array
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1623,7 +1776,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Category'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Category'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1650,9 +1808,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/entity.Contact'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entity.Contact'
+                  type: array
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1679,7 +1842,12 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Contact'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Contact'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1732,7 +1900,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Contact'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Contact'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1768,7 +1941,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Contact'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Contact'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1795,9 +1973,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/entity.Debt'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entity.Debt'
+                  type: array
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1824,7 +2007,12 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Debt'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Debt'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1877,7 +2065,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Debt'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Debt'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1913,7 +2106,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Debt'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Debt'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1946,9 +2144,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
               type: object
-            type: array
         "401":
           description: Unauthorized
           schema:
@@ -1985,7 +2188,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2013,7 +2221,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2039,7 +2252,12 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Transaction'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Transaction'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2067,9 +2285,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              type: string
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    type: string
+                  type: array
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -2094,9 +2317,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
               type: object
-            type: array
         "400":
           description: Bad Request
           schema:
@@ -2134,7 +2362,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Transaction'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Transaction'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2170,9 +2403,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/entity.Account'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entity.Account'
+                  type: array
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2197,7 +2435,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Account'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Account'
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2230,7 +2473,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Account'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Account'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2259,9 +2507,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
               type: object
-            type: array
         "500":
           description: Internal Server Error
           schema:
@@ -2286,7 +2539,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2311,9 +2569,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/entity.Trade'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entity.Trade'
+                  type: array
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2345,7 +2608,12 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Trade'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Trade'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2379,9 +2647,14 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2418,7 +2691,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Trade'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Trade'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2450,7 +2728,12 @@ paths:
         "202":
           description: Accepted
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2473,7 +2756,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2502,7 +2790,12 @@ paths:
         "202":
           description: Accepted
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2552,6 +2845,141 @@ paths:
       summary: Proxy Media Images
       tags:
       - Public
+  /profile/me:
+    get:
+      description: Retrieve the profile of the currently authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get Current User
+      tags:
+      - Profile
+    patch:
+      consumes:
+      - application/json
+      description: Update user information such as email, phone, displayName, or username
+      parameters:
+      - description: Profile Update Body
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Update User Profile
+      tags:
+      - Profile
+  /profile/me/avatar:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a new avatar image for the user
+      parameters:
+      - description: Avatar image file
+        in: formData
+        name: avatar
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Upload Avatar
+      tags:
+      - Profile
+  /profile/me/change-password:
+    post:
+      consumes:
+      - application/json
+      description: Change the password for the current user
+      parameters:
+      - description: Password Change Body
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Change Password
+      tags:
+      - Profile
   /public/u/{username}/debts:
     get:
       description: Retrieve publicly visible debts for a specific participant linked
@@ -2573,9 +3001,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
               type: object
-            type: array
         "400":
           description: Bad Request
           schema:
@@ -2603,9 +3036,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
               type: object
-            type: array
         "500":
           description: Internal Server Error
           schema:
@@ -2629,7 +3067,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "404":
           description: Not Found
           schema:
@@ -2653,7 +3096,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "404":
           description: Not Found
           schema:
@@ -2671,7 +3119,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -2694,9 +3147,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
               type: object
-            type: array
         "500":
           description: Internal Server Error
           schema:
@@ -2723,7 +3181,12 @@ paths:
         "201":
           description: Created
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2752,9 +3215,14 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2778,7 +3246,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2810,7 +3283,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2847,7 +3325,12 @@ paths:
         "201":
           description: Created
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2881,9 +3364,14 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2902,9 +3390,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/entity.Savings'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entity.Savings'
+                  type: array
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2931,7 +3424,12 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Savings'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Savings'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2960,9 +3458,14 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -2986,7 +3489,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Savings'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Savings'
+              type: object
         "404":
           description: Not Found
           schema:
@@ -3018,7 +3526,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Savings'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Savings'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -3041,9 +3554,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/entity.Security'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entity.Security'
+                  type: array
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -3075,7 +3593,12 @@ paths:
         "202":
           description: Accepted
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -3112,7 +3635,12 @@ paths:
         "202":
           description: Accepted
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -3141,7 +3669,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -3166,7 +3699,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Security'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Security'
+              type: object
         "500":
           description: Internal Server Error
           schema:
@@ -3197,9 +3735,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
               type: object
-            type: array
         "500":
           description: Internal Server Error
           schema:
@@ -3230,9 +3773,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
               type: object
-            type: array
         "500":
           description: Internal Server Error
           schema:
@@ -3240,6 +3788,44 @@ paths:
       summary: List Security Prices
       tags:
       - Securities
+  /settings/me:
+    patch:
+      consumes:
+      - application/json
+      description: Update the settings for the currently authenticated user
+      parameters:
+      - description: Settings mappings
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Update User Settings
+      tags:
+      - Settings
   /tags:
     get:
       description: Retrieve all tags owned by the current user
@@ -3249,9 +3835,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/entity.Tag'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/entity.Tag'
+                  type: array
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -3278,7 +3869,12 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Tag'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Tag'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -3307,7 +3903,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Tag'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/entity.Tag'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -3333,9 +3934,18 @@ paths:
       - application/json
       responses:
         "200":
-          description: items, next_cursor, total
+          description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.TransactionResponse'
+                  type: array
+                meta:
+                  type: object
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -3363,7 +3973,12 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Transaction'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.TransactionResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -3379,7 +3994,7 @@ paths:
       - Transactions
   /transactions/{transactionId}:
     delete:
-      description: Delete a specific transaction by its ID
+      description: Remove a transaction record permanently
       parameters:
       - description: Transaction ID
         in: path
@@ -3416,7 +4031,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Transaction'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.TransactionResponse'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -3433,7 +4053,7 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Partially update properties of a transaction
+      description: Update fields of an existing transaction
       parameters:
       - description: Transaction ID
         in: path
@@ -3452,7 +4072,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Transaction'
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.TransactionResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -3470,7 +4095,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Update multiple transactions at once (e.g. recategorize, retag)
+      description: Update multiple transactions at once (e.g. category assignment)
       parameters:
       - description: Batch Patch Payload
         in: body
@@ -3484,7 +4109,12 @@ paths:
         "200":
           description: OK
           schema:
-            type: object
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.BatchPatchResult'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -3495,7 +4125,7 @@ paths:
             $ref: '#/definitions/response.ErrorEnvelope'
       security:
       - BearerAuth: []
-      summary: Batch Patch Transactions
+      summary: Batch Update Transactions
       tags:
       - Transactions
 securityDefinitions:

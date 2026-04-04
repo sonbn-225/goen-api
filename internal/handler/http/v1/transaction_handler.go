@@ -38,7 +38,7 @@ func (h *TransactionHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Tags Transactions
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} object "items, next_cursor, total"
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.TransactionResponse,meta=object}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /transactions [get]
 func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -60,10 +60,9 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, map[string]any{
-		"items": items,
+	response.WriteSuccessWithMeta(w, http.StatusOK, items, map[string]any{
 		"next_cursor": cursor,
-		"total": total,
+		"total":       total,
 	})
 }
 
@@ -75,7 +74,7 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.CreateTransactionRequest true "Transaction Creation Payload"
-// @Success 201 {object} entity.Transaction
+// @Success 201 {object} response.SuccessEnvelope{data=dto.TransactionResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /transactions [post]
@@ -98,7 +97,7 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusCreated, tx)
+	response.WriteSuccess(w, http.StatusCreated, tx)
 }
 
 // Get godoc
@@ -108,7 +107,7 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param transactionId path string true "Transaction ID"
-// @Success 200 {object} entity.Transaction
+// @Success 200 {object} response.SuccessEnvelope{data=dto.TransactionResponse}
 // @Failure 401 {object} response.ErrorEnvelope
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /transactions/{transactionId} [get]
@@ -119,26 +118,26 @@ func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := chi.URLParam(r, "transactionId")
-	tx, err := h.svc.Get(r.Context(), userID, id)
+	transactionID := chi.URLParam(r, "transactionId")
+	tx, err := h.svc.Get(r.Context(), userID, transactionID)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, tx)
+	response.WriteSuccess(w, http.StatusOK, tx)
 }
 
 // Patch godoc
 // @Summary Update Transaction
-// @Description Partially update properties of a transaction
+// @Description Update fields of an existing transaction
 // @Tags Transactions
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param transactionId path string true "Transaction ID"
 // @Param request body dto.TransactionPatchRequest true "Transaction Patch Payload"
-// @Success 200 {object} entity.Transaction
+// @Success 200 {object} response.SuccessEnvelope{data=dto.TransactionResponse}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /transactions/{transactionId} [patch]
@@ -149,31 +148,57 @@ func (h *TransactionHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := chi.URLParam(r, "transactionId")
+	transactionID := chi.URLParam(r, "transactionId")
 	var req dto.TransactionPatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
 		return
 	}
 
-	tx, err := h.svc.Patch(r.Context(), userID, id, req)
+	tx, err := h.svc.Patch(r.Context(), userID, transactionID, req)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, tx)
+	response.WriteSuccess(w, http.StatusOK, tx)
+}
+
+// Delete godoc
+// @Summary Delete Transaction
+// @Description Remove a transaction record permanently
+// @Tags Transactions
+// @Security BearerAuth
+// @Param transactionId path string true "Transaction ID"
+// @Success 204 "No Content"
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /transactions/{transactionId} [delete]
+func (h *TransactionHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
+
+	transactionID := chi.URLParam(r, "transactionId")
+	if err := h.svc.Delete(r.Context(), userID, transactionID); err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // BatchPatch godoc
-// @Summary Batch Patch Transactions
-// @Description Update multiple transactions at once (e.g. recategorize, retag)
+// @Summary Batch Update Transactions
+// @Description Update multiple transactions at once (e.g. category assignment)
 // @Tags Transactions
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param request body dto.BatchPatchRequest true "Batch Patch Payload"
-// @Success 200 {object} object
+// @Success 200 {object} response.SuccessEnvelope{data=dto.BatchPatchResult}
 // @Failure 400 {object} response.ErrorEnvelope
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /transactions/batch-patch [post]
@@ -196,31 +221,5 @@ func (h *TransactionHandler) BatchPatch(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, res)
-}
-
-// Delete godoc
-// @Summary Delete Transaction
-// @Description Delete a specific transaction by its ID
-// @Tags Transactions
-// @Security BearerAuth
-// @Param transactionId path string true "Transaction ID"
-// @Success 204 "No Content"
-// @Failure 401 {object} response.ErrorEnvelope
-// @Failure 404 {object} response.ErrorEnvelope
-// @Router /transactions/{transactionId} [delete]
-func (h *TransactionHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
-		return
-	}
-
-	id := chi.URLParam(r, "transactionId")
-	if err := h.svc.Delete(r.Context(), userID, id); err != nil {
-		response.WriteInternalError(w, err)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
+	response.WriteSuccess(w, http.StatusOK, res)
 }

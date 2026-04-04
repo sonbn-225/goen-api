@@ -44,7 +44,11 @@ func main() {
 
 	logger.Init(cfg.LogLevel)
 
-	a := app.New(cfg)
+	a, err := app.New(cfg)
+	if err != nil {
+		slog.Error("failed to initialize app", "error", err)
+		os.Exit(1)
+	}
 
 	srv := &http.Server{
 		Addr:         cfg.HTTPAddr(),
