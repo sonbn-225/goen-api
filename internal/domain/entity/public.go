@@ -12,6 +12,13 @@ type PaymentInfo struct {
 	BankName      string `json:"bank_name"`
 }
 
+type PublicDebt struct {
+	ID          string  `json:"id"`
+	CreatedAt   string  `json:"created_at"`
+	ShareAmount string  `json:"share_amount"`
+	Status      *string `json:"status,omitempty"`
+}
+
 type Diagnostics struct {
 	Status    string            `json:"status"`
 	DBStatus  string            `json:"db_status"`

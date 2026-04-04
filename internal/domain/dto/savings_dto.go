@@ -4,8 +4,9 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
-// SavingsInstrument Requests/Responses
-type CreateSavingsInstrumentRequest struct {
+// Savings Requests/Responses
+type CreateSavingsRequest struct {
+	Name             string  `json:"name"`
 	SavingsAccountID string  `json:"savings_account_id"`
 	ParentAccountID  string  `json:"parent_account_id"`
 	Principal        string  `json:"principal"`
@@ -14,6 +15,17 @@ type CreateSavingsInstrumentRequest struct {
 	StartDate        *string `json:"start_date,omitempty"`
 	MaturityDate     *string `json:"maturity_date,omitempty"`
 	AutoRenew        bool    `json:"auto_renew"`
+}
+
+type PatchSavingsRequest struct {
+	Name             *string `json:"name,omitempty"`
+	SavingsAccountID *string `json:"savings_account_id,omitempty"`
+	Principal        *string `json:"principal,omitempty"`
+	InterestRate     *string `json:"interest_rate,omitempty"`
+	TermMonths       *int    `json:"term_months,omitempty"`
+	MaturityDate     *string `json:"maturity_date,omitempty"`
+	AutoRenew        *bool   `json:"auto_renew,omitempty"`
+	Status           *string `json:"status,omitempty"`
 }
 
 // RotatingSavings Requests/Responses

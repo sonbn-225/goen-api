@@ -31,6 +31,15 @@ func (h *ContactHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	})
 }
 
+// List godoc
+// @Summary List Contacts
+// @Description Retrieve a list of contacts for the current user
+// @Tags Contacts
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} entity.Contact
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /contacts [get]
 func (h *ContactHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.UserIDFromContext(r.Context())
 	items, err := h.svc.List(r.Context(), userID)
@@ -41,6 +50,18 @@ func (h *ContactHandler) List(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, items)
 }
 
+// Create godoc
+// @Summary Create Contact
+// @Description Create a new contact, optionally linked to another Goen user
+// @Tags Contacts
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.CreateContactRequest true "Contact Creation Payload"
+// @Success 201 {object} entity.Contact
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /contacts [post]
 func (h *ContactHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.UserIDFromContext(r.Context())
 	var req dto.CreateContactRequest
@@ -56,6 +77,17 @@ func (h *ContactHandler) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusCreated, res)
 }
 
+// Get godoc
+// @Summary Get Contact
+// @Description Retrieve a specific contact by its ID
+// @Tags Contacts
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Contact ID"
+// @Success 200 {object} entity.Contact
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /contacts/{id} [get]
 func (h *ContactHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.UserIDFromContext(r.Context())
 	id := chi.URLParam(r, "id")
@@ -67,6 +99,20 @@ func (h *ContactHandler) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, res)
 }
 
+// Update godoc
+// @Summary Update Contact
+// @Description Partially update specific contact properties
+// @Tags Contacts
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Contact ID"
+// @Param request body dto.UpdateContactRequest true "Contact Update Payload"
+// @Success 200 {object} entity.Contact
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /contacts/{id} [patch]
 func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.UserIDFromContext(r.Context())
 	id := chi.URLParam(r, "id")
@@ -83,6 +129,16 @@ func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, res)
 }
 
+// Delete godoc
+// @Summary Delete Contact
+// @Description Standardized soft-delete or link removal for a contact
+// @Tags Contacts
+// @Security BearerAuth
+// @Param id path string true "Contact ID"
+// @Success 204 "No Content"
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /contacts/{id} [delete]
 func (h *ContactHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.UserIDFromContext(r.Context())
 	id := chi.URLParam(r, "id")

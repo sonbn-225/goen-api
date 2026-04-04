@@ -12,13 +12,13 @@ import (
 )
 
 type RotatingSavingsService struct {
-	repo       interfaces.RotatingSavingsRepository
+	repo       interfaces.SavingsRepository
 	accountSvc interfaces.AccountService
 	txSvc      interfaces.TransactionService
 }
 
 func NewRotatingSavingsService(
-	repo interfaces.RotatingSavingsRepository,
+	repo interfaces.SavingsRepository,
 	accountSvc interfaces.AccountService,
 	txSvc interfaces.TransactionService,
 ) *RotatingSavingsService {
@@ -55,11 +55,11 @@ func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 		g.UserSlots = 1
 	}
 
-	if err := s.repo.CreateGroup(ctx, g); err != nil {
+	if err := s.repo.CreateRotatingGroup(ctx, g); err != nil {
 		return nil, err
 	}
 
-	_ = s.repo.CreateAuditLog(ctx, entity.RotatingSavingsAuditLog{
+	_ = s.repo.AddAuditLog(ctx, entity.RotatingSavingsAuditLog{
 		ID:        uuid.NewString(),
 		UserID:    userID,
 		GroupID:   &g.ID,
@@ -72,11 +72,11 @@ func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 }
 
 func (s *RotatingSavingsService) GetGroup(ctx context.Context, userID, groupID string) (*entity.RotatingSavingsGroup, error) {
-	return s.repo.GetGroup(ctx, userID, groupID)
+	return s.repo.GetRotatingGroup(ctx, userID, groupID)
 }
 
 func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupID string, req dto.UpdateRotatingSavingsGroupRequest) (*entity.RotatingSavingsGroup, error) {
-	g, err := s.repo.GetGroup(ctx, userID, groupID)
+	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -90,11 +90,11 @@ func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupI
 
 	g.UpdatedAt = time.Now().UTC()
 
-	if err := s.repo.UpdateGroup(ctx, *g); err != nil {
+	if err := s.repo.UpdateRotatingGroup(ctx, *g); err != nil {
 		return nil, err
 	}
 
-	_ = s.repo.CreateAuditLog(ctx, entity.RotatingSavingsAuditLog{
+	_ = s.repo.AddAuditLog(ctx, entity.RotatingSavingsAuditLog{
 		ID:        uuid.NewString(),
 		UserID:    userID,
 		GroupID:   &g.ID,
@@ -107,17 +107,17 @@ func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupI
 }
 
 func (s *RotatingSavingsService) GetGroupDetail(ctx context.Context, userID, groupID string) (*dto.RotatingSavingsGroupDetailResponse, error) {
-	g, err := s.repo.GetGroup(ctx, userID, groupID)
+	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
 	if err != nil {
 		return nil, err
 	}
 
-	contributions, err := s.repo.ListContributions(ctx, userID, groupID)
+	contributions, err := s.repo.GetContributions(ctx, groupID)
 	if err != nil {
 		return nil, err
 	}
 
-	auditLogs, _ := s.repo.ListAuditLogs(ctx, userID, groupID)
+	auditLogs, _ := s.repo.GetAuditLogs(ctx, groupID)
 
 	schedule := s.generateSchedule(*g, contributions)
 
@@ -238,14 +238,14 @@ func (s *RotatingSavingsService) generateSchedule(g entity.RotatingSavingsGroup,
 }
 
 func (s *RotatingSavingsService) ListGroups(ctx context.Context, userID string) ([]dto.RotatingSavingsGroupSummary, error) {
-	groups, err := s.repo.ListGroups(ctx, userID)
+	groups, err := s.repo.ListRotatingGroups(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	summaries := make([]dto.RotatingSavingsGroupSummary, 0, len(groups))
 	for _, g := range groups {
-		contributions, _ := s.repo.ListContributions(ctx, userID, g.ID)
+		contributions, _ := s.repo.GetContributions(ctx, g.ID)
 		totalPaid := 0.0
 		totalReceived := 0.0
 		completedCycles := make(map[int]bool)
@@ -275,7 +275,7 @@ func (s *RotatingSavingsService) ListGroups(ctx context.Context, userID string) 
 }
 
 func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID, groupID string, req dto.RotatingSavingsContributionRequest) (*entity.RotatingSavingsContribution, error) {
-	g, err := s.repo.GetGroup(ctx, userID, groupID)
+	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -306,13 +306,12 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 		ID: uuid.NewString(), GroupID: groupID, TransactionID: tx.ID, Kind: req.Kind, CycleNo: req.CycleNo, DueDate: req.DueDate,
 		Amount: parsedAmount, SlotsTaken: req.SlotsTaken, CollectedFeePerSlot: req.CollectedFeePerSlot, OccurredAt: time.Now().UTC(), Note: req.Note, CreatedAt: time.Now().UTC(),
 	}
-	// Note: In real impl, we should parse req.Amount properly.
 
 	if err := s.repo.CreateContribution(ctx, c); err != nil {
 		return nil, err
 	}
 
-	_ = s.repo.CreateAuditLog(ctx, entity.RotatingSavingsAuditLog{
+	_ = s.repo.AddAuditLog(ctx, entity.RotatingSavingsAuditLog{
 		ID: uuid.NewString(), UserID: userID, GroupID: &groupID, Action: "contribution_created", Details: map[string]any{"kind": c.Kind, "amount": req.Amount}, CreatedAt: time.Now().UTC(),
 	})
 
@@ -320,25 +319,35 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 }
 
 func (s *RotatingSavingsService) DeleteContribution(ctx context.Context, userID, groupID, id string) error {
-	c, err := s.repo.GetContribution(ctx, userID, id)
+	// Finding contribution in group because GetContribution was removed from interface for consolidation
+	conts, err := s.repo.GetContributions(ctx, groupID)
 	if err != nil {
 		return err
 	}
-	if c.GroupID != groupID {
-		return errors.New("contribution does not belong to group")
+	
+	var target *entity.RotatingSavingsContribution
+	for i := range conts {
+		if conts[i].ID == id {
+			target = &conts[i]
+			break
+		}
+	}
+	
+	if target == nil {
+		return errors.New("contribution not found")
 	}
 
-	if c.TransactionID != "" {
-		_ = s.txSvc.Delete(ctx, userID, c.TransactionID)
+	if target.TransactionID != "" {
+		_ = s.txSvc.Delete(ctx, userID, target.TransactionID)
 	}
 
-	return s.repo.DeleteContribution(ctx, userID, id)
+	return s.repo.DeleteContribution(ctx, id)
 }
 
 func (s *RotatingSavingsService) DeleteGroup(ctx context.Context, userID, groupID string) error {
-	conts, _ := s.repo.ListContributions(ctx, userID, groupID)
+	conts, _ := s.repo.GetContributions(ctx, groupID)
 	for _, c := range conts {
 		if c.TransactionID != "" { _ = s.txSvc.Delete(ctx, userID, c.TransactionID) }
 	}
-	return s.repo.DeleteGroup(ctx, userID, groupID)
+	return s.repo.DeleteRotatingGroup(ctx, userID, groupID)
 }

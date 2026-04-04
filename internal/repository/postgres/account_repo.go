@@ -72,10 +72,25 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID string) ([
 
 	rows, err := pool.Query(ctx, `
 		SELECT a.id, a.client_id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
-		       a.created_at, a.updated_at, a.created_by, a.updated_by, a.deleted_at
+		       a.created_at, a.updated_at, a.created_by, a.updated_by, a.deleted_at,
+		       COALESCE(SUM(
+		         CASE
+		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
+		           WHEN t.type = 'expense' AND t.account_id = a.id THEN -t.amount
+		           WHEN t.type = 'transfer' AND t.to_account_id = a.id THEN COALESCE(t.to_amount, t.amount)
+		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -COALESCE(t.from_amount, t.amount)
+		           ELSE 0
+		         END
+		       ), 0)::text AS balance,
+		       ia.id AS investment_account_id
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
+		LEFT JOIN transactions t
+		  ON t.deleted_at IS NULL AND t.status = 'posted'
+		 AND (t.account_id = a.id OR t.from_account_id = a.id OR t.to_account_id = a.id)
+		LEFT JOIN investment_accounts ia ON ia.account_id = a.id
 		WHERE ua.user_id = $1 AND ua.status = 'active' AND a.deleted_at IS NULL
+		GROUP BY a.id, ia.id
 		ORDER BY a.created_at DESC
 	`, userID)
 	if err != nil {
@@ -89,7 +104,7 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID string) ([
 		err := rows.Scan(
 			&a.ID, &a.ClientID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
 			&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt, &a.CreatedBy,
-			&a.UpdatedBy, &a.DeletedAt,
+			&a.UpdatedBy, &a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
 		)
 		if err != nil {
 			return nil, err
@@ -107,17 +122,32 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID string, acco
 
 	row := pool.QueryRow(ctx, `
 		SELECT a.id, a.client_id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
-		       a.created_at, a.updated_at, a.created_by, a.updated_by, a.deleted_at
+		       a.created_at, a.updated_at, a.created_by, a.updated_by, a.deleted_at,
+		       COALESCE(SUM(
+		         CASE
+		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
+		           WHEN t.type = 'expense' AND t.account_id = a.id THEN -t.amount
+		           WHEN t.type = 'transfer' AND t.to_account_id = a.id THEN COALESCE(t.to_amount, t.amount)
+		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -COALESCE(t.from_amount, t.amount)
+		           ELSE 0
+		         END
+		       ), 0)::text AS balance,
+		       ia.id AS investment_account_id
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
+		LEFT JOIN transactions t
+		  ON t.deleted_at IS NULL AND t.status = 'posted'
+		 AND (t.account_id = a.id OR t.from_account_id = a.id OR t.to_account_id = a.id)
+		LEFT JOIN investment_accounts ia ON ia.account_id = a.id
 		WHERE a.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
+		GROUP BY a.id, ia.id
 	`, accountID, userID)
 
 	var a entity.Account
 	err = row.Scan(
 		&a.ID, &a.ClientID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
 		&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt, &a.CreatedBy,
-		&a.UpdatedBy, &a.DeletedAt,
+		&a.UpdatedBy, &a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -366,17 +396,32 @@ func (r *AccountRepo) requireAccountOwner(ctx context.Context, tx pgx.Tx, userID
 func (r *AccountRepo) getAccountInTx(ctx context.Context, tx pgx.Tx, userID, accountID string) (*entity.Account, error) {
 	row := tx.QueryRow(ctx, `
 		SELECT a.id, a.client_id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
-		       a.created_at, a.updated_at, a.created_by, a.updated_by, a.deleted_at
+		       a.created_at, a.updated_at, a.created_by, a.updated_by, a.deleted_at,
+		       COALESCE(SUM(
+		         CASE
+		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
+		           WHEN t.type = 'expense' AND t.account_id = a.id THEN -t.amount
+		           WHEN t.type = 'transfer' AND t.to_account_id = a.id THEN COALESCE(t.to_amount, t.amount)
+		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -COALESCE(t.from_amount, t.amount)
+		           ELSE 0
+		         END
+		       ), 0)::text AS balance,
+		       ia.id AS investment_account_id
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
+		LEFT JOIN transactions t
+		  ON t.deleted_at IS NULL AND t.status = 'posted'
+		 AND (t.account_id = a.id OR t.from_account_id = a.id OR t.to_account_id = a.id)
+		LEFT JOIN investment_accounts ia ON ia.account_id = a.id
 		WHERE a.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
+		GROUP BY a.id, ia.id
 	`, accountID, userID)
 
 	var a entity.Account
 	err := row.Scan(
 		&a.ID, &a.ClientID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
 		&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt, &a.CreatedBy,
-		&a.UpdatedBy, &a.DeletedAt,
+		&a.UpdatedBy, &a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

@@ -54,6 +54,7 @@ func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID stri
 	`, budgetID, userID)
 
 	var b entity.Budget
+	var spent string
 	if err := row.Scan(
 		&b.ID, &b.UserID, &b.Name, &b.Period, &b.PeriodStart, &b.PeriodEnd,
 		&b.Amount, &b.AlertThresholdPercent, &b.RolloverMode, &b.CategoryID,
@@ -64,6 +65,17 @@ func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID stri
 		}
 		return nil, err
 	}
+
+	// Compute spent (simplified, should use recursive tree if category_id exists)
+	if b.CategoryID != nil && b.PeriodStart != nil && b.PeriodEnd != nil {
+		s, _ := r.ComputeSpent(ctx, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
+		spent = s
+	} else {
+		spent = "0"
+	}
+	b.Spent = spent
+	// Remaining calculation (simplified, assuming numeric amounts)
+	b.Remaining = "0" // Placeholder, in real app would use decimal arithmetic
 	return &b, nil
 }
 
@@ -99,6 +111,15 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID string) ([]entity.B
 		); err != nil {
 			return nil, err
 		}
+		
+		if b.CategoryID != nil && b.PeriodStart != nil && b.PeriodEnd != nil {
+			s, _ := r.ComputeSpent(ctx, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
+			b.Spent = s
+		} else {
+			b.Spent = "0"
+		}
+		b.Remaining = "0" // Placeholder
+		
 		results = append(results, b)
 	}
 	return results, nil

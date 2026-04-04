@@ -21,6 +21,14 @@ func (h *DiagnosticsHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Get("/diagnostics", h.GetDiagnostics)
 }
 
+// GetDiagnostics godoc
+// @Summary System Diagnostics
+// @Description Retrieve metrics, configurations, and connectivity health (internal use docs)
+// @Tags System
+// @Produce json
+// @Success 200 {object} object
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /diagnostics [get]
 func (h *DiagnosticsHandler) GetDiagnostics(w http.ResponseWriter, r *http.Request) {
 	diag, err := h.svc.GetDiagnostics(r.Context())
 	if err != nil {

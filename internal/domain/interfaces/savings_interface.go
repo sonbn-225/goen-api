@@ -8,34 +8,33 @@ import (
 )
 
 type SavingsRepository interface {
-	CreateSavingsInstrument(ctx context.Context, userID string, s entity.SavingsInstrument) error
-	GetSavingsInstrument(ctx context.Context, userID, id string) (*entity.SavingsInstrument, error)
-	ListSavingsInstruments(ctx context.Context, userID string) ([]entity.SavingsInstrument, error)
-	UpdateSavingsInstrument(ctx context.Context, userID string, s entity.SavingsInstrument) error
-	DeleteSavingsInstrument(ctx context.Context, userID, id string) error
-}
+	CreateSavings(ctx context.Context, userID string, s entity.Savings) error
+	GetSavings(ctx context.Context, userID string, savingsID string) (*entity.Savings, error)
+	ListSavings(ctx context.Context, userID string) ([]entity.Savings, error)
+	UpdateSavings(ctx context.Context, userID string, s entity.Savings) error
+	DeleteSavings(ctx context.Context, userID string, savingsID string) error
 
-type RotatingSavingsRepository interface {
-	CreateGroup(ctx context.Context, g entity.RotatingSavingsGroup) error
-	GetGroup(ctx context.Context, userID, groupID string) (*entity.RotatingSavingsGroup, error)
-	UpdateGroup(ctx context.Context, g entity.RotatingSavingsGroup) error
-	DeleteGroup(ctx context.Context, userID, groupID string) error
-	ListGroups(ctx context.Context, userID string) ([]entity.RotatingSavingsGroup, error)
+	// Rotating Savings
+	CreateRotatingGroup(ctx context.Context, g entity.RotatingSavingsGroup) error
+	GetRotatingGroup(ctx context.Context, userID, groupID string) (*entity.RotatingSavingsGroup, error)
+	ListRotatingGroups(ctx context.Context, userID string) ([]entity.RotatingSavingsGroup, error)
+	UpdateRotatingGroup(ctx context.Context, g entity.RotatingSavingsGroup) error
+	DeleteRotatingGroup(ctx context.Context, userID, groupID string) error
 
 	CreateContribution(ctx context.Context, c entity.RotatingSavingsContribution) error
-	GetContribution(ctx context.Context, userID, id string) (*entity.RotatingSavingsContribution, error)
-	ListContributions(ctx context.Context, userID, groupID string) ([]entity.RotatingSavingsContribution, error)
-	DeleteContribution(ctx context.Context, userID, id string) error
+	GetContributions(ctx context.Context, groupID string) ([]entity.RotatingSavingsContribution, error)
+	DeleteContribution(ctx context.Context, contributionID string) error
 
-	CreateAuditLog(ctx context.Context, log entity.RotatingSavingsAuditLog) error
-	ListAuditLogs(ctx context.Context, userID, groupID string) ([]entity.RotatingSavingsAuditLog, error)
+	AddAuditLog(ctx context.Context, log entity.RotatingSavingsAuditLog) error
+	GetAuditLogs(ctx context.Context, groupID string) ([]entity.RotatingSavingsAuditLog, error)
 }
 
 type SavingsService interface {
-	CreateSavingsInstrument(ctx context.Context, userID string, req dto.CreateSavingsInstrumentRequest) (*entity.SavingsInstrument, error)
-	GetSavingsInstrument(ctx context.Context, userID, id string) (*entity.SavingsInstrument, error)
-	ListSavingsInstruments(ctx context.Context, userID string) ([]entity.SavingsInstrument, error)
-	DeleteSavingsInstrument(ctx context.Context, userID, id string) error
+	CreateSavings(ctx context.Context, userID string, req dto.CreateSavingsRequest) (*entity.Savings, error)
+	GetSavings(ctx context.Context, userID, savingsID string) (*entity.Savings, error)
+	ListSavings(ctx context.Context, userID string) ([]entity.Savings, error)
+	PatchSavings(ctx context.Context, userID, savingsID string, req dto.PatchSavingsRequest) (*entity.Savings, error)
+	DeleteSavings(ctx context.Context, userID, savingsID string) error
 }
 
 type RotatingSavingsService interface {

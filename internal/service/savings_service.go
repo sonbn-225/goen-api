@@ -18,8 +18,9 @@ func NewSavingsService(repo interfaces.SavingsRepository) *SavingsService {
 	return &SavingsService{repo: repo}
 }
 
-func (s *SavingsService) CreateSavingsInstrument(ctx context.Context, userID string, req dto.CreateSavingsInstrumentRequest) (*entity.SavingsInstrument, error) {
-	instr := entity.SavingsInstrument{
+func (s *SavingsService) CreateSavings(ctx context.Context, userID string, req dto.CreateSavingsRequest) (*entity.Savings, error) {
+	now := time.Now().UTC()
+	instr := entity.Savings(entity.Savings{
 		ID:               uuid.NewString(),
 		SavingsAccountID: req.SavingsAccountID,
 		ParentAccountID:  req.ParentAccountID,
@@ -31,24 +32,65 @@ func (s *SavingsService) CreateSavingsInstrument(ctx context.Context, userID str
 		AutoRenew:        req.AutoRenew,
 		AccruedInterest:  "0",
 		Status:           "active",
-		CreatedAt:        time.Now().UTC(),
-		UpdatedAt:        time.Now().UTC(),
-	}
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	})
 
-	if err := s.repo.CreateSavingsInstrument(ctx, userID, instr); err != nil {
+	if err := s.repo.CreateSavings(ctx, userID, instr); err != nil {
 		return nil, err
 	}
 	return &instr, nil
 }
 
-func (s *SavingsService) GetSavingsInstrument(ctx context.Context, userID, id string) (*entity.SavingsInstrument, error) {
-	return s.repo.GetSavingsInstrument(ctx, userID, id)
+func (s *SavingsService) GetSavings(ctx context.Context, userID, id string) (*entity.Savings, error) {
+	return s.repo.GetSavings(ctx, userID, id)
 }
 
-func (s *SavingsService) ListSavingsInstruments(ctx context.Context, userID string) ([]entity.SavingsInstrument, error) {
-	return s.repo.ListSavingsInstruments(ctx, userID)
+func (s *SavingsService) ListSavings(ctx context.Context, userID string) ([]entity.Savings, error) {
+	return s.repo.ListSavings(ctx, userID)
 }
 
-func (s *SavingsService) DeleteSavingsInstrument(ctx context.Context, userID, id string) error {
-	return s.repo.DeleteSavingsInstrument(ctx, userID, id)
+func (s *SavingsService) PatchSavings(ctx context.Context, userID, id string, req dto.PatchSavingsRequest) (*entity.Savings, error) {
+	cur, err := s.repo.GetSavings(ctx, userID, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Name != nil {
+		// Note: The entity might need a Name field if requirements evolved
+	}
+	if req.Principal != nil {
+		cur.Principal = *req.Principal
+	}
+	if req.InterestRate != nil {
+		cur.InterestRate = req.InterestRate
+	}
+	if req.TermMonths != nil {
+		cur.TermMonths = req.TermMonths
+	}
+	if req.MaturityDate != nil {
+		cur.MaturityDate = req.MaturityDate
+	}
+	if req.AutoRenew != nil {
+		cur.AutoRenew = *req.AutoRenew
+	}
+	if req.Status != nil {
+		cur.Status = *req.Status
+		if *req.Status == "closed" || *req.Status == "matured" {
+			now := time.Now().UTC()
+			cur.ClosedAt = &now
+		}
+	}
+
+	cur.UpdatedAt = time.Now().UTC()
+
+	if err := s.repo.UpdateSavings(ctx, userID, *cur); err != nil {
+		return nil, err
+	}
+
+	return cur, nil
+}
+
+func (s *SavingsService) DeleteSavings(ctx context.Context, userID, id string) error {
+	return s.repo.DeleteSavings(ctx, userID, id)
 }

@@ -5,21 +5,23 @@ import (
 )
 
 type Account struct {
-	ID              string     `json:"id"`
-	ClientID        *string    `json:"client_id,omitempty"`
-	Name            string     `json:"name"`
-	AccountNumber   *string    `json:"account_number,omitempty"`
-	Color           *string    `json:"color,omitempty"`
-	AccountType     string     `json:"account_type"`
-	Currency        string     `json:"currency"`
-	ParentAccountID *string    `json:"parent_account_id,omitempty"`
-	Status          string     `json:"status"`
-	ClosedAt        *time.Time `json:"closed_at,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	CreatedBy       *string    `json:"created_by,omitempty"`
-	UpdatedBy       *string    `json:"updated_by,omitempty"`
-	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
+	ID                  string     `json:"id"`
+	ClientID            *string    `json:"client_id,omitempty"`
+	Name                string     `json:"name"`
+	AccountNumber       *string    `json:"account_number,omitempty"`
+	Color               *string    `json:"color,omitempty"`
+	AccountType         string     `json:"account_type"`
+	Currency            string     `json:"currency"`
+	ParentAccountID     *string    `json:"parent_account_id,omitempty"`
+	Status              string     `json:"status"`
+	ClosedAt            *time.Time `json:"closed_at,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	CreatedBy           *string    `json:"created_by,omitempty"`
+	UpdatedBy           *string    `json:"updated_by,omitempty"`
+	DeletedAt           *time.Time `json:"deleted_at,omitempty"`
+	Balance             string     `json:"balance"`               // Joined
+	InvestmentAccountID *string    `json:"investment_account_id"` // Joined
 }
 
 type AccountPatch struct {

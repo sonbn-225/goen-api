@@ -29,6 +29,15 @@ func (h *MarketDataHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Post("/securities/{id}/refresh-events", h.RefreshEvents)
 }
 
+// GetGlobalStatus godoc
+// @Summary Get Global Market Data Status
+// @Description Retrieve the status of the global background market data sync routines
+// @Tags MarketData
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} object
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /market-data/status [get]
 func (h *MarketDataHandler) GetGlobalStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := h.svc.GetGlobalStatus(r.Context())
 	if err != nil {
@@ -38,6 +47,18 @@ func (h *MarketDataHandler) GetGlobalStatus(w http.ResponseWriter, r *http.Reque
 	response.WriteJSON(w, http.StatusOK, status)
 }
 
+// MarketSync godoc
+// @Summary Enqueue Global Market Sync
+// @Description Trigger a global sync mapping all active investments to real-time prices
+// @Tags MarketData
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.MarketSyncRequest true "Market Sync Payload"
+// @Success 202 {object} object
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /market-data/sync [post]
 func (h *MarketDataHandler) MarketSync(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	var req dto.MarketSyncRequest
@@ -54,6 +75,18 @@ func (h *MarketDataHandler) MarketSync(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusAccepted, res)
 }
 
+// RefreshSymbols godoc
+// @Summary Refresh Specific Symbols
+// @Description Trigger a refresh for distinct market symbols immediately
+// @Tags MarketData
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.RefreshSymbolsRequest true "Symbols payload"
+// @Success 202 {object} object
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /market-data/refresh-symbols [post]
 func (h *MarketDataHandler) RefreshSymbols(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	var req dto.RefreshSymbolsRequest
@@ -70,6 +103,16 @@ func (h *MarketDataHandler) RefreshSymbols(w http.ResponseWriter, r *http.Reques
 	response.WriteJSON(w, http.StatusAccepted, res)
 }
 
+// GetSecurityStatus godoc
+// @Summary Get Security Sync Status
+// @Description Real-time sync status for a distinct security ID
+// @Tags MarketData
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Security ID"
+// @Success 200 {object} object
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /securities/{id}/status [get]
 func (h *MarketDataHandler) GetSecurityStatus(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	id := chi.URLParam(r, "id")
@@ -81,6 +124,19 @@ func (h *MarketDataHandler) GetSecurityStatus(w http.ResponseWriter, r *http.Req
 	response.WriteJSON(w, http.StatusOK, status)
 }
 
+// RefreshPrices godoc
+// @Summary Refresh Security Prices
+// @Description Manually queue a price refresh from provider for a specific security
+// @Tags MarketData
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Security ID"
+// @Param request body dto.RefreshPriceRequest true "Refresh Payload"
+// @Success 202 {object} object
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /securities/{id}/refresh-prices [post]
 func (h *MarketDataHandler) RefreshPrices(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	id := chi.URLParam(r, "id")
@@ -99,6 +155,19 @@ func (h *MarketDataHandler) RefreshPrices(w http.ResponseWriter, r *http.Request
 	response.WriteJSON(w, http.StatusAccepted, res)
 }
 
+// RefreshEvents godoc
+// @Summary Refresh Security Events
+// @Description Manually queue an event updates fetch (dividends, splits) for a security
+// @Tags MarketData
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Security ID"
+// @Param request body dto.RefreshEventRequest true "Refresh Event Payload"
+// @Success 202 {object} object
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 500 {object} response.ErrorEnvelope
+// @Router /securities/{id}/refresh-events [post]
 func (h *MarketDataHandler) RefreshEvents(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 	id := chi.URLParam(r, "id")

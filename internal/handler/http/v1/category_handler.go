@@ -26,6 +26,16 @@ func (h *CategoryHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	})
 }
 
+// List godoc
+// @Summary List Categories
+// @Description Retrieve all categories, optionally filtered by transaction type
+// @Tags Categories
+// @Produce json
+// @Security BearerAuth
+// @Param type query string false "Transaction type filter (INCOME/EXPENSE)"
+// @Success 200 {array} entity.Category
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /categories [get]
 func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -43,6 +53,18 @@ func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, items)
 }
 
+// Get godoc
+// @Summary Get Category
+// @Description Retrieve details of a specific category by ID
+// @Tags Categories
+// @Produce json
+// @Security BearerAuth
+// @Param categoryId path string true "Category ID"
+// @Success 200 {object} entity.Category
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /categories/{categoryId} [get]
 func (h *CategoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
