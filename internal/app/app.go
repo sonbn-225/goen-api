@@ -1,41 +1,44 @@
-// Package app provides the main application entry point.
 package app
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/sonbn-225/goen-api/internal/config"
-	"github.com/sonbn-225/goen-api/internal/modules/account"
-	authMod "github.com/sonbn-225/goen-api/internal/modules/auth"
-	"github.com/sonbn-225/goen-api/internal/modules/budget"
-	"github.com/sonbn-225/goen-api/internal/modules/category"
-	"github.com/sonbn-225/goen-api/internal/modules/contact"
-	"github.com/sonbn-225/goen-api/internal/modules/debt"
-	"github.com/sonbn-225/goen-api/internal/modules/diagnostics"
-	groupExpense "github.com/sonbn-225/goen-api/internal/modules/group_expense"
-	"github.com/sonbn-225/goen-api/internal/modules/investment"
-	"github.com/sonbn-225/goen-api/internal/modules/marketdata"
-	"github.com/sonbn-225/goen-api/internal/modules/public"
-	"github.com/sonbn-225/goen-api/internal/modules/report"
-	rotatingsavings "github.com/sonbn-225/goen-api/internal/modules/rotating_savings"
-	"github.com/sonbn-225/goen-api/internal/modules/savings"
-	"github.com/sonbn-225/goen-api/internal/modules/tag"
-	"github.com/sonbn-225/goen-api/internal/modules/transaction"
-	"github.com/sonbn-225/goen-api/internal/platform/httpx"
-	"github.com/sonbn-225/goen-api/internal/storage"
+	_ "github.com/sonbn-225/goen-api-v2/docs"
+	"github.com/sonbn-225/goen-api-v2/internal/core/config"
+	"github.com/sonbn-225/goen-api-v2/internal/core/httpx"
+	"github.com/sonbn-225/goen-api-v2/internal/core/response"
+	"github.com/sonbn-225/goen-api-v2/internal/core/security"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/account"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/auth"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/budget"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/category"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/contact"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/debt"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/investment"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/media"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/profile"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/report"
+	rotatingsavings "github.com/sonbn-225/goen-api-v2/internal/domains/rotating_savings"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/savings"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/setting"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/tag"
+	"github.com/sonbn-225/goen-api-v2/internal/domains/transaction"
+	"github.com/sonbn-225/goen-api-v2/internal/infra/objectstorage"
+	"github.com/sonbn-225/goen-api-v2/internal/infra/postgres"
+	repository "github.com/sonbn-225/goen-api-v2/internal/repository"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
-// App represents the application.
 type App struct {
 	Handler http.Handler
 	cleanup func(context.Context)
 }
 
-// Close gracefully shuts down the application.
 func (a *App) Close(ctx context.Context) {
 	if a == nil || a.cleanup == nil {
 		return
@@ -43,29 +46,26 @@ func (a *App) Close(ctx context.Context) {
 	a.cleanup(ctx)
 }
 
-// New creates a new App using the modular architecture.
 func New(cfg *config.Config) *App {
-	db := storage.NewPostgres(cfg.DatabaseURL)
-	redis := storage.NewRedis(cfg.RedisURL)
+	db, err := postgres.NewPool(cfg.DatabaseURL)
+	if err != nil {
+		panic(err)
+	}
 
-	// Repositories
-	accountRepo := storage.NewAccountRepo(db)
-	auditRepo := storage.NewAuditRepo(db)
-	txRepo := storage.NewTransactionRepo(db)
-	budgetRepo := storage.NewBudgetRepo(db)
-	categoryRepo := storage.NewCategoryRepo(db)
-	tagRepo := storage.NewTagRepo(db)
-	userRepo := storage.NewUserRepo(db)
-	savingsRepo := storage.NewSavingsRepo(db)
-	rotatingSavingsRepo := storage.NewRotatingSavingsRepo(db)
-	debtRepo := storage.NewDebtRepo(db)
-	investmentRepo := storage.NewInvestmentRepo(db)
-	contactRepo := storage.NewContactRepo(db)
-	groupExpenseRepo := storage.NewGroupExpenseRepo(db)
-	reportRepo := storage.NewReportRepo(db)
-
-	// Object storage (optional — gracefully degraded if not configured)
-	s3Client := storage.NewS3Client(storage.S3Config{
+	userRepo := repository.NewUserRepository(db)
+	accountRepo := repository.NewAccountRepository(db)
+	budgetRepo := repository.NewBudgetRepository(db)
+	categoryRepo := repository.NewCategoryRepository(db)
+	contactRepo := repository.NewContactRepository(db)
+	debtRepo := repository.NewDebtRepository(db)
+	investmentRepo := repository.NewInvestmentRepository(db)
+	reportRepo := repository.NewReportRepository(db)
+	rotatingSavingsRepo := repository.NewRotatingSavingsRepository(db)
+	savingsRepo := repository.NewSavingsRepository(db)
+	tagRepo := repository.NewTagRepository(db)
+	txRepo := repository.NewTransactionRepository(db)
+	hasher := security.NewPasswordHasher()
+	avatarStorage := objectstorage.NewSeaweedClient(objectstorage.Config{
 		Endpoint:      cfg.S3Endpoint,
 		AccessKey:     cfg.S3AccessKey,
 		SecretKey:     cfg.S3SecretKey,
@@ -74,173 +74,35 @@ func New(cfg *config.Config) *App {
 		PublicBaseURL: cfg.S3PublicBaseURL,
 	})
 
-	// Independent modules (no cross-module dependencies)
-	diagMod := diagnostics.NewModule(diagnostics.ModuleDeps{
-		Cfg:   cfg,
-		DB:    db,
-		Redis: redis,
+	authMod := auth.NewModule(auth.ModuleDeps{
+		UserRepo:         userRepo,
+		Hasher:           hasher,
+		Issuer:           security.NewTokenIssuer(cfg.JWTSecret, time.Duration(cfg.JWTAccessTTLMinutes)*time.Minute),
+		AccessTTLMinutes: cfg.JWTAccessTTLMinutes,
 	})
+	mediaMod := media.NewModule(media.ModuleDeps{Storage: newMediaStorageAdapter(avatarStorage)})
+	profileSvc := profile.NewService(userRepo, hasher, avatarStorage)
+	settingSvc := setting.NewService(userRepo)
+	profileMod := profile.NewModule(profile.ModuleDeps{Service: profileSvc})
+	settingMod := setting.NewModule(setting.ModuleDeps{Service: settingSvc})
 
-	authModule := authMod.NewModule(authMod.ModuleDeps{
-		UserRepo: userRepo,
-		Config:   cfg,
-		S3Client: s3Client,
-	})
+	accountMod := account.NewModule(account.ModuleDeps{Repo: accountRepo})
+	budgetMod := budget.NewModule(budget.ModuleDeps{Repo: budgetRepo, CategoryRepo: categoryRepo})
+	categoryMod := category.NewModule(category.ModuleDeps{Repo: categoryRepo})
+	contactMod := contact.NewModule(contact.ModuleDeps{Repo: contactRepo})
+	tagMod := tag.NewModule(tag.ModuleDeps{Repo: tagRepo})
+	txMod := transaction.NewModule(transaction.ModuleDeps{Repo: txRepo})
+	savingsMod := savings.NewModule(savings.ModuleDeps{Repo: savingsRepo, TxService: txMod.Service})
+	debtMod := debt.NewModule(debt.ModuleDeps{Repo: debtRepo, TxService: txMod.Service, ContactService: contactMod.Service})
+	investmentMod := investment.NewModule(investment.ModuleDeps{Repo: investmentRepo})
+	rotatingSavingsMod := rotatingsavings.NewModule(rotatingsavings.ModuleDeps{Repo: rotatingSavingsRepo, TxService: txMod.Service})
+	reportMod := report.NewModule(report.ModuleDeps{Repo: reportRepo})
 
-	categoryMod := category.NewModule(category.ModuleDeps{
-		Repo: categoryRepo,
-	})
-
-	tagMod := tag.NewModule(tag.ModuleDeps{
-		Repo: tagRepo,
-	})
-
-	contactMod := contact.NewModule(contact.ModuleDeps{
-		Repo: contactRepo,
-	})
-
-	// Transaction module
-	txMod := transaction.NewModule(transaction.ModuleDeps{
-		Repo:         txRepo,
-		CategoryRepo: categoryRepo,
-		AccountRepo:  accountRepo,
-		TagService:   tagMod.Service,
-	})
-
-	// Budget module (depends on category repo)
-	budgetMod := budget.NewModule(budget.ModuleDeps{
-		BudgetRepo:   budgetRepo,
-		CategoryRepo: categoryRepo,
-	})
-
-	// Account module (depends on audit)
-	auditSvc := &auditServiceAdapter{repo: auditRepo}
-	accountMod := account.NewModule(account.ModuleDeps{
-		AccountRepo:  accountRepo,
-		UserRepo:     userRepo,
-		AuditService: auditSvc,
-	})
-
-	// Savings module (depends on account and transaction services)
-	savingsMod := savings.NewModule(savings.ModuleDeps{
-		Repo:       savingsRepo,
-		AccountSvc: accountMod.Service,
-		TxSvc:      txMod.Service,
-	})
-
-	// Debt module (depends on transaction and contact services)
-	debtMod := debt.NewModule(debt.ModuleDeps{
-		Repo:       debtRepo,
-		TxSvc:      txMod.Service,
-		ContactSvc: contactMod.Service,
-	})
-
-	// Inject debt service into transaction service for group expense support
-	txMod.Service.SetDebtService(debtMod.Service)
-
-	// Group expense module (depends on transaction service and debt service for auto-debt creation)
-	groupExpenseMod := groupExpense.NewModule(groupExpense.ModuleDeps{
-		Repo:    groupExpenseRepo,
-		TxSvc:   txMod.Service,
-		DebtSvc: debtMod.Service,
-	})
-
-	// Rotating Savings module (depends on account repo and transaction service)
-	rotTxAdapter := &rotTxServiceAdapter{svc: txMod.Service}
-	rotMod := rotatingsavings.NewModule(rotatingsavings.ModuleDeps{
-		Repo:        rotatingSavingsRepo,
-		AccountRepo: accountRepo,
-		TxSvc:       rotTxAdapter,
-	})
-
-	// Investment module (depends on account and transaction services)
-	investAccountAdapter := &investmentAccountServiceAdapter{svc: accountMod.Service}
-	investMod := investment.NewModule(investment.ModuleDeps{
-		Repo:               investmentRepo,
-		Redis:              redis,
-		Config:             cfg,
-		AccountService:     investAccountAdapter,
-		TransactionService: txMod.Service,
-	})
-
-	// Market Data module (depends on investment service)
-	marketDataMod := marketdata.NewModule(marketdata.ModuleDeps{
-		Cfg:       cfg,
-		Redis:     redis,
-		Repo:      marketdata.NewPostgresRepo(db),
-		InvestSvc: investMod.Service,
-	})
-
-	// Report module
-	reportMod := report.NewModule(report.ModuleDeps{
-		ReportRepo:  reportRepo,
-		AccountRepo: accountRepo,
-	})
-
-	// Public module
-	publicMod := public.New(userRepo, accountRepo, groupExpenseRepo)
-
-	// Create router
-	h := newModularRouter(cfg, &modules{
-		diagnostics:     diagMod,
-		auth:            authModule,
-		account:         accountMod,
-		transaction:     txMod,
-		category:        categoryMod,
-		tag:             tagMod,
-		budget:          budgetMod,
-		savings:         savingsMod,
-		rotatingSavings: rotMod,
-		debt:            debtMod,
-		groupExpense:    groupExpenseMod,
-		investment:      investMod,
-		marketData:      marketDataMod,
-		report:          reportMod,
-		contact:         contactMod,
-		public:          publicMod,
-	})
-
-	return &App{
-		Handler: h,
-		cleanup: func(_ context.Context) {
-			if db != nil {
-				db.Close()
-			}
-			if redis != nil {
-				redis.Close()
-			}
-		},
-	}
-}
-
-// modules holds all application modules internally.
-type modules struct {
-	diagnostics     *diagnostics.Module
-	auth            *authMod.Module
-	account         *account.Module
-	transaction     *transaction.Module
-	category        *category.Module
-	tag             *tag.Module
-	budget          *budget.Module
-	savings         *savings.Module
-	rotatingSavings *rotatingsavings.Module
-	debt            *debt.Module
-	groupExpense    *groupExpense.Module
-	investment      *investment.Module
-	marketData      *marketdata.Module
-	report          *report.Module
-	contact         *contact.Module
-	public          *public.Module
-}
-
-func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(httpx.OptionalAuthMiddleware(cfg))
 	r.Use(httpx.RequestLogger())
-	r.Use(httpx.CORSMiddleware(cfg))
 	r.Use(middleware.Heartbeat("/healthz"))
 
 	r.Get("/swagger", func(w http.ResponseWriter, req *http.Request) {
@@ -249,62 +111,55 @@ func newModularRouter(cfg *config.Config, mods *modules) http.Handler {
 	r.Get("/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL("/swagger/doc.json"),
 	))
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
+			response.WriteData(w, http.StatusOK, map[string]string{"message": "ok"})
+		})
 
-	registerV1Routes := func(r chi.Router) {
-		// Diagnostics (no auth required)
-		mods.diagnostics.Handler.RegisterRoutes(r)
+		authMod.RegisterPublicRoutes(r)
+		r.Group(func(r chi.Router) {
+			r.Use(httpx.AuthMiddleware(cfg.JWTSecret))
+			authMod.RegisterProtectedRoutes(r)
+			mediaMod.RegisterRoutes(r)
+			profileMod.RegisterRoutes(r)
+			settingMod.RegisterRoutes(r)
+			accountMod.RegisterRoutes(r)
+			budgetMod.RegisterRoutes(r)
+			categoryMod.RegisterRoutes(r)
+			contactMod.RegisterRoutes(r)
+			debtMod.RegisterRoutes(r)
+			investmentMod.RegisterRoutes(r)
+			rotatingSavingsMod.RegisterRoutes(r)
+			savingsMod.RegisterRoutes(r)
+			reportMod.RegisterRoutes(r)
+			tagMod.RegisterRoutes(r)
+			txMod.RegisterRoutes(r)
+		})
+	})
 
-		// Public module (no auth required)
-		mods.public.RegisterRoutes(r)
-
-		// Auth - uses its own cfg-based middleware
-		mods.auth.Handler.RegisterRoutes(r, cfg)
-
-		// Others use auth middleware
-		authMiddleware := httpx.AuthMiddleware(cfg)
-
-		// Account
-		mods.account.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Transaction
-		mods.transaction.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Group Expense
-		mods.groupExpense.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Category
-		mods.category.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Tag
-		mods.tag.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Budget
-		mods.budget.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Savings
-		mods.savings.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Rotating Savings
-		mods.rotatingSavings.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Debt
-		mods.debt.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Investment
-		mods.investment.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Market Data
-		mods.marketData.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Report
-		mods.report.Handler.RegisterRoutes(r, authMiddleware)
-
-		// Contact
-		mods.contact.Handler.RegisterRoutes(r, authMiddleware)
+	return &App{
+		Handler: r,
+		cleanup: func(_ context.Context) {
+			db.Close()
+		},
 	}
+}
 
-	r.Route("/api/v1", registerV1Routes)
-	r.Route("/v1", registerV1Routes)
+type mediaStorageAdapter struct {
+	client *objectstorage.SeaweedClient
+}
 
-	return r
+func newMediaStorageAdapter(client *objectstorage.SeaweedClient) media.Storage {
+	if client == nil {
+		return nil
+	}
+	return mediaStorageAdapter{client: client}
+}
+
+func (a mediaStorageAdapter) GetObject(ctx context.Context, bucket, key string) (io.ReadCloser, media.ObjectInfo, error) {
+	obj, info, err := a.client.GetObject(ctx, bucket, key)
+	if err != nil {
+		return nil, media.ObjectInfo{}, err
+	}
+	return obj, media.ObjectInfo{ContentType: info.ContentType}, nil
 }

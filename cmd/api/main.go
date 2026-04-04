@@ -1,12 +1,3 @@
-// @title Goen API
-// @version 0.1
-// @description Goen REST API (MVP scaffold). Includes health checks and connectivity probes.
-// @BasePath /api/v1
-// @schemes http https
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
-// @description Type "Bearer {token}" to authenticate.
 package main
 
 import (
@@ -18,11 +9,18 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/sonbn-225/goen-api/docs"
-	"github.com/sonbn-225/goen-api/internal/app"
-	"github.com/sonbn-225/goen-api/internal/config"
-	"github.com/sonbn-225/goen-api/internal/storage"
+	"github.com/sonbn-225/goen-api-v2/internal/app"
+	"github.com/sonbn-225/goen-api-v2/internal/core/config"
+	"github.com/sonbn-225/goen-api-v2/internal/infra/postgres"
 )
+
+// @title goen-api-v2
+// @version 0.1.0
+// @description goen-api-v2 clean architecture backend API.
+// @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 
 func main() {
 	cfg, err := config.Load()
@@ -33,10 +31,10 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	slog.SetDefault(logger)
 
-	if cfg.MigrateOnStart {
+	if cfg.MigrateOnStart && cfg.DatabaseURL != "" {
 		logger.Info("running database migrations", "dir", cfg.MigrationDir)
-		if err := storage.RunMigrations(cfg.DatabaseURL, cfg.MigrationDir); err != nil {
-			logger.Error("failed to run migrations", "err", err)
+		if err := postgres.RunMigrations(cfg.DatabaseURL, cfg.MigrationDir); err != nil {
+			logger.Error("failed to run database migrations", "err", err)
 			os.Exit(1)
 		}
 		logger.Info("database migrations completed")

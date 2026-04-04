@@ -1,5 +1,34 @@
 basePath: /api/v1
 definitions:
+  account.Account:
+    properties:
+      account_number:
+        type: string
+      account_type:
+        type: string
+      balance:
+        $ref: '#/definitions/money.Amount'
+      closed_at:
+        type: string
+      color:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      parent_account_id:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
   account.CreateAccountRequest:
     properties:
       account_number:
@@ -14,6 +43,8 @@ definitions:
         type: string
       parent_account_id:
         type: string
+      type:
+        type: string
     type: object
   auth.AuthResponse:
     properties:
@@ -24,7 +55,21 @@ definitions:
       token_type:
         type: string
       user:
-        $ref: '#/definitions/domain.User'
+        $ref: '#/definitions/auth.User'
+    type: object
+  auth.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  auth.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
     type: object
   auth.SigninRequest:
     properties:
@@ -46,7 +91,29 @@ definitions:
       username:
         type: string
     type: object
-  budget.CreateRequest:
+  auth.User:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      phone:
+        type: string
+      settings:
+        additionalProperties: {}
+        type: object
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  budget.CreateBudgetRequest:
     properties:
       alert_threshold_percent:
         type: integer
@@ -98,7 +165,85 @@ definitions:
       user_id:
         type: string
     type: object
-  debt.CreateInstallmentRequest:
+  category.Category:
+    properties:
+      color:
+        type: string
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      icon:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      parent_category_id:
+        type: string
+      sort_order:
+        type: integer
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  contact.Contact:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      linked_avatar_url:
+        type: string
+      linked_display_name:
+        type: string
+      linked_user_id:
+        type: string
+      name:
+        type: string
+      notes:
+        type: string
+      phone:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  contact.CreateContactRequest:
+    properties:
+      avatar_url:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      notes:
+        type: string
+      phone:
+        type: string
+    type: object
+  contact.PatchContactRequest:
+    properties:
+      avatar_url:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      notes:
+        type: string
+      phone:
+        type: string
+    type: object
+  debt.CreateDebtInstallmentRequest:
     properties:
       amount_due:
         type: string
@@ -111,7 +256,7 @@ definitions:
       status:
         type: string
     type: object
-  debt.CreatePaymentRequest:
+  debt.CreateDebtPaymentRequest:
     properties:
       interest_paid:
         type: string
@@ -120,7 +265,7 @@ definitions:
       transaction_id:
         type: string
     type: object
-  debt.CreateRequest:
+  debt.CreateDebtRequest:
     properties:
       account_id:
         type: string
@@ -145,118 +290,7 @@ definitions:
       status:
         type: string
     type: object
-  diagnostics.ConnectivityItem:
-    properties:
-      details:
-        additionalProperties: {}
-        type: object
-      error:
-        type: string
-      ok:
-        type: boolean
-    type: object
-  diagnostics.ConnectivityResponse:
-    properties:
-      postgres:
-        $ref: '#/definitions/diagnostics.ConnectivityItem'
-      redis:
-        $ref: '#/definitions/diagnostics.ConnectivityItem'
-    type: object
-  diagnostics.HealthResponse:
-    properties:
-      checks:
-        additionalProperties:
-          type: string
-        type: object
-      status:
-        type: string
-    type: object
-  diagnostics.PingResponse:
-    properties:
-      env:
-        type: string
-      request_id:
-        type: string
-      service:
-        type: string
-      time:
-        type: string
-    type: object
-  domain.Account:
-    properties:
-      account_number:
-        type: string
-      account_type:
-        type: string
-      client_id:
-        type: string
-      closed_at:
-        type: string
-      color:
-        type: string
-      created_at:
-        type: string
-      created_by:
-        type: string
-      currency:
-        type: string
-      deleted_at:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
-      parent_account_id:
-        type: string
-      status:
-        type: string
-      updated_at:
-        type: string
-      updated_by:
-        type: string
-    type: object
-  domain.AccountBalance:
-    properties:
-      account_id:
-        type: string
-      balance:
-        type: string
-      currency:
-        type: string
-    type: object
-  domain.AccountPatch:
-    properties:
-      color:
-        type: string
-      name:
-        type: string
-      status:
-        type: string
-    type: object
-  domain.Category:
-    properties:
-      color:
-        type: string
-      created_at:
-        type: string
-      deleted_at:
-        type: string
-      icon:
-        type: string
-      id:
-        type: string
-      is_active:
-        type: boolean
-      parent_category_id:
-        type: string
-      sort_order:
-        type: integer
-      type:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  domain.Debt:
+  debt.Debt:
     properties:
       account_id:
         type: string
@@ -301,7 +335,7 @@ definitions:
       user_id:
         type: string
     type: object
-  domain.DebtInstallment:
+  debt.DebtInstallment:
     properties:
       amount_due:
         type: string
@@ -318,7 +352,7 @@ definitions:
       status:
         type: string
     type: object
-  domain.DebtPaymentLink:
+  debt.DebtPaymentLink:
     properties:
       created_at:
         type: string
@@ -333,7 +367,390 @@ definitions:
       transaction_id:
         type: string
     type: object
-  domain.RotatingSavingsContribution:
+  investment.CreateTradeRequest:
+    properties:
+      client_id:
+        type: string
+      fee_transaction_id:
+        type: string
+      fees:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      price:
+        type: string
+      quantity:
+        type: string
+      security_id:
+        type: string
+      side:
+        type: string
+      tax_transaction_id:
+        type: string
+      taxes:
+        type: string
+    type: object
+  investment.Holding:
+    properties:
+      as_of:
+        type: string
+      avg_cost:
+        type: string
+      broker_account_id:
+        type: string
+      cost_basis_total:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      market_price:
+        type: string
+      market_value:
+        type: string
+      quantity:
+        type: string
+      security_id:
+        type: string
+      source_of_truth:
+        type: string
+      unrealized_pnl:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  investment.InvestmentAccount:
+    properties:
+      account_id:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      fee_settings: {}
+      id:
+        type: string
+      tax_settings: {}
+      updated_at:
+        type: string
+    type: object
+  investment.PatchInvestmentAccountRequest:
+    properties:
+      fee_settings: {}
+      tax_settings: {}
+    type: object
+  investment.Security:
+    properties:
+      asset_class:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      symbol:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  investment.SecurityEvent:
+    properties:
+      cash_amount_per_share:
+        type: string
+      created_at:
+        type: string
+      currency:
+        type: string
+      effective_date:
+        type: string
+      event_type:
+        type: string
+      ex_date:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      pay_date:
+        type: string
+      ratio_denominator:
+        type: string
+      ratio_numerator:
+        type: string
+      record_date:
+        type: string
+      security_id:
+        type: string
+      subscription_price:
+        type: string
+      updated_at:
+        type: string
+      vnstock_event_id:
+        type: string
+    type: object
+  investment.SecurityPriceDaily:
+    properties:
+      close:
+        type: string
+      created_at:
+        type: string
+      high:
+        type: string
+      id:
+        type: string
+      low:
+        type: string
+      open:
+        type: string
+      price_date:
+        type: string
+      security_id:
+        type: string
+      updated_at:
+        type: string
+      volume:
+        type: string
+    type: object
+  investment.Trade:
+    properties:
+      broker_account_id:
+        type: string
+      client_id:
+        type: string
+      created_at:
+        type: string
+      fee_transaction_id:
+        type: string
+      fees:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      price:
+        type: string
+      quantity:
+        type: string
+      security_id:
+        type: string
+      side:
+        type: string
+      tax_transaction_id:
+        type: string
+      taxes:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  money.Amount:
+    properties:
+      decimal.Decimal:
+        type: number
+    type: object
+  profile.ChangePasswordRequest:
+    properties:
+      current_password:
+        type: string
+      new_password:
+        type: string
+    type: object
+  profile.ChangePasswordResult:
+    properties:
+      success:
+        type: boolean
+    type: object
+  profile.PatchProfileRequest:
+    properties:
+      display_name:
+        type: string
+      email:
+        type: string
+      phone:
+        type: string
+      username:
+        type: string
+    type: object
+  report.AccountBalance:
+    properties:
+      account_id:
+        type: string
+      balance:
+        type: string
+      currency:
+        type: string
+    type: object
+  report.CashflowStat:
+    properties:
+      expense:
+        type: string
+      income:
+        type: string
+      month:
+        type: string
+    type: object
+  report.CategoryExpenseStat:
+    properties:
+      amount:
+        type: string
+      category_id:
+        type: string
+    type: object
+  report.DashboardReport:
+    properties:
+      cashflow_6_months:
+        items:
+          $ref: '#/definitions/report.CashflowStat'
+        type: array
+      top_expenses_month:
+        items:
+          $ref: '#/definitions/report.CategoryExpenseStat'
+        type: array
+      total_balances:
+        items:
+          $ref: '#/definitions/report.AccountBalance'
+        type: array
+    type: object
+  response.APIError:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  response.Envelope:
+    properties:
+      data: {}
+      meta:
+        $ref: '#/definitions/response.Meta'
+    type: object
+  response.ErrorEnvelope:
+    properties:
+      error:
+        $ref: '#/definitions/response.APIError'
+    type: object
+  response.Meta:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  rotatingsavings.CreateContributionRequest:
+    properties:
+      account_id:
+        type: string
+      amount: {}
+      collected_fee_per_slot: {}
+      cycle_no:
+        type: integer
+      due_date:
+        type: string
+      kind:
+        type: string
+      note:
+        type: string
+      occurred_date:
+        type: string
+      occurred_time:
+        type: string
+      slots_taken:
+        type: integer
+    type: object
+  rotatingsavings.CreateGroupRequest:
+    properties:
+      account_id:
+        type: string
+      contribution_amount: {}
+      cycle_frequency:
+        type: string
+      fixed_interest_amount: {}
+      member_count:
+        type: integer
+      name:
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+      user_slots:
+        type: integer
+    type: object
+  rotatingsavings.GroupDetailResponse:
+    properties:
+      audit_logs:
+        items:
+          $ref: '#/definitions/rotatingsavings.RotatingSavingsAuditLog'
+        type: array
+      collected_slots_count:
+        type: integer
+      contributions:
+        items:
+          $ref: '#/definitions/rotatingsavings.RotatingSavingsContribution'
+        type: array
+      current_accrued_interest:
+        type: number
+      current_payout_value:
+        type: number
+      group:
+        $ref: '#/definitions/rotatingsavings.RotatingSavingsGroup'
+      next_payment:
+        type: number
+      remaining_amount:
+        type: number
+      schedule:
+        items:
+          $ref: '#/definitions/rotatingsavings.ScheduleCycle'
+        type: array
+      total_paid:
+        type: number
+      total_received:
+        type: number
+    type: object
+  rotatingsavings.GroupSummary:
+    properties:
+      completed_cycles:
+        type: integer
+      group:
+        $ref: '#/definitions/rotatingsavings.RotatingSavingsGroup'
+      next_due_date:
+        type: string
+      remaining_amount:
+        type: number
+      total_cycles:
+        type: integer
+      total_paid:
+        type: number
+      total_received:
+        type: number
+    type: object
+  rotatingsavings.RotatingSavingsAuditLog:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      details:
+        additionalProperties: {}
+        type: object
+      group_id:
+        type: string
+      id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  rotatingsavings.RotatingSavingsContribution:
     properties:
       amount:
         type: number
@@ -360,7 +777,7 @@ definitions:
       transaction_id:
         type: string
     type: object
-  domain.RotatingSavingsGroup:
+  rotatingsavings.RotatingSavingsGroup:
     properties:
       account_id:
         type: string
@@ -393,7 +810,93 @@ definitions:
       user_slots:
         type: integer
     type: object
-  domain.SavingsInstrument:
+  rotatingsavings.ScheduleCycle:
+    properties:
+      accrued_interest:
+        type: number
+      contribution_id:
+        type: string
+      cycle_no:
+        type: integer
+      due_date:
+        type: string
+      expected_amount:
+        type: number
+      is_paid:
+        type: boolean
+      is_payout:
+        type: boolean
+      kind:
+        type: string
+      payout_amount:
+        type: number
+      payout_id:
+        type: string
+      payout_slots:
+        type: integer
+      user_collected_slots:
+        type: integer
+    type: object
+  rotatingsavings.UpdateGroupRequest:
+    properties:
+      account_id:
+        type: string
+      contribution_amount:
+        type: number
+      fixed_interest_amount:
+        type: number
+      name:
+        type: string
+      payout_cycle_no:
+        type: integer
+      status:
+        type: string
+    type: object
+  savings.CreateSavingsInstrumentRequest:
+    properties:
+      accrued_interest:
+        type: string
+      auto_renew:
+        type: boolean
+      interest_rate:
+        type: string
+      maturity_date:
+        type: string
+      name:
+        type: string
+      parent_account_id:
+        type: string
+      principal:
+        type: string
+      savings_account_id:
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+      term_months:
+        type: integer
+    type: object
+  savings.PatchSavingsInstrumentRequest:
+    properties:
+      accrued_interest:
+        type: string
+      auto_renew:
+        type: boolean
+      interest_rate:
+        type: string
+      maturity_date:
+        type: string
+      principal:
+        type: string
+      start_date:
+        type: string
+      status:
+        type: string
+      term_months:
+        type: integer
+    type: object
+  savings.SavingsInstrument:
     properties:
       accrued_interest:
         type: string
@@ -424,7 +927,41 @@ definitions:
       updated_at:
         type: string
     type: object
-  domain.Tag:
+  setting.PatchSettingsRequest:
+    additionalProperties: {}
+    type: object
+  setting.UserResponse:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      phone:
+        type: string
+      settings:
+        additionalProperties: {}
+        type: object
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  tag.CreateTagRequest:
+    properties:
+      color:
+        type: string
+      name_en:
+        type: string
+      name_vi:
+        type: string
+    type: object
+  tag.Tag:
     properties:
       color:
         type: string
@@ -441,346 +978,6 @@ definitions:
       user_id:
         type: string
     type: object
-  domain.Transaction:
-    properties:
-      account_currency:
-        description: Currencies are derived from linked accounts (not stored on transactions).
-        type: string
-      account_id:
-        type: string
-      amount:
-        type: string
-      category_ids:
-        items:
-          type: string
-        type: array
-      client_id:
-        type: string
-      created_at:
-        type: string
-      created_by:
-        type: string
-      deleted_at:
-        type: string
-      description:
-        type: string
-      exchange_rate:
-        type: string
-      external_ref:
-        type: string
-      from_account_id:
-        type: string
-      from_amount:
-        description: For FX transfers, amounts can differ per side.
-        type: string
-      from_currency:
-        type: string
-      id:
-        type: string
-      line_items:
-        items:
-          $ref: '#/definitions/domain.TransactionLineItem'
-        type: array
-      occurred_at:
-        type: string
-      occurred_date:
-        type: string
-      status:
-        type: string
-      tag_ids:
-        items:
-          type: string
-        type: array
-      to_account_id:
-        type: string
-      to_amount:
-        type: string
-      to_currency:
-        type: string
-      type:
-        type: string
-      updated_at:
-        type: string
-      updated_by:
-        type: string
-    type: object
-  domain.TransactionLineItem:
-    properties:
-      amount:
-        type: string
-      category_id:
-        type: string
-      id:
-        type: string
-      note:
-        type: string
-      tag_ids:
-        items:
-          type: string
-        type: array
-    type: object
-  domain.User:
-    properties:
-      avatar_url:
-        type: string
-      created_at:
-        type: string
-      display_name:
-        type: string
-      email:
-        type: string
-      id:
-        type: string
-      phone:
-        type: string
-      public_share_url:
-        type: string
-      settings: {}
-      status:
-        type: string
-      updated_at:
-        type: string
-      username:
-        type: string
-    type: object
-  marketdata.GlobalStatus:
-    properties:
-      market_sync:
-        $ref: '#/definitions/marketdata.SyncState'
-      rate_limit:
-        $ref: '#/definitions/marketdata.RateLimit'
-    type: object
-  marketdata.RateLimit:
-    properties:
-      hour_reset_in_seconds:
-        type: number
-      minute_reset_in_seconds:
-        type: number
-      per_hour:
-        type: integer
-      per_minute:
-        type: integer
-      remaining_hour:
-        type: integer
-      remaining_minute:
-        type: integer
-      used_hour:
-        type: integer
-      used_minute:
-        type: integer
-    type: object
-  marketdata.RefreshManyResponse:
-    properties:
-      enqueued:
-        type: integer
-      message_ids:
-        items:
-          type: string
-        type: array
-      not_found_symbols:
-        items:
-          type: string
-        type: array
-      stream:
-        type: string
-    type: object
-  marketdata.RefreshOneResponse:
-    properties:
-      message_id:
-        type: string
-      stream:
-        type: string
-    type: object
-  marketdata.SecurityStatus:
-    properties:
-      prices_daily:
-        $ref: '#/definitions/marketdata.SyncState'
-      rate_limit:
-        $ref: '#/definitions/marketdata.RateLimit'
-      security_events:
-        $ref: '#/definitions/marketdata.SyncState'
-      security_id:
-        type: string
-    type: object
-  marketdata.SyncState:
-    properties:
-      cooldown_seconds:
-        type: integer
-      last_error:
-        type: string
-      last_failure_at:
-        type: string
-      last_started_at:
-        type: string
-      last_status:
-        type: string
-      last_success_at:
-        type: string
-      min_interval_seconds:
-        type: integer
-      next_due_at:
-        type: string
-      sync_key:
-        type: string
-    type: object
-  marketdata.SyncSymbolsRequest:
-    properties:
-      force:
-        type: boolean
-      include_events:
-        type: boolean
-      include_prices:
-        type: boolean
-      symbols:
-        items:
-          type: string
-        type: array
-    type: object
-  response.Envelope:
-    properties:
-      message:
-        type: string
-    type: object
-  response.ErrorBody:
-    properties:
-      code:
-        type: string
-      details:
-        additionalProperties: {}
-        type: object
-      message:
-        type: string
-    type: object
-  response.ErrorEnvelope:
-    properties:
-      error:
-        $ref: '#/definitions/response.ErrorBody'
-    type: object
-  rotatingsavings.CreateContributionRequest:
-    properties:
-      account_id:
-        type: string
-      amount:
-        type: string
-      collected_fee_per_slot:
-        type: number
-      cycle_no:
-        type: integer
-      due_date:
-        type: string
-      kind:
-        type: string
-      note:
-        type: string
-      occurred_date:
-        type: string
-      occurred_time:
-        type: string
-      slots_taken:
-        type: integer
-    type: object
-  rotatingsavings.CreateGroupRequest:
-    properties:
-      account_id:
-        type: string
-      contribution_amount:
-        type: number
-      cycle_frequency:
-        type: string
-      fixed_interest_amount:
-        type: number
-      member_count:
-        type: integer
-      name:
-        type: string
-      start_date:
-        type: string
-      status:
-        type: string
-      user_slots:
-        type: integer
-    type: object
-  rotatingsavings.GroupSummary:
-    properties:
-      completed_cycles:
-        type: integer
-      group:
-        $ref: '#/definitions/domain.RotatingSavingsGroup'
-      next_due_date:
-        type: string
-      remaining_amount:
-        type: number
-      total_cycles:
-        type: integer
-      total_paid:
-        type: number
-      total_received:
-        type: number
-    type: object
-  savings.CreateRequest:
-    properties:
-      accrued_interest:
-        type: string
-      auto_renew:
-        type: boolean
-      interest_rate:
-        type: string
-      maturity_date:
-        type: string
-      name:
-        type: string
-      parent_account_id:
-        type: string
-      principal:
-        type: string
-      savings_account_id:
-        type: string
-      start_date:
-        type: string
-      status:
-        type: string
-      term_months:
-        type: integer
-    type: object
-  savings.PatchRequest:
-    properties:
-      accrued_interest:
-        type: string
-      auto_renew:
-        type: boolean
-      interest_rate:
-        type: string
-      maturity_date:
-        type: string
-      principal:
-        type: string
-      start_date:
-        type: string
-      status:
-        type: string
-      term_months:
-        type: integer
-    type: object
-  tag.CreateTagRequest:
-    properties:
-      color:
-        type: string
-      name_en:
-        type: string
-      name_vi:
-        type: string
-    type: object
-  transaction.BatchPatchBody:
-    properties:
-      mode:
-        type: string
-      patch:
-        $ref: '#/definitions/transaction.PatchRequest'
-      transaction_ids:
-        items:
-          type: string
-        type: array
-    type: object
   transaction.BatchPatchResult:
     properties:
       failed_count:
@@ -789,8 +986,6 @@ definitions:
         items:
           type: string
         type: array
-      mode:
-        type: string
       updated_count:
         type: integer
       updated_ids:
@@ -798,155 +993,198 @@ definitions:
           type: string
         type: array
     type: object
-  transaction.CreateBody:
+  transaction.BatchPatchTransactionsData:
+    properties:
+      status:
+        type: string
+    type: object
+  transaction.BatchPatchTransactionsRequest:
+    properties:
+      patch:
+        $ref: '#/definitions/transaction.BatchPatchTransactionsData'
+      transaction_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  transaction.CreateGroupExpenseParticipantRequest:
+    properties:
+      original_amount:
+        $ref: '#/definitions/money.Amount'
+      participant_name:
+        type: string
+      share_amount:
+        $ref: '#/definitions/money.Amount'
+    type: object
+  transaction.CreateTransactionLineItemRequest:
+    properties:
+      amount:
+        $ref: '#/definitions/money.Amount'
+      category_id:
+        type: string
+      note:
+        type: string
+      tag_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  transaction.CreateTransactionRequest:
     properties:
       account_id:
         type: string
       amount:
+        $ref: '#/definitions/money.Amount'
+      from_account_id:
         type: string
-      category_id:
+      group_participants:
+        items:
+          $ref: '#/definitions/transaction.CreateGroupExpenseParticipantRequest'
+        type: array
+      line_items:
+        items:
+          $ref: '#/definitions/transaction.CreateTransactionLineItemRequest'
+        type: array
+      note:
         type: string
-      client_id:
+      owner_original_amount:
+        $ref: '#/definitions/money.Amount'
+      to_account_id:
         type: string
-      description:
+      type:
         type: string
-      exchange_rate:
+    type: object
+  transaction.GroupExpenseParticipant:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      is_settled:
+        type: boolean
+      original_amount:
+        type: string
+      participant_name:
+        type: string
+      settlement_transaction_id:
+        type: string
+      share_amount:
+        type: string
+      transaction_id:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  transaction.Transaction:
+    properties:
+      account_id:
+        type: string
+      amount:
+        $ref: '#/definitions/money.Amount'
+      created_at:
         type: string
       external_ref:
         type: string
       from_account_id:
         type: string
-      from_amount:
-        type: string
-      group_participants:
-        items:
-          $ref: '#/definitions/transaction.GroupParticipantInput'
-        type: array
-      lang:
+      id:
         type: string
       line_items:
         items:
-          $ref: '#/definitions/transaction.CreateLineItemRequest'
+          $ref: '#/definitions/transaction.TransactionLineItem'
         type: array
-      occurred_at:
-        type: string
-      occurred_date:
-        type: string
-      occurred_time:
-        type: string
-      owner_original_amount:
-        type: string
-      tag_ids:
-        items:
-          type: string
-        type: array
-      to_account_id:
-        type: string
-      to_amount:
-        type: string
-      type:
-        type: string
-    type: object
-  transaction.CreateLineItemRequest:
-    properties:
-      amount:
-        type: string
-      category_id:
-        type: string
       note:
         type: string
-      tag_ids:
-        items:
-          type: string
-        type: array
-    type: object
-  transaction.GroupParticipantInput:
-    properties:
-      original_amount:
-        type: string
-      participant_name:
-        type: string
-      share_amount:
-        type: string
-    type: object
-  transaction.LineItemInput:
-    properties:
-      amount:
-        type: string
-      category_id:
-        type: string
-      note:
-        type: string
-      tag_ids:
-        items:
-          type: string
-        type: array
-    type: object
-  transaction.ListResponse:
-    properties:
-      data:
-        items:
-          $ref: '#/definitions/domain.Transaction'
-        type: array
-      limit:
-        type: integer
-      next_cursor:
-        type: string
-      page:
-        type: integer
-      total:
-        type: integer
-      total_pages:
-        type: integer
-    type: object
-  transaction.PatchRequest:
-    properties:
-      amount:
-        type: string
-      category_ids:
-        items:
-          type: string
-        type: array
-      description:
-        type: string
-      group_participants:
-        items:
-          $ref: '#/definitions/transaction.GroupParticipantInput'
-        type: array
-      lang:
-        type: string
-      line_items:
-        items:
-          $ref: '#/definitions/transaction.LineItemInput'
-        type: array
       occurred_at:
         type: string
       status:
         type: string
+      to_account_id:
+        type: string
+      type:
+        type: string
+      user_id:
+        type: string
+    type: object
+  transaction.TransactionLineItem:
+    properties:
+      amount:
+        type: string
+      category_id:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
       tag_ids:
         items:
           type: string
         type: array
     type: object
+  transaction.UpdateGroupExpenseParticipantRequest:
+    properties:
+      original_amount:
+        $ref: '#/definitions/money.Amount'
+      participant_name:
+        type: string
+      share_amount:
+        $ref: '#/definitions/money.Amount'
+    type: object
+  transaction.UpdateTransactionLineItemRequest:
+    properties:
+      amount:
+        $ref: '#/definitions/money.Amount'
+      category_id:
+        type: string
+      note:
+        type: string
+      tag_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  transaction.UpdateTransactionRequest:
+    properties:
+      group_participants:
+        items:
+          $ref: '#/definitions/transaction.UpdateGroupExpenseParticipantRequest'
+        type: array
+      line_items:
+        items:
+          $ref: '#/definitions/transaction.UpdateTransactionLineItemRequest'
+        type: array
+      note:
+        type: string
+    type: object
 info:
   contact: {}
-  description: Goen REST API (MVP scaffold). Includes health checks and connectivity
-    probes.
-  title: Goen API
-  version: "0.1"
+  description: goen-api-v2 clean architecture backend API.
+  title: goen-api-v2
+  version: 0.1.0
 paths:
   /accounts:
     get:
-      description: List accounts that the current user can access.
+      consumes:
+      - application/json
+      description: List accounts for current authenticated user.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/domain.Account'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/account.Account'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -955,27 +1193,34 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List accounts
+      security:
+      - BearerAuth: []
+      summary: List Accounts
       tags:
       - accounts
     post:
       consumes:
       - application/json
-      description: Create a new financial account for the current user.
+      description: Create a new account for the current authenticated user.
       parameters:
       - description: Create account request
         in: body
-        name: body
+        name: request
         required: true
         schema:
           $ref: '#/definitions/account.CreateAccountRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
-            $ref: '#/definitions/domain.Account'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/account.Account'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -988,11 +1233,15 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Create account
+      security:
+      - BearerAuth: []
+      summary: Create Account
       tags:
       - accounts
   /accounts/{accountId}:
     delete:
+      consumes:
+      - application/json
       description: Soft-delete an account (owner-only).
       parameters:
       - description: Account ID
@@ -1000,81 +1249,13 @@ paths:
         name: accountId
         required: true
         type: string
+      produces:
+      - application/json
       responses:
         "204":
           description: No Content
-        "401":
-          description: Unauthorized
           schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Delete account
-      tags:
-      - accounts
-    get:
-      description: Get a single account (must be accessible to current user).
-      parameters:
-      - description: Account ID
-        in: path
-        name: accountId
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.Account'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Get account
-      tags:
-      - accounts
-    patch:
-      consumes:
-      - application/json
-      description: Update an account (owner-only).
-      parameters:
-      - description: Account ID
-        in: path
-        name: accountId
-        required: true
-        type: string
-      - description: Account patch
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/domain.AccountPatch'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.Account'
+            type: string
         "400":
           description: Bad Request
           schema:
@@ -1095,71 +1276,33 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Patch account
+      security:
+      - BearerAuth: []
+      summary: Delete Account
       tags:
       - accounts
-  /accounts/balances:
     get:
-      description: List computed balances per account for the current user.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/domain.AccountBalance'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List account balances
-      tags:
-      - accounts
-  /auth/me:
-    get:
-      description: Get current logged in user information.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.User'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Get current user
-      tags:
-      - auth
-  /auth/me/avatar:
-    post:
       consumes:
-      - multipart/form-data
-      description: Upload a profile image (multipart/form-data, field "avatar").
+      - application/json
+      description: Get account details by account id for current authenticated user.
       parameters:
-      - description: Image file
-        in: formData
-        name: avatar
+      - description: Account ID
+        in: path
+        name: accountId
         required: true
-        type: file
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.User'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/account.Account'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1168,74 +1311,43 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-        "503":
-          description: Service Unavailable
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Upload profile avatar
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get Account
       tags:
-      - auth
-  /auth/me/change-password:
+      - accounts
+  /auth/login:
     post:
       consumes:
       - application/json
+      description: Legacy login endpoint for backward compatibility.
       parameters:
-      - description: Password change request
+      - description: Login request
         in: body
-        name: body
+        name: request
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/auth.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Envelope'
-      summary: Change password
-      tags:
-      - auth
-  /auth/me/profile:
-    patch:
-      consumes:
-      - application/json
-      parameters:
-      - description: Profile patch (display_name, email, phone, username)
-        in: body
-        name: body
-        required: true
-        schema:
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.User'
-      summary: Update profile (name, email, phone)
-      tags:
-      - auth
-  /auth/me/settings:
-    patch:
-      consumes:
-      - application/json
-      description: Merge-patch current user's settings.
-      parameters:
-      - description: Settings patch
-        in: body
-        name: body
-        required: true
-        schema:
-          type: object
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.User'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.AuthResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1248,21 +1360,26 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Update current user settings
+      summary: Login (legacy)
       tags:
       - auth
   /auth/refresh:
     post:
       consumes:
       - application/json
-      description: Issue a new access token for the current authenticated user.
+      description: Refresh access token for current authenticated user.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/auth.AuthResponse'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.AuthResponse'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1271,18 +1388,59 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Refresh access token
+      security:
+      - BearerAuth: []
+      summary: Refresh Access Token
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Legacy register endpoint for backward compatibility.
+      parameters:
+      - description: Register request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      summary: Register (legacy)
       tags:
       - auth
   /auth/signin:
     post:
       consumes:
       - application/json
-      description: Sign in with email/phone and password.
+      description: Authenticate by email/phone/username and return access token.
       parameters:
       - description: Signin request
         in: body
-        name: body
+        name: request
         required: true
         schema:
           $ref: '#/definitions/auth.SigninRequest'
@@ -1292,7 +1450,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/auth.AuthResponse'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.AuthResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1312,11 +1475,11 @@ paths:
     post:
       consumes:
       - application/json
-      description: Create a new user account (email or phone required).
+      description: Create a new user and return access token.
       parameters:
       - description: Signup request
         in: body
-        name: body
+        name: request
         required: true
         schema:
           $ref: '#/definitions/auth.SignupRequest'
@@ -1326,7 +1489,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/auth.AuthResponse'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.AuthResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1344,16 +1512,25 @@ paths:
       - auth
   /budgets:
     get:
-      description: List budgets owned by current user.
+      consumes:
+      - application/json
+      description: List budgets for current authenticated user.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/budget.WithStats'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/budget.WithStats'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1362,27 +1539,34 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List budgets
+      security:
+      - BearerAuth: []
+      summary: List Budgets
       tags:
       - budgets
     post:
       consumes:
       - application/json
-      description: Create a new budget.
+      description: Create a new budget for current authenticated user.
       parameters:
       - description: Create budget request
         in: body
-        name: body
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/budget.CreateRequest'
+          $ref: '#/definitions/budget.CreateBudgetRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
-            $ref: '#/definitions/budget.WithStats'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/budget.WithStats'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1395,12 +1579,16 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Create budget
+      security:
+      - BearerAuth: []
+      summary: Create Budget
       tags:
       - budgets
   /budgets/{budgetId}:
     get:
-      description: Get a single budget.
+      consumes:
+      - application/json
+      description: Get budget details by budget id for current authenticated user.
       parameters:
       - description: Budget ID
         in: path
@@ -1413,7 +1601,16 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/budget.WithStats'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/budget.WithStats'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
@@ -1426,13 +1623,16 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Get budget
+      security:
+      - BearerAuth: []
+      summary: Get Budget
       tags:
       - budgets
   /categories:
     get:
-      description: List categories accessible to current user. Optionally filter by
-        transaction type.
+      consumes:
+      - application/json
+      description: List categories accessible to the current authenticated user.
       parameters:
       - description: Filter by transaction type (income, expense, both)
         in: query
@@ -1444,109 +1644,16 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/domain.Category'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List categories
-      tags:
-      - categories
-  /categories/{categoryId}:
-    get:
-      description: Get a single category.
-      parameters:
-      - description: Category ID
-        in: path
-        name: categoryId
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.Category'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Get category
-      tags:
-      - categories
-  /connectivity:
-    get:
-      description: Probes Postgres and Redis and returns diagnostic info.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/diagnostics.ConnectivityResponse'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/diagnostics.ConnectivityResponse'
-      summary: Connectivity probe
-      tags:
-      - meta
-  /debts:
-    get:
-      description: List debts owned by current user.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/domain.Debt'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List debts
-      tags:
-      - debts
-    post:
-      consumes:
-      - application/json
-      description: Create a new debt.
-      parameters:
-      - description: Create debt request
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/debt.CreateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.Debt'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/category.Category'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1559,16 +1666,20 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Create debt
+      security:
+      - BearerAuth: []
+      summary: List Categories
       tags:
-      - debts
-  /debts/{debtId}:
+      - categories
+  /categories/{categoryId}:
     get:
-      description: Get a single debt.
+      consumes:
+      - application/json
+      description: Get category details by category id for current authenticated user.
       parameters:
-      - description: Debt ID
+      - description: Category ID
         in: path
-        name: debtId
+        name: categoryId
         required: true
         type: string
       produces:
@@ -1577,7 +1688,16 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.Debt'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/category.Category'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
@@ -1590,11 +1710,344 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Get debt
+      security:
+      - BearerAuth: []
+      summary: Get Category
+      tags:
+      - categories
+  /contacts:
+    get:
+      consumes:
+      - application/json
+      description: List contacts for current authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/contact.Contact'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List Contacts
+      tags:
+      - contacts
+    post:
+      consumes:
+      - application/json
+      description: Create a new contact for current authenticated user.
+      parameters:
+      - description: Create contact request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/contact.CreateContactRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/contact.Contact'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Create Contact
+      tags:
+      - contacts
+  /contacts/{contactId}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a contact by contact id.
+      parameters:
+      - description: Contact ID
+        in: path
+        name: contactId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Delete Contact
+      tags:
+      - contacts
+    get:
+      consumes:
+      - application/json
+      description: Get contact details by contact id for current authenticated user.
+      parameters:
+      - description: Contact ID
+        in: path
+        name: contactId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/contact.Contact'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get Contact
+      tags:
+      - contacts
+    patch:
+      consumes:
+      - application/json
+      description: Partially update contact details.
+      parameters:
+      - description: Contact ID
+        in: path
+        name: contactId
+        required: true
+        type: string
+      - description: Patch contact request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/contact.PatchContactRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/contact.Contact'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Update Contact
+      tags:
+      - contacts
+  /debts:
+    get:
+      consumes:
+      - application/json
+      description: List debts for current authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/debt.Debt'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List Debts
+      tags:
+      - debts
+    post:
+      consumes:
+      - application/json
+      description: Create a new debt for current authenticated user.
+      parameters:
+      - description: Create debt request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/debt.CreateDebtRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/debt.Debt'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Create Debt
+      tags:
+      - debts
+  /debts/{debtId}:
+    get:
+      consumes:
+      - application/json
+      description: Get debt details by debt id for current authenticated user.
+      parameters:
+      - description: Debt ID
+        in: path
+        name: debtId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/debt.Debt'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get Debt
       tags:
       - debts
   /debts/{debtId}/installments:
     get:
+      consumes:
+      - application/json
       description: List installment schedule for a debt.
       parameters:
       - description: Debt ID
@@ -1608,47 +2061,16 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/domain.DebtInstallment'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List debt installments
-      tags:
-      - debts
-    post:
-      consumes:
-      - application/json
-      description: Create a single installment schedule row for a debt.
-      parameters:
-      - description: Debt ID
-        in: path
-        name: debtId
-        required: true
-        type: string
-      - description: Create debt installment request
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/debt.CreateInstallmentRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/domain.DebtInstallment'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/debt.DebtInstallment'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1665,11 +2087,64 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Create debt installment
+      security:
+      - BearerAuth: []
+      summary: List Debt Installments
+      tags:
+      - debts
+    post:
+      consumes:
+      - application/json
+      description: Create an installment row for a debt.
+      parameters:
+      - description: Debt ID
+        in: path
+        name: debtId
+        required: true
+        type: string
+      - description: Create debt installment request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/debt.CreateDebtInstallmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/debt.DebtInstallment'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Create Debt Installment
       tags:
       - debts
   /debts/{debtId}/payments:
     get:
+      consumes:
+      - application/json
       description: List payment links for a debt.
       parameters:
       - description: Debt ID
@@ -1683,9 +2158,20 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/domain.DebtPaymentLink'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/debt.DebtPaymentLink'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
@@ -1698,13 +2184,15 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List debt payments
+      security:
+      - BearerAuth: []
+      summary: List Debt Payments
       tags:
       - debts
     post:
       consumes:
       - application/json
-      description: Link a transaction as a payment/collection for a debt.
+      description: Link a transaction as payment or top-up for a debt.
       parameters:
       - description: Debt ID
         in: path
@@ -1713,17 +2201,22 @@ paths:
         type: string
       - description: Create debt payment request
         in: body
-        name: body
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/debt.CreatePaymentRequest'
+          $ref: '#/definitions/debt.CreateDebtPaymentRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
-            $ref: '#/definitions/domain.DebtPaymentLink'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/debt.DebtPaymentLink'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1740,33 +2233,32 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Create debt payment link
+      security:
+      - BearerAuth: []
+      summary: Create Debt Payment Link
       tags:
       - debts
-  /healthz:
+  /investment-accounts:
     get:
-      description: Liveness check for goen-api.
+      consumes:
+      - application/json
+      description: List investment accounts for current authenticated user.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/diagnostics.HealthResponse'
-      summary: Health check
-      tags:
-      - meta
-  /market-data/vnstock/status:
-    get:
-      description: Returns global worker rate-limit remaining and market sync last
-        timestamps.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/marketdata.GlobalStatus'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/investment.InvestmentAccount'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1775,80 +2267,34 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Global market-data worker status
+      security:
+      - BearerAuth: []
+      summary: List Investment Accounts
       tags:
       - investments
-  /market-data/vnstock/sync-all:
-    post:
-      description: Enqueue a vnstock job to sync securities catalog then (optionally)
-        fan-out daily prices and events jobs.
-      parameters:
-      - description: Bypass caching (1/true)
-        in: query
-        name: force
-        type: string
-      - description: Full price history
-        in: query
-        name: full
-        type: string
-      - description: 'Include daily prices (default: 1)'
-        in: query
-        name: include_prices
-        type: string
-      - description: 'Include events (default: 1)'
-        in: query
-        name: include_events
-        type: string
-      produces:
+  /investment-accounts/{investmentAccountId}:
+    get:
+      consumes:
       - application/json
-      responses:
-        "202":
-          description: Accepted
-          schema:
-            $ref: '#/definitions/marketdata.RefreshOneResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Enqueue market-wide sync (vnstock)
-      tags:
-      - investments
-  /market-data/vnstock/sync-symbol/{symbol}:
-    post:
-      description: Enqueue vnstock jobs for a ticker symbol.
+      description: Get investment account detail for current authenticated user.
       parameters:
-      - description: Ticker symbol (e.g. FPT)
+      - description: Investment Account ID
         in: path
-        name: symbol
+        name: investmentAccountId
         required: true
         type: string
-      - description: 'Include daily prices (default: 1)'
-        in: query
-        name: include_prices
-        type: string
-      - description: 'Include events (default: 1)'
-        in: query
-        name: include_events
-        type: string
-      - description: Bypass caching (1/true)
-        in: query
-        name: force
-        type: string
       produces:
       - application/json
       responses:
-        "202":
-          description: Accepted
+        "200":
+          description: OK
           schema:
-            $ref: '#/definitions/marketdata.RefreshManyResponse'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/investment.InvestmentAccount'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1865,36 +2311,184 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Enqueue vnstock refresh for a symbol
+      security:
+      - BearerAuth: []
+      summary: Get Investment Account
       tags:
       - investments
-  /market-data/vnstock/sync-symbols:
+    patch:
+      consumes:
+      - application/json
+      description: Patch fee/tax settings for an investment account.
+      parameters:
+      - description: Investment Account ID
+        in: path
+        name: investmentAccountId
+        required: true
+        type: string
+      - description: Patch request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/investment.PatchInvestmentAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/investment.InvestmentAccount'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Patch Investment Account Settings
+      tags:
+      - investments
+  /investment-accounts/{investmentAccountId}/holdings:
+    get:
+      consumes:
+      - application/json
+      description: List holdings for an investment account.
+      parameters:
+      - description: Investment Account ID
+        in: path
+        name: investmentAccountId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/investment.Holding'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List Holdings
+      tags:
+      - investments
+  /investment-accounts/{investmentAccountId}/trades:
+    get:
+      consumes:
+      - application/json
+      description: List trades for an investment account.
+      parameters:
+      - description: Investment Account ID
+        in: path
+        name: investmentAccountId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/investment.Trade'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List Trades
+      tags:
+      - investments
     post:
       consumes:
       - application/json
-      description: Enqueue vnstock jobs for a list of ticker symbols.
+      description: Create a trade in an investment account and update holding snapshot.
       parameters:
-      - description: Bypass caching (1/true)
-        in: query
-        name: force
+      - description: Investment Account ID
+        in: path
+        name: investmentAccountId
+        required: true
         type: string
-      - description: Symbols request
+      - description: Create trade request
         in: body
-        name: body
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/marketdata.SyncSymbolsRequest'
+          $ref: '#/definitions/investment.CreateTradeRequest'
       produces:
       - application/json
       responses:
-        "202":
-          description: Accepted
+        "201":
+          description: Created
           schema:
-            $ref: '#/definitions/marketdata.RefreshManyResponse'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/investment.Trade'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -1903,19 +2497,22 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Enqueue vnstock refresh for a list of symbols
+      security:
+      - BearerAuth: []
+      summary: Create Trade
       tags:
       - investments
   /media/{bucket}/{key}:
     get:
+      description: Stream a media object from SeaweedFS through backend proxy.
       parameters:
       - description: Bucket name
         in: path
@@ -1934,55 +2531,44 @@ paths:
           description: OK
           schema:
             type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
       summary: Get media file
       tags:
       - media
-  /ping:
+  /profile/me:
     get:
-      description: Lightweight endpoint for browser/app connectivity test.
+      consumes:
+      - application/json
+      description: Return current authenticated user profile.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/diagnostics.PingResponse'
-      summary: Ping
-      tags:
-      - meta
-  /readyz:
-    get:
-      description: Readiness check; includes Postgres/Redis status when configured.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/diagnostics.HealthResponse'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/diagnostics.HealthResponse'
-      summary: Readiness check
-      tags:
-      - meta
-  /rotating-savings/groups:
-    get:
-      description: List rotating savings groups owned by current user.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/rotatingsavings.GroupSummary'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.User'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -1991,6 +2577,209 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get Current User
+      tags:
+      - profile
+    patch:
+      consumes:
+      - application/json
+      description: Partially update current user profile.
+      parameters:
+      - description: Profile patch request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/profile.PatchProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.User'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Update Profile
+      tags:
+      - profile
+  /profile/me/avatar:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload current user's profile image as multipart/form-data field
+        "avatar".
+      parameters:
+      - description: Avatar image file
+        in: formData
+        name: avatar
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.User'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Upload Profile Avatar
+      tags:
+      - profile
+  /profile/me/change-password:
+    post:
+      consumes:
+      - application/json
+      description: Change current user's password.
+      parameters:
+      - description: Change password request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/profile.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/profile.ChangePasswordResult'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Change Password
+      tags:
+      - profile
+  /reports/dashboard:
+    get:
+      consumes:
+      - application/json
+      description: Return dashboard metrics including account balances, 6-month cashflow
+        and top expenses in current month.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/report.DashboardReport'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get Dashboard Report
+      tags:
+      - reports
+  /rotating-savings/groups:
+    get:
+      consumes:
+      - application/json
+      description: List rotating savings groups owned by current user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/rotatingsavings.GroupSummary'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
       summary: List rotating savings groups
       tags:
       - rotating_savings
@@ -1999,7 +2788,7 @@ paths:
       - application/json
       description: Create a new rotating savings group.
       parameters:
-      - description: Create group request
+      - description: Create rotating savings group request
         in: body
         name: body
         required: true
@@ -2011,7 +2800,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.RotatingSavingsGroup'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/rotatingsavings.RotatingSavingsGroup'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2024,12 +2818,16 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
       summary: Create rotating savings group
       tags:
       - rotating_savings
   /rotating-savings/groups/{groupId}:
-    get:
-      description: Get a rotating savings group.
+    delete:
+      consumes:
+      - application/json
+      description: Delete rotating savings group and linked contributions.
       parameters:
       - description: Group ID
         in: path
@@ -2039,10 +2837,14 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "204":
+          description: No Content
           schema:
-            $ref: '#/definitions/domain.RotatingSavingsGroup'
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
@@ -2055,12 +2857,109 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Get rotating savings group
+      security:
+      - BearerAuth: []
+      summary: Delete rotating savings group
+      tags:
+      - rotating_savings
+    get:
+      consumes:
+      - application/json
+      description: Get rotating savings group detail with schedule, contributions,
+        and audit logs.
+      parameters:
+      - description: Group ID
+        in: path
+        name: groupId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/rotatingsavings.GroupDetailResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get rotating savings group detail
+      tags:
+      - rotating_savings
+    patch:
+      consumes:
+      - application/json
+      description: Update mutable fields of rotating savings group.
+      parameters:
+      - description: Group ID
+        in: path
+        name: groupId
+        required: true
+        type: string
+      - description: Update rotating savings group request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/rotatingsavings.UpdateGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/rotatingsavings.RotatingSavingsGroup'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Update rotating savings group
       tags:
       - rotating_savings
   /rotating-savings/groups/{groupId}/contributions:
     get:
-      description: List contributions/payouts for a group.
+      consumes:
+      - application/json
+      description: List contributions/payouts of a rotating savings group.
       parameters:
       - description: Group ID
         in: path
@@ -2073,9 +2972,18 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/domain.RotatingSavingsContribution'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/rotatingsavings.RotatingSavingsContribution'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
@@ -2088,20 +2996,22 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
       summary: List rotating savings contributions
       tags:
       - rotating_savings
     post:
       consumes:
       - application/json
-      description: Create a contribution/payout.
+      description: Create a contribution or payout for rotating savings group.
       parameters:
       - description: Group ID
         in: path
         name: groupId
         required: true
         type: string
-      - description: Create contribution request
+      - description: Create rotating savings contribution request
         in: body
         name: body
         required: true
@@ -2113,7 +3023,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.RotatingSavingsContribution'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/rotatingsavings.RotatingSavingsContribution'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2130,21 +3045,74 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
       summary: Create rotating savings contribution
+      tags:
+      - rotating_savings
+  /rotating-savings/groups/{groupId}/contributions/{contributionId}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a contribution/payout from rotating savings group.
+      parameters:
+      - description: Group ID
+        in: path
+        name: groupId
+        required: true
+        type: string
+      - description: Contribution ID
+        in: path
+        name: contributionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Delete rotating savings contribution
       tags:
       - rotating_savings
   /savings/instruments:
     get:
-      description: List savings instruments accessible to current user.
+      consumes:
+      - application/json
+      description: List savings instruments accessible to current authenticated user.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/domain.SavingsInstrument'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/savings.SavingsInstrument'
+                  type: array
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -2153,7 +3121,9 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List savings instruments
+      security:
+      - BearerAuth: []
+      summary: List Savings Instruments
       tags:
       - savings
     post:
@@ -2166,14 +3136,19 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/savings.CreateRequest'
+          $ref: '#/definitions/savings.CreateSavingsInstrumentRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
-            $ref: '#/definitions/domain.SavingsInstrument'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/savings.SavingsInstrument'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2186,42 +3161,16 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Create savings instrument
+      security:
+      - BearerAuth: []
+      summary: Create Savings Instrument
       tags:
       - savings
   /savings/instruments/{instrumentId}:
     delete:
-      description: Delete a savings instrument.
-      parameters:
-      - description: Savings instrument ID
-        in: path
-        name: instrumentId
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Delete savings instrument
-      tags:
-      - savings
-    get:
-      description: Get a single savings instrument.
+      consumes:
+      - application/json
+      description: Delete savings instrument by id.
       parameters:
       - description: Savings instrument ID
         in: path
@@ -2234,7 +3183,18 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.SavingsInstrument'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
@@ -2247,13 +3207,58 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Get savings instrument
+      security:
+      - BearerAuth: []
+      summary: Delete Savings Instrument
+      tags:
+      - savings
+    get:
+      consumes:
+      - application/json
+      description: Get a savings instrument by id.
+      parameters:
+      - description: Savings instrument ID
+        in: path
+        name: instrumentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/savings.SavingsInstrument'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get Savings Instrument
       tags:
       - savings
     patch:
       consumes:
       - application/json
-      description: Patch a savings instrument.
+      description: Patch mutable fields of savings instrument.
       parameters:
       - description: Savings instrument ID
         in: path
@@ -2265,14 +3270,19 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/savings.PatchRequest'
+          $ref: '#/definitions/savings.PatchSavingsInstrumentRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.SavingsInstrument'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/savings.SavingsInstrument'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2289,12 +3299,50 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Patch savings instrument
+      security:
+      - BearerAuth: []
+      summary: Patch Savings Instrument
       tags:
       - savings
-  /securities/{securityId}/events/refresh:
-    post:
-      description: Enqueue a vnstock job; worker will fetch corporate actions/events.
+  /securities:
+    get:
+      consumes:
+      - application/json
+      description: List all securities.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/investment.Security'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List Securities
+      tags:
+      - investments
+  /securities/{securityId}:
+    get:
+      consumes:
+      - application/json
+      description: Get security detail.
       parameters:
       - description: Security ID
         in: path
@@ -2304,10 +3352,15 @@ paths:
       produces:
       - application/json
       responses:
-        "202":
-          description: Accepted
+        "200":
+          description: OK
           schema:
-            $ref: '#/definitions/marketdata.RefreshOneResponse'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/investment.Security'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2324,52 +3377,16 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Enqueue refresh security events
+      security:
+      - BearerAuth: []
+      summary: Get Security
       tags:
       - investments
-  /securities/{securityId}/market-data/status:
+  /securities/{securityId}/events:
     get:
-      description: Returns last sync timestamps, cooldown, and rate-limit (best-effort).
-      parameters:
-      - description: Security ID
-        in: path
-        name: securityId
-        required: true
-        type: string
-      produces:
+      consumes:
       - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/marketdata.SecurityStatus'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Market data status for a security
-      tags:
-      - investments
-  /securities/{securityId}/prices-daily/refresh:
-    post:
-      description: Enqueue a vnstock job; worker will fetch OHLCV and upsert into
-        security_price_dailies.
+      description: List security events.
       parameters:
       - description: Security ID
         in: path
@@ -2384,17 +3401,22 @@ paths:
         in: query
         name: to
         type: string
-      - description: Fetch full history (1/true)
-        in: query
-        name: full
-        type: string
       produces:
       - application/json
       responses:
-        "202":
-          description: Accepted
+        "200":
+          description: OK
           schema:
-            $ref: '#/definitions/marketdata.RefreshOneResponse'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/investment.SecurityEvent'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2411,25 +3433,133 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Enqueue refresh daily prices for security
+      security:
+      - BearerAuth: []
+      summary: List Security Events
       tags:
       - investments
-  /tags:
+  /securities/{securityId}/prices-daily:
     get:
-      description: List tags owned by current user.
+      consumes:
+      - application/json
+      description: List daily prices for a security.
+      parameters:
+      - description: Security ID
+        in: path
+        name: securityId
+        required: true
+        type: string
+      - description: From date (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: To date (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/domain.Tag'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/investment.SecurityPriceDaily'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List Security Prices Daily
+      tags:
+      - investments
+  /settings/me:
+    patch:
+      consumes:
+      - application/json
+      description: Partially update current user settings map.
+      parameters:
+      - description: Settings patch request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/setting.PatchSettingsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/setting.UserResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Update Settings
+      tags:
+      - settings
+  /tags:
+    get:
+      consumes:
+      - application/json
+      description: List tags for current authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/tag.Tag'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -2438,27 +3568,34 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List tags
+      security:
+      - BearerAuth: []
+      summary: List Tags
       tags:
       - tags
     post:
       consumes:
       - application/json
-      description: Create a new tag.
+      description: Create a new tag for current authenticated user.
       parameters:
       - description: Create tag request
         in: body
-        name: body
+        name: request
         required: true
         schema:
           $ref: '#/definitions/tag.CreateTagRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
-            $ref: '#/definitions/domain.Tag'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/tag.Tag'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2471,12 +3608,16 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Create tag
+      security:
+      - BearerAuth: []
+      summary: Create Tag
       tags:
       - tags
   /tags/{tagId}:
     get:
-      description: Get a single tag.
+      consumes:
+      - application/json
+      description: Get tag details by tag id for current authenticated user.
       parameters:
       - description: Tag ID
         in: path
@@ -2489,7 +3630,16 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.Tag'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/tag.Tag'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
@@ -2502,40 +3652,65 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Get tag
+      security:
+      - BearerAuth: []
+      summary: Get Tag
       tags:
       - tags
   /transactions:
     get:
-      description: List transactions visible to current user.
+      consumes:
+      - application/json
+      description: List transactions for current authenticated user.
       parameters:
-      - description: Filter by account id
-        in: query
-        name: account_id
-        type: string
-      - description: From (YYYY-MM-DD or RFC3339)
-        in: query
-        name: from
-        type: string
-      - description: To (YYYY-MM-DD or RFC3339)
-        in: query
-        name: to
-        type: string
-      - description: Cursor
-        in: query
-        name: cursor
-        type: string
       - description: Limit (max 200)
         in: query
         name: limit
         type: integer
+      - description: Filter by account id
+        in: query
+        name: account_id
+        type: string
+      - description: Filter by status
+        in: query
+        name: status
+        type: string
+      - description: Search by external_ref
+        in: query
+        name: search
+        type: string
+      - description: From date/time (YYYY-MM-DD or RFC3339)
+        in: query
+        name: from
+        type: string
+      - description: To date/time (YYYY-MM-DD or RFC3339)
+        in: query
+        name: to
+        type: string
+      - description: Filter by transaction type
+        in: query
+        name: type
+        type: string
+      - description: Filter by external ref family
+        in: query
+        name: external_ref_family
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/transaction.ListResponse'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/transaction.Transaction'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
         "401":
           description: Unauthorized
           schema:
@@ -2544,27 +3719,34 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List transactions
+      security:
+      - BearerAuth: []
+      summary: List Transactions
       tags:
       - transactions
     post:
       consumes:
       - application/json
-      description: Create a new transaction (expense/income/transfer).
+      description: Create a new transaction for the current authenticated user.
       parameters:
       - description: Create transaction request
         in: body
-        name: body
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/transaction.CreateBody'
+          $ref: '#/definitions/transaction.CreateTransactionRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
-            $ref: '#/definitions/domain.Transaction'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/transaction.Transaction'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2577,38 +3759,16 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Create transaction
+      security:
+      - BearerAuth: []
+      summary: Create Transaction
       tags:
       - transactions
   /transactions/{transactionId}:
-    delete:
-      description: Soft delete a transaction.
-      parameters:
-      - description: Transaction ID
-        in: path
-        name: transactionId
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Delete transaction
-      tags:
-      - transactions
     get:
-      description: Get a single transaction.
+      consumes:
+      - application/json
+      description: Get transaction details by id for current authenticated user.
       parameters:
       - description: Transaction ID
         in: path
@@ -2621,7 +3781,16 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.Transaction'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/transaction.Transaction'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
         "401":
           description: Unauthorized
           schema:
@@ -2634,32 +3803,39 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Get transaction
+      security:
+      - BearerAuth: []
+      summary: Get Transaction
       tags:
       - transactions
     patch:
       consumes:
       - application/json
-      description: Merge-patch transaction fields.
+      description: Update transaction fields for current authenticated user.
       parameters:
       - description: Transaction ID
         in: path
         name: transactionId
         required: true
         type: string
-      - description: Patch transaction request
+      - description: Update transaction request
         in: body
-        name: body
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/transaction.PatchRequest'
+          $ref: '#/definitions/transaction.UpdateTransactionRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.Transaction'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/transaction.Transaction'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2676,12 +3852,16 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Patch transaction
+      security:
+      - BearerAuth: []
+      summary: Update Transaction
       tags:
       - transactions
   /transactions/{transactionId}/debt-links:
     get:
-      description: List debt payment links for a transaction.
+      consumes:
+      - application/json
+      description: List debt payment links associated with a transaction.
       parameters:
       - description: Transaction ID
         in: path
@@ -2694,9 +3874,16 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/domain.DebtPaymentLink'
-            type: array
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/debt.DebtPaymentLink'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2713,28 +3900,83 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: List debt links for transaction
+      security:
+      - BearerAuth: []
+      summary: List Debt Links For Transaction
       tags:
       - debts
-  /transactions/batch:
-    patch:
+  /transactions/{transactionId}/group-expense-participants:
+    get:
       consumes:
       - application/json
-      description: Apply patch payload to multiple transactions in one API call.
+      description: List group expense participants associated with a transaction.
       parameters:
-      - description: Batch patch request
-        in: body
-        name: body
+      - description: Transaction ID
+        in: path
+        name: transactionId
         required: true
-        schema:
-          $ref: '#/definitions/transaction.BatchPatchBody'
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/transaction.BatchPatchResult'
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/transaction.GroupExpenseParticipant'
+                  type: array
+                meta:
+                  $ref: '#/definitions/response.Meta'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List Group Expense Participants For Transaction
+      tags:
+      - transactions
+  /transactions/batch:
+    patch:
+      consumes:
+      - application/json
+      description: Update status for multiple transactions in one call.
+      parameters:
+      - description: Batch status patch request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/transaction.BatchPatchTransactionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Envelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/transaction.BatchPatchResult'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -2747,15 +3989,13 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorEnvelope'
-      summary: Batch patch transactions
+      security:
+      - BearerAuth: []
+      summary: Batch Update Transaction Status
       tags:
       - transactions
-schemes:
-- http
-- https
 securityDefinitions:
   BearerAuth:
-    description: Type "Bearer {token}" to authenticate.
     in: header
     name: Authorization
     type: apiKey
