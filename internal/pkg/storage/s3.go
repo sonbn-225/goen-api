@@ -29,17 +29,18 @@ type S3Client struct {
 	publicBaseURL string
 }
 
-func NewS3Client(cfg S3Config) *S3Client {
+func NewS3Client(cfg S3Config) (*S3Client, error) {
 	if strings.TrimSpace(cfg.Endpoint) == "" {
-		return nil
+		return nil, nil // Silently skip if no endpoint (standard dev behavior)
 	}
 
 	client, err := minio.New(cfg.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
 		Secure: cfg.UseSSL,
+		Region: "auto", // Most compatible with SeaweedFS/S3 variants
 	})
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("failed to initialize s3 client at %s: %w", cfg.Endpoint, err)
 	}
 
 	s := &S3Client{
@@ -50,12 +51,20 @@ func NewS3Client(cfg S3Config) *S3Client {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	
 	exists, err := client.BucketExists(ctx, cfg.Bucket)
-	if err == nil && !exists {
-		_ = client.MakeBucket(ctx, cfg.Bucket, minio.MakeBucketOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to check bucket %s: %w", cfg.Bucket, err)
+	}
+	
+	if !exists {
+		err = client.MakeBucket(ctx, cfg.Bucket, minio.MakeBucketOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create bucket %s: %w", cfg.Bucket, err)
+		}
 	}
 
-	return s
+	return s, nil
 }
 
 func (s *S3Client) UploadAvatar(ctx context.Context, userID string, file *multipart.FileHeader) (string, error) {
@@ -147,5 +156,8 @@ func (s *S3Client) AvatarURL(baseURL, objectKey string) string {
 }
 
 func (s *S3Client) Bucket() string {
+	if s == nil {
+		return ""
+	}
 	return s.bucket
 }

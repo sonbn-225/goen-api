@@ -36,10 +36,30 @@ func Load() (*Config, error) {
 	cfg.Host = getenvDefault("HOST", "0.0.0.0")
 	cfg.Port = getenvIntDefault("PORT", 8080)
 	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
+	
+	// Redis: favor REDIS_HOST if provided, otherwise fallback to sunflower-redis
 	cfg.RedisURL = os.Getenv("REDIS_URL")
+	if os.Getenv("REDIS_HOST") != "" || cfg.RedisURL == "" {
+		host := getenvDefault("REDIS_HOST", "sunflower-redis")
+		port := getenvIntDefault("REDIS_PORT", 6379)
+		pass := os.Getenv("REDIS_PASSWORD")
+		if pass != "" {
+			cfg.RedisURL = fmt.Sprintf("redis://default:%s@%s:%d/0", pass, host, port)
+		} else {
+			cfg.RedisURL = fmt.Sprintf("redis://%s:%d/0", host, port)
+		}
+	}
+
 	cfg.JWTSecret = getenvDefault("JWT_SECRET", "dev-secret")
 	cfg.JWTAccessTTL = getenvIntDefault("JWT_ACCESS_TTL_MINUTES", 60)
+
+	// SeaweedFS: favor SEAWEEDFS_HOST if provided, otherwise fallback to sunflower-seaweedfs
 	cfg.S3Endpoint = os.Getenv("SEAWEEDFS_ENDPOINT")
+	if os.Getenv("SEAWEEDFS_HOST") != "" || cfg.S3Endpoint == "" {
+		host := getenvDefault("SEAWEEDFS_HOST", "sunflower-seaweedfs")
+		port := getenvIntDefault("SEAWEEDFS_PORT", 8333)
+		cfg.S3Endpoint = fmt.Sprintf("%s:%d", host, port)
+	}
 	cfg.S3AccessKey = os.Getenv("SEAWEEDFS_ACCESS_KEY_ID")
 	cfg.S3SecretKey = os.Getenv("SEAWEEDFS_SECRET_ACCESS_KEY")
 	cfg.S3Bucket = getenvDefault("SEAWEEDFS_BUCKET", "goen")

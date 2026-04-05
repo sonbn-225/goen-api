@@ -44,7 +44,7 @@ func New(cfg *config.Config) (*App, error) {
 		}
 	}
 
-	s3 := storage.NewS3Client(storage.S3Config{
+	s3, err := storage.NewS3Client(storage.S3Config{
 		Endpoint:      cfg.S3Endpoint,
 		AccessKey:     cfg.S3AccessKey,
 		SecretKey:     cfg.S3SecretKey,
@@ -52,6 +52,9 @@ func New(cfg *config.Config) (*App, error) {
 		UseSSL:        cfg.S3UseSSL,
 		PublicBaseURL: cfg.PublicBaseURL,
 	})
+	if err != nil {
+		slog.Error("failed to initialize s3 storage", "error", err)
+	}
 
 	// Repositories
 	userRepo := postgres.NewUserRepo(db)
