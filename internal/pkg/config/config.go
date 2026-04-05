@@ -21,7 +21,6 @@ type Config struct {
 	S3Endpoint     string
 	S3AccessKey    string
 	S3SecretKey    string
-	S3AccessKeySource string
 	S3Bucket       string
 	S3UseSSL       bool
 	PublicBaseURL  string
@@ -65,8 +64,8 @@ func Load() (*Config, error) {
 	}
 
 	// Try multiple environment variable names for keys to be robust
-	cfg.S3AccessKey, cfg.S3AccessKeySource = getenvFallbackWithSource("SEAWEEDFS_ACCESS_KEY_ID", "S3_ACCESS_KEY_ID", "SEAWEEDFS_ACCESS_KEY")
-	cfg.S3SecretKey, _ = getenvFallbackWithSource("SEAWEEDFS_SECRET_ACCESS_KEY", "S3_SECRET_ACCESS_KEY", "SEAWEEDFS_SECRET_KEY")
+	cfg.S3AccessKey = getenvFallback("SEAWEEDFS_ACCESS_KEY_ID", "S3_ACCESS_KEY_ID", "SEAWEEDFS_ACCESS_KEY")
+	cfg.S3SecretKey = getenvFallback("SEAWEEDFS_SECRET_ACCESS_KEY", "S3_SECRET_ACCESS_KEY", "SEAWEEDFS_SECRET_KEY")
 	
 	cfg.S3Bucket = getenvDefault("SEAWEEDFS_BUCKET", "goen")
 	cfg.S3UseSSL = getenvBoolDefault("SEAWEEDFS_USE_SSL", false)
