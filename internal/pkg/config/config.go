@@ -21,6 +21,7 @@ type Config struct {
 	S3Endpoint     string
 	S3AccessKey    string
 	S3SecretKey    string
+	S3AccessKeySource string
 	S3Bucket       string
 	S3UseSSL       bool
 	PublicBaseURL  string
@@ -55,15 +56,18 @@ func Load() (*Config, error) {
 	cfg.JWTSecret = getenvDefault("JWT_SECRET", "dev-secret")
 	cfg.JWTAccessTTL = getenvIntDefault("JWT_ACCESS_TTL_MINUTES", 60)
 
-	// SeaweedFS: favor SEAWEEDFS_HOST if provided, otherwise fallback to sunflower-seaweedfs
+	// SeaweedFS: support unified endpoint or individual parts
 	cfg.S3Endpoint = os.Getenv("SEAWEEDFS_ENDPOINT")
 	if os.Getenv("SEAWEEDFS_HOST") != "" || cfg.S3Endpoint == "" {
 		host := getenvDefault("SEAWEEDFS_HOST", "sunflower-seaweedfs")
 		port := getenvIntDefault("SEAWEEDFS_PORT", 8333)
 		cfg.S3Endpoint = fmt.Sprintf("%s:%d", host, port)
 	}
-	cfg.S3AccessKey = os.Getenv("SEAWEEDFS_ACCESS_KEY_ID")
-	cfg.S3SecretKey = os.Getenv("SEAWEEDFS_SECRET_ACCESS_KEY")
+
+	// Try multiple environment variable names for keys to be robust
+	cfg.S3AccessKey, cfg.S3AccessKeySource = getenvFallbackWithSource("SEAWEEDFS_ACCESS_KEY_ID", "S3_ACCESS_KEY_ID", "SEAWEEDFS_ACCESS_KEY")
+	cfg.S3SecretKey, _ = getenvFallbackWithSource("SEAWEEDFS_SECRET_ACCESS_KEY", "S3_SECRET_ACCESS_KEY", "SEAWEEDFS_SECRET_KEY")
+	
 	cfg.S3Bucket = getenvDefault("SEAWEEDFS_BUCKET", "goen")
 	cfg.S3UseSSL = getenvBoolDefault("SEAWEEDFS_USE_SSL", false)
 	cfg.PublicBaseURL = os.Getenv("PUBLIC_BASE_URL")
@@ -128,4 +132,18 @@ func getenvBoolDefault(key string, def bool) bool {
 		return def
 	}
 	return v == "true" || v == "1"
+}
+
+func getenvFallback(keys ...string) string {
+	v, _ := getenvFallbackWithSource(keys...)
+	return v
+}
+
+func getenvFallbackWithSource(keys ...string) (string, string) {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v, k
+		}
+	}
+	return "", "NONE"
 }

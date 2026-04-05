@@ -19,6 +19,7 @@ type S3Config struct {
 	Endpoint      string
 	AccessKey     string
 	SecretKey     string
+	AccessKeySource string
 	Bucket        string
 	UseSSL        bool
 	PublicBaseURL string
@@ -40,12 +41,17 @@ func NewS3Client(cfg S3Config) (*S3Client, error) {
 	if len(cfg.AccessKey) > 4 {
 		maskedKey = cfg.AccessKey[:4] + "****"
 	}
-	slog.Info("initializing s3 storage", "endpoint", cfg.Endpoint, "bucket", cfg.Bucket, "access_key", maskedKey)
+	slog.Info("initializing s3 storage", 
+		"endpoint", cfg.Endpoint, 
+		"bucket", cfg.Bucket, 
+		"access_key", maskedKey,
+		"key_source", cfg.AccessKeySource,
+	)
 
 	client, err := minio.New(cfg.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
 		Secure: cfg.UseSSL,
-		Region: "auto", // Most compatible with SeaweedFS/S3 variants
+		// Reverted to empty region for maximum SeaweedFS compatibility
 		// SeaweedFS production often requires PathStyle to avoid DNS issues with bucket subdomains
 		// especially within custom internal docker networks.
 		BucketLookup: minio.BucketLookupPath,

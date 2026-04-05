@@ -48,6 +48,7 @@ func New(cfg *config.Config) (*App, error) {
 		Endpoint:      cfg.S3Endpoint,
 		AccessKey:     cfg.S3AccessKey,
 		SecretKey:     cfg.S3SecretKey,
+		AccessKeySource: cfg.S3AccessKeySource,
 		Bucket:        cfg.S3Bucket,
 		UseSSL:        cfg.S3UseSSL,
 		PublicBaseURL: cfg.PublicBaseURL,
