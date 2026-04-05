@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -58,6 +59,8 @@ func (h *MediaHandler) GetMedia(w http.ResponseWriter, r *http.Request) {
 	defer obj.Close()
 
 	w.Header().Set("Content-Type", info.ContentType)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", info.Size))
+	w.Header().Set("Cache-Control", "public, max-age=3600") // 1 hour for safety
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, obj)
 }
