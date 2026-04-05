@@ -231,3 +231,26 @@ func NewImportMappingRuleResponses(items []entity.ImportMappingRule) []ImportMap
 	}
 	return out
 }
+
+type BatchImportResult struct {
+	Created int      `json:"created"`
+	Skipped int      `json:"skipped"`
+	Errors  []string `json:"errors,omitempty"`
+}
+
+type StageImportRequest struct {
+	Items []StageImportedItem `json:"items"`
+}
+
+type PatchImportedRequest struct {
+	MappedAccountID  *string `json:"mapped_account_id,omitempty"`
+	MappedCategoryID *string `json:"mapped_category_id,omitempty"`
+}
+
+type CreateManyImportedRequest struct {
+	ImportIDs []string `json:"import_ids"`
+}
+
+type UpsertMappingRulesRequest struct {
+	Rules []MappingRuleInput `json:"rules"`
+}

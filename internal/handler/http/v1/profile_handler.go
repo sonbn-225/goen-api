@@ -26,7 +26,10 @@ func (h *ProfileHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 		r.Route("/profile/me", func(r chi.Router) {
 			r.Get("/", h.Me)
 			r.Patch("/", h.PatchMyProfile)
-			r.Post("/avatar", h.UploadAvatar)
+			r.Route("/avatar", func(r chi.Router) {
+				r.Get("/", h.GetMyAvatars)
+				r.Post("/", h.UploadAvatar)
+			})
 			r.Post("/change-password", h.ChangePassword)
 		})
 	})
@@ -170,4 +173,29 @@ func (h *ProfileHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 	}
 
 	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "password updated successfully"})
+}
+
+// GetMyAvatars godoc
+// @Summary List My Avatars
+// @Description Retrieve a list of all previously uploaded avatars for the current user
+// @Tags Profile
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.SuccessEnvelope{data=[]dto.MediaResponse}
+// @Failure 401 {object} response.ErrorEnvelope
+// @Router /profile/me/avatar [get]
+func (h *ProfileHandler) GetMyAvatars(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		return
+	}
+
+	res, err := h.svc.GetMyAvatars(r.Context(), userID)
+	if err != nil {
+		response.WriteInternalError(w, err)
+		return
+	}
+
+	response.WriteSuccess(w, http.StatusOK, res)
 }

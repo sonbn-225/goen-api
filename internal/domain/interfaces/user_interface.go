@@ -33,6 +33,7 @@ type AuthService interface {
 	GetMe(ctx context.Context, userID string) (*dto.UserResponse, error)
 	UpdateMySettings(ctx context.Context, userID string, patch map[string]any) (*dto.UserResponse, error)
 	UploadAvatar(ctx context.Context, userID string, file *multipart.FileHeader) (*dto.UserResponse, error)
+	GetMyAvatars(ctx context.Context, userID string) ([]dto.MediaResponse, error)
 	UpdateMyProfile(ctx context.Context, userID string, displayName, email, phone, username *string) (*dto.UserResponse, error)
 	ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error
 }

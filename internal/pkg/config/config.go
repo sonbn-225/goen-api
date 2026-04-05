@@ -44,7 +44,7 @@ func Load() (*Config, error) {
 	cfg.S3SecretKey = os.Getenv("SEAWEEDFS_SECRET_ACCESS_KEY")
 	cfg.S3Bucket = getenvDefault("SEAWEEDFS_BUCKET", "goen")
 	cfg.S3UseSSL = getenvBoolDefault("SEAWEEDFS_USE_SSL", false)
-	cfg.PublicBaseURL = getenvDefault("PUBLIC_BASE_URL", "http://localhost:8080")
+	cfg.PublicBaseURL = os.Getenv("PUBLIC_BASE_URL")
 	cfg.MigrationDir = getenvDefault("MIGRATION_DIR", "scripts")
 	cfg.MigrateOnStart = getenvBoolDefault("MIGRATE_ON_START", true)
 	cfg.MarketDataStatusURL = os.Getenv("MARKET_DATA_STATUS_URL")

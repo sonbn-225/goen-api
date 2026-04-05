@@ -2,6 +2,7 @@ package v1
 
 import (
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -44,6 +45,7 @@ func (h *MediaHandler) GetMedia(w http.ResponseWriter, r *http.Request) {
 	bucket := chi.URLParam(r, "bucket")
 	key := strings.TrimPrefix(chi.URLParam(r, "*"), "/")
 	if bucket == "" || key == "" {
+		slog.Warn("media_request_missing_params", "bucket", bucket, "key", key, "url", r.URL.Path)
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "missing bucket or key", nil)
 		return
 	}
