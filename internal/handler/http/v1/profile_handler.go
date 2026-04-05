@@ -2,6 +2,8 @@ package v1
 
 import (
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -118,8 +120,9 @@ func (h *ProfileHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "invalid_request", "failed to parse multipart form", nil)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		slog.Error("failed to parse multipart form", "error", err)
+		response.WriteError(w, http.StatusBadRequest, "invalid_request", fmt.Sprintf("failed to parse multipart form: %v", err), nil)
 		return
 	}
 
