@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
@@ -245,30 +246,245 @@ func (s *TransactionService) Delete(ctx context.Context, userID, transactionID s
 	return s.repo.DeleteTransaction(ctx, userID, transactionID)
 }
 
-// Stubs for Imports
+// Imports
 func (s *TransactionService) StageImport(ctx context.Context, userID string, items []dto.StageImportedItem) (int, int, []string, error) {
-	return 0, 0, nil, nil
+	// 1. Fetch rules for auto-mapping
+	rules, err := s.repo.ListImportMappingRules(ctx, userID)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	normalize := func(v string) string {
+		return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(v)), " "))
+	}
+
+	accountRules := map[string]string{}
+	categoryRules := map[string]string{}
+	for _, rule := range rules {
+		key := normalize(rule.SourceName)
+		if key == "" { continue }
+		if rule.Kind == "account" { accountRules[key] = rule.MappedID }
+		if rule.Kind == "category" { categoryRules[key] = rule.MappedID }
+	}
+
+	// 2. Prepare entities
+	creates := make([]entity.ImportedTransactionCreate, 0, len(items))
+	for _, item := range items {
+		tDate, err := s.normalizeImportDate(item.TransactionDate)
+		if err != nil { continue }
+
+		create := entity.ImportedTransactionCreate{
+			Source:               "generic", // Default source
+			TransactionDate:      tDate,
+			Amount:               item.Amount,
+			Description:          item.Description,
+			TransactionType:      item.TransactionType,
+			ImportedAccountName:  item.AccountName,
+			ImportedCategoryName: item.CategoryName,
+			RawPayload:           item.Raw,
+		}
+
+		// Auto-map
+		if item.AccountName != nil {
+			if id, ok := accountRules[normalize(*item.AccountName)]; ok {
+				create.MappedAccountID = &id
+			}
+		}
+		if item.CategoryName != nil {
+			if id, ok := categoryRules[normalize(*item.CategoryName)]; ok {
+				create.MappedCategoryID = &id
+			}
+		}
+
+		creates = append(creates, create)
+	}
+
+	if len(creates) == 0 {
+		return 0, len(items), nil, nil
+	}
+
+	// 3. Save
+	staged, err := s.repo.CreateImportedTransactions(ctx, userID, creates)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	return len(staged), len(items) - len(staged), nil, nil
 }
+
 func (s *TransactionService) ListImported(ctx context.Context, userID string) ([]dto.ImportedTransactionResponse, error) {
-	return nil, nil
+	items, err := s.repo.ListImportedTransactions(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewImportedTransactionResponses(items), nil
 }
+
 func (s *TransactionService) PatchImported(ctx context.Context, userID, importID string, patch entity.ImportedTransactionPatch) (*dto.ImportedTransactionResponse, error) {
-	return nil, nil
+	it, err := s.repo.PatchImportedTransaction(ctx, userID, importID, patch)
+	if err != nil {
+		return nil, err
+	}
+	resp := dto.NewImportedTransactionResponse(*it)
+	return &resp, nil
 }
+
 func (s *TransactionService) DeleteImported(ctx context.Context, userID, importID string) error {
-	return nil
+	return s.repo.DeleteImportedTransaction(ctx, userID, importID)
 }
+
 func (s *TransactionService) ClearImported(ctx context.Context, userID string) error {
-	return nil
+	_, err := s.repo.DeleteAllImportedTransactions(ctx, userID)
+	return err
 }
+
+// Rules
 func (s *TransactionService) UpsertMappingRules(ctx context.Context, userID string, inputs []dto.MappingRuleInput) ([]dto.ImportMappingRuleResponse, error) {
-	return nil, nil
+	upserts := make([]entity.ImportMappingRuleUpsert, len(inputs))
+	for i, in := range inputs {
+		upserts[i] = entity.ImportMappingRuleUpsert{
+			Kind:       in.Kind,
+			SourceName: in.SourceName,
+			MappedID:   in.MappedID,
+		}
+	}
+	rules, err := s.repo.UpsertImportMappingRules(ctx, userID, upserts)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewImportMappingRuleResponses(rules), nil
 }
+
 func (s *TransactionService) ListMappingRules(ctx context.Context, userID string) ([]dto.ImportMappingRuleResponse, error) {
-	return nil, nil
+	rules, err := s.repo.ListImportMappingRules(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewImportMappingRuleResponses(rules), nil
 }
+
 func (s *TransactionService) DeleteMappingRule(ctx context.Context, userID, ruleID string) error {
-	return nil
+	return s.repo.DeleteImportMappingRule(ctx, userID, ruleID)
+}
+
+// Create from Imports
+func (s *TransactionService) CreateFromImported(ctx context.Context, userID, importID string) (*dto.TransactionResponse, error) {
+	it, err := s.repo.GetImportedTransaction(ctx, userID, importID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Prepare create request
+	req := dto.CreateTransactionRequest{
+		OccurredDate: &it.TransactionDate,
+		Amount:       it.Amount,
+		Description:  it.Description,
+		Type:         "expense", // Default
+	}
+	if it.TransactionType != nil {
+		req.Type = strings.ToLower(*it.TransactionType)
+	}
+	if it.MappedAccountID != nil {
+		if req.Type == "transfer" {
+			req.FromAccountID = it.MappedAccountID
+		} else {
+			req.AccountID = it.MappedAccountID
+		}
+	}
+	if it.MappedCategoryID != nil {
+		req.CategoryID = it.MappedCategoryID
+	}
+
+	tx, err := s.Create(ctx, userID, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cleanup
+	_ = s.repo.DeleteImportedTransaction(ctx, userID, importID)
+
+	return tx, nil
+}
+
+func (s *TransactionService) CreateManyFromImported(ctx context.Context, userID string, importIDs []string) (*dto.BatchImportResult, error) {
+	res := &dto.BatchImportResult{}
+	for _, id := range importIDs {
+		_, err := s.CreateFromImported(ctx, userID, id)
+		if err != nil {
+			res.Skipped++
+			res.Errors = append(res.Errors, fmt.Sprintf("ID %s: %v", id, err))
+		} else {
+			res.Created++
+		}
+	}
+	return res, nil
+}
+
+func (s *TransactionService) ApplyRulesAndCreate(ctx context.Context, userID string) (*dto.BatchImportResult, error) {
+	// 1. Get rules and items
+	rules, _ := s.repo.ListImportMappingRules(ctx, userID)
+	items, _ := s.repo.ListImportedTransactions(ctx, userID)
+
+	normalize := func(v string) string {
+		return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(v)), " "))
+	}
+
+	accountRules := map[string]string{}
+	categoryRules := map[string]string{}
+	for _, rule := range rules {
+		k := normalize(rule.SourceName)
+		if rule.Kind == "account" { accountRules[k] = rule.MappedID } else { categoryRules[k] = rule.MappedID }
+	}
+
+	// 2. Patch items that can be auto-mapped
+	for _, it := range items {
+		patch := entity.ImportedTransactionPatch{}
+		changed := false
+		if it.MappedAccountID == nil && it.ImportedAccountName != nil {
+			if id, ok := accountRules[normalize(*it.ImportedAccountName)]; ok {
+				patch.MappedAccountID = &id
+				changed = true
+			}
+		}
+		if it.MappedCategoryID == nil && it.ImportedCategoryName != nil {
+			if id, ok := categoryRules[normalize(*it.ImportedCategoryName)]; ok {
+				patch.MappedCategoryID = &id
+				changed = true
+			}
+		}
+		if changed {
+			_, _ = s.repo.PatchImportedTransaction(ctx, userID, it.ID, patch)
+		}
+	}
+
+	// 3. Create all that are fully mapped
+	items, _ = s.repo.ListImportedTransactions(ctx, userID)
+	res := &dto.BatchImportResult{}
+	for _, it := range items {
+		if it.MappedAccountID == nil { continue }
+		if !strings.EqualFold(utils.Coalesce(it.TransactionType, ""), "transfer") && it.MappedCategoryID == nil {
+			continue
+		}
+
+		_, err := s.CreateFromImported(ctx, userID, it.ID)
+		if err != nil {
+			res.Skipped++
+			res.Errors = append(res.Errors, fmt.Sprintf("ID %s: %v", it.ID, err))
+		} else {
+			res.Created++
+		}
+	}
+	return res, nil
+}
+
+func (s *TransactionService) normalizeImportDate(v string) (string, error) {
+	v = strings.TrimSpace(v)
+	if v == "" { return "", errors.New("empty date") }
+	layouts := []string{"2006-01-02", "2006/01/02", "02/01/2006", "2-1-2006", "02-01-2006", time.RFC3339}
+	for _, l := range layouts {
+		if t, err := time.Parse(l, v); err == nil { return t.Format("2006-01-02"), nil }
+	}
+	return "", errors.New("invalid date format")
 }
 
 // Helpers

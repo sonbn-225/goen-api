@@ -90,6 +90,26 @@ func (s *S3Client) UploadAvatar(ctx context.Context, userID string, file *multip
 	return objectKey, nil
 }
 
+func (s *S3Client) ListObjects(ctx context.Context, prefix string) ([]minio.ObjectInfo, error) {
+	if s == nil {
+		return nil, fmt.Errorf("storage not configured")
+	}
+
+	objects := s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	})
+
+	var result []minio.ObjectInfo
+	for obj := range objects {
+		if obj.Err != nil {
+			return nil, obj.Err
+		}
+		result = append(result, obj)
+	}
+	return result, nil
+}
+
 type S3ObjectInfo struct {
 	Size        int64
 	ContentType string
@@ -119,7 +139,11 @@ func (s *S3Client) GetObject(ctx context.Context, bucket, key string) (io.ReadCl
 
 func (s *S3Client) AvatarURL(baseURL, objectKey string) string {
 	base := strings.TrimRight(baseURL, "/")
-	return fmt.Sprintf("%s/api/v1/media/%s/%s", base, s.bucket, objectKey)
+	key := strings.TrimLeft(objectKey, "/")
+	if base == "" {
+		return fmt.Sprintf("/api/v1/media/%s/%s", s.bucket, key)
+	}
+	return fmt.Sprintf("%s/api/v1/media/%s/%s", base, s.bucket, key)
 }
 
 func (s *S3Client) Bucket() string {

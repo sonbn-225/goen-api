@@ -26,6 +26,7 @@ type TransactionRepository interface {
 	UpsertImportMappingRules(ctx context.Context, userID string, rules []entity.ImportMappingRuleUpsert) ([]entity.ImportMappingRule, error)
 	ListImportMappingRules(ctx context.Context, userID string) ([]entity.ImportMappingRule, error)
 	DeleteImportMappingRule(ctx context.Context, userID string, ruleID string) error
+	GetImportedTransaction(ctx context.Context, userID string, importID string) (*entity.ImportedTransaction, error)
 }
 
 type TransactionService interface {
@@ -47,4 +48,9 @@ type TransactionService interface {
 	UpsertMappingRules(ctx context.Context, userID string, inputs []dto.MappingRuleInput) ([]dto.ImportMappingRuleResponse, error)
 	ListMappingRules(ctx context.Context, userID string) ([]dto.ImportMappingRuleResponse, error)
 	DeleteMappingRule(ctx context.Context, userID, ruleID string) error
+
+	// Create from Imports
+	CreateFromImported(ctx context.Context, userID, importID string) (*dto.TransactionResponse, error)
+	CreateManyFromImported(ctx context.Context, userID string, importIDs []string) (*dto.BatchImportResult, error)
+	ApplyRulesAndCreate(ctx context.Context, userID string) (*dto.BatchImportResult, error)
 }

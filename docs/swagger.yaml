@@ -83,6 +83,17 @@ definitions:
       user:
         $ref: '#/definitions/dto.UserResponse'
     type: object
+  dto.BatchImportResult:
+    properties:
+      created:
+        type: integer
+      errors:
+        items:
+          type: string
+        type: array
+      skipped:
+        type: integer
+    type: object
   dto.BatchPatchRequest:
     properties:
       mode:
@@ -315,6 +326,13 @@ definitions:
       note:
         type: string
       tag_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  dto.CreateManyImportedRequest:
+    properties:
+      import_ids:
         items:
           type: string
         type: array
@@ -606,6 +624,43 @@ definitions:
       unrealized_pnl:
         type: string
     type: object
+  dto.ImportMappingRuleResponse:
+    properties:
+      id:
+        type: string
+      kind:
+        type: string
+      mapped_id:
+        type: string
+      source_name:
+        type: string
+    type: object
+  dto.ImportedTransactionResponse:
+    properties:
+      amount:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      imported_account_name:
+        type: string
+      imported_category_name:
+        type: string
+      mapped_account_id:
+        type: string
+      mapped_category_id:
+        type: string
+      raw_payload:
+        additionalProperties: {}
+        type: object
+      source:
+        type: string
+      transaction_date:
+        type: string
+      transaction_type:
+        type: string
+    type: object
   dto.InvestmentAccountResponse:
     properties:
       account_id:
@@ -621,6 +676,15 @@ definitions:
       updated_at:
         type: string
     type: object
+  dto.MappingRuleInput:
+    properties:
+      kind:
+        type: string
+      mapped_id:
+        type: string
+      source_name:
+        type: string
+    type: object
   dto.MarketSyncRequest:
     properties:
       force:
@@ -632,6 +696,17 @@ definitions:
       include_prices:
         type: boolean
     type: object
+  dto.MediaResponse:
+    properties:
+      key:
+        type: string
+      size:
+        type: integer
+      updated_at:
+        type: string
+      url:
+        type: string
+    type: object
   dto.PatchAccountRequest:
     properties:
       color:
@@ -639,6 +714,13 @@ definitions:
       name:
         type: string
       status:
+        type: string
+    type: object
+  dto.PatchImportedRequest:
+    properties:
+      mapped_account_id:
+        type: string
+      mapped_category_id:
         type: string
     type: object
   dto.PatchInvestmentAccountRequest:
@@ -1016,6 +1098,31 @@ definitions:
       username:
         type: string
     type: object
+  dto.StageImportRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.StageImportedItem'
+        type: array
+    type: object
+  dto.StageImportedItem:
+    properties:
+      account_name:
+        type: string
+      amount:
+        type: string
+      category_name:
+        type: string
+      description:
+        type: string
+      raw:
+        additionalProperties: {}
+        type: object
+      transaction_date:
+        type: string
+      transaction_type:
+        type: string
+    type: object
   dto.TagResponse:
     properties:
       color:
@@ -1218,6 +1325,13 @@ definitions:
         type: integer
       status:
         type: string
+    type: object
+  dto.UpsertMappingRulesRequest:
+    properties:
+      rules:
+        items:
+          $ref: '#/definitions/dto.MappingRuleInput'
+        type: array
     type: object
   dto.UpsertShareRequest:
     properties:
@@ -3292,6 +3406,32 @@ paths:
       tags:
       - Profile
   /profile/me/avatar:
+    get:
+      description: Retrieve a list of all previously uploaded avatars for the current
+        user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.MediaResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: List My Avatars
+      tags:
+      - Profile
     post:
       consumes:
       - multipart/form-data
@@ -4269,6 +4409,262 @@ paths:
       security:
       - BearerAuth: []
       summary: Batch Update Transactions
+      tags:
+      - Transactions
+  /transactions/import/apply-rules-create:
+    post:
+      description: Automatically map all staged imports using rules and create transactions
+        for fully mapped items
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.BatchImportResult'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Apply Rules and Create Transactions
+      tags:
+      - Transactions
+  /transactions/import/rules:
+    get:
+      description: Retrieve all auto-mapping rules for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.ImportMappingRuleResponse'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: List Import Mapping Rules
+      tags:
+      - Transactions
+    post:
+      consumes:
+      - application/json
+      description: Create or update multiple auto-mapping rules
+      parameters:
+      - description: Rules Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpsertMappingRulesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.ImportMappingRuleResponse'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Upsert Import Mapping Rules
+      tags:
+      - Transactions
+  /transactions/import/rules/{ruleId}:
+    delete:
+      description: Remove an auto-mapping rule
+      parameters:
+      - description: Rule ID
+        in: path
+        name: ruleId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete Import Mapping Rule
+      tags:
+      - Transactions
+  /transactions/import/stage:
+    post:
+      consumes:
+      - application/json
+      description: Stage generic transaction data for manual mapping and review
+      parameters:
+      - description: Import Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.StageImportRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  type: object
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Stage Imported Transactions
+      tags:
+      - Transactions
+  /transactions/import/staged:
+    delete:
+      description: Remove all items from the staging area
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Clear All Staged Imports
+      tags:
+      - Transactions
+    get:
+      description: Retrieve all transactions currently in the staging area
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.ImportedTransactionResponse'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: List Staged Imports
+      tags:
+      - Transactions
+  /transactions/import/staged/{importId}:
+    delete:
+      description: Remove an item from the staging area without creating a transaction
+      parameters:
+      - description: Import ID
+        in: path
+        name: importId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete Staged Import
+      tags:
+      - Transactions
+    patch:
+      consumes:
+      - application/json
+      description: Manually map a staged import to an account and category
+      parameters:
+      - description: Import ID
+        in: path
+        name: importId
+        required: true
+        type: string
+      - description: Mapping Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.PatchImportedRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.ImportedTransactionResponse'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Update Staged Import Mapping
+      tags:
+      - Transactions
+  /transactions/import/staged/{importId}/create:
+    post:
+      description: Finalize a staged import by creating a real transaction
+      parameters:
+      - description: Import ID
+        in: path
+        name: importId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.TransactionResponse'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Create Transaction from Staged Import
+      tags:
+      - Transactions
+  /transactions/import/staged/create-many:
+    post:
+      consumes:
+      - application/json
+      description: Finalize multiple staged imports at once
+      parameters:
+      - description: Import IDs Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateManyImportedRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.SuccessEnvelope'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.BatchImportResult'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Create Multiple Transactions from Staged Imports
       tags:
       - Transactions
 securityDefinitions:

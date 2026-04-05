@@ -218,6 +218,30 @@ func (s *AuthService) UploadAvatar(ctx context.Context, userID string, file *mul
 	return &res, nil
 }
 
+func (s *AuthService) GetMyAvatars(ctx context.Context, userID string) ([]dto.MediaResponse, error) {
+	if s.s3 == nil {
+		return nil, errors.New("storage not configured")
+	}
+
+	prefix := fmt.Sprintf("avatars/%s/", userID)
+	objects, err := s.s3.ListObjects(ctx, prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	var res []dto.MediaResponse
+	for _, obj := range objects {
+		res = append(res, dto.MediaResponse{
+			Key:       obj.Key,
+			URL:       s.s3.AvatarURL(s.cfg.PublicBaseURL, obj.Key),
+			Size:      obj.Size,
+			UpdatedAt: obj.LastModified,
+		})
+	}
+
+	return res, nil
+}
+
 func (s *AuthService) UpdateMyProfile(ctx context.Context, userID string, displayName, email, phone, username *string) (*dto.UserResponse, error) {
 	params := entity.UpdateUserParams{}
 	if displayName != nil {

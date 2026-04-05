@@ -13,3 +13,11 @@ func NormalizeOptionalString(s *string) *string {
 	}
 	return &v
 }
+
+// Coalesce returns the value if not nil, else the default value.
+func Coalesce(v *string, def string) string {
+	if v == nil {
+		return def
+	}
+	return *v
+}
