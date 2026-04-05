@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"path/filepath"
 	"strings"
@@ -34,13 +35,23 @@ func NewS3Client(cfg S3Config) (*S3Client, error) {
 		return nil, nil // Silently skip if no endpoint (standard dev behavior)
 	}
 
+	// Diagnostics (masked)
+	maskedKey := "****" 
+	if len(cfg.AccessKey) > 4 {
+		maskedKey = cfg.AccessKey[:4] + "****"
+	}
+	slog.Info("initializing s3 storage", "endpoint", cfg.Endpoint, "bucket", cfg.Bucket, "access_key", maskedKey)
+
 	client, err := minio.New(cfg.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
 		Secure: cfg.UseSSL,
 		Region: "auto", // Most compatible with SeaweedFS/S3 variants
+		// SeaweedFS production often requires PathStyle to avoid DNS issues with bucket subdomains
+		// especially within custom internal docker networks.
+		BucketLookup: minio.BucketLookupPath,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize s3 client at %s: %w", cfg.Endpoint, err)
+		return nil, fmt.Errorf("failed to initialize s3 client for %s: %w", cfg.Endpoint, err)
 	}
 
 	s := &S3Client{

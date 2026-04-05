@@ -37,9 +37,11 @@ func Load() (*Config, error) {
 	cfg.Port = getenvIntDefault("PORT", 8080)
 	cfg.DatabaseURL = os.Getenv("DATABASE_URL")
 	
-	// Redis: favor REDIS_HOST if provided, otherwise fallback to sunflower-redis
+	// Redis: support unified URL or individual parts
 	cfg.RedisURL = os.Getenv("REDIS_URL")
-	if os.Getenv("REDIS_HOST") != "" || cfg.RedisURL == "" {
+	redisHost := os.Getenv("REDIS_HOST")
+	// FORCE REBUILD if URL is missing OR looks mangled (typical production interpolation error)
+	if redisHost != "" || cfg.RedisURL == "" || strings.Contains(cfg.RedisURL, "default:s") {
 		host := getenvDefault("REDIS_HOST", "sunflower-redis")
 		port := getenvIntDefault("REDIS_PORT", 6379)
 		pass := os.Getenv("REDIS_PASSWORD")

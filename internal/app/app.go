@@ -158,6 +158,9 @@ func New(cfg *config.Config) (*App, error) {
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("ok"))
 		})
+		r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("ok"))
+		})
 
 		authHandler.RegisterRoutes(r, cfg)
 		profileHandler.RegisterRoutes(r, cfg)
