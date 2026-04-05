@@ -29,6 +29,9 @@ pipeline {
 
         GOEN_MARKET_DATA_CONTAINER_NAME = credentials('GOEN_MARKET_DATA_CONTAINER_NAME')
         GOEN_MARKET_DATA_STATUS_PORT    = credentials('GOEN_MARKET_DATA_STATUS_PORT')
+
+        SEAWEEDFS_ACCESS_KEY_ID     = credentials('SEAWEEDFS_ACCESS_KEY_ID')
+        SEAWEEDFS_SECRET_ACCESS_KEY = credentials('SEAWEEDFS_SECRET_ACCESS_KEY')
     }
 
     stages {
