@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -23,10 +24,23 @@ func NewRedis(url string) (*Redis, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("failed to connect to redis: %w", err)
+		maskedURL := redactRedisURL(url)
+		return nil, fmt.Errorf("failed to connect to redis at %s: %w", maskedURL, err)
 	}
 
 	return &Redis{client: client}, nil
+}
+
+func redactRedisURL(url string) string {
+	if !strings.Contains(url, "@") {
+		return url
+	}
+	parts := strings.SplitN(url, "@", 2)
+	prefixParts := strings.SplitN(parts[0], ":", 3)
+	if len(prefixParts) > 2 {
+		return fmt.Sprintf("%s:****@%s", prefixParts[0], parts[1])
+	}
+	return "****@" + parts[1]
 }
 
 func (r *Redis) Close() error {
