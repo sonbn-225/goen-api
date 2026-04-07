@@ -21,24 +21,17 @@ func NewBaseRepo(db *database.Postgres) *BaseRepo {
 }
 
 // SoftDelete performs a soft delete on the specified table for the given ID.
-// It sets the deleted_at timestamp and optionally the updated_by field.
 func (r *BaseRepo) SoftDelete(ctx context.Context, table string, id uuid.UUID, userID *uuid.UUID) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
 	}
 
-	now := utils.Now()
-	query := fmt.Sprintf("UPDATE %s SET deleted_at = $1", table)
-	args := []any{now}
+	_ = userID
 
-	if userID != nil {
-		query += ", updated_by = $2 WHERE id = $3 AND deleted_at IS NULL"
-		args = append(args, *userID, id)
-	} else {
-		query += " WHERE id = $2 AND deleted_at IS NULL"
-		args = append(args, id)
-	}
+	now := utils.Now()
+	query := fmt.Sprintf("UPDATE %s SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL", table)
+	args := []any{now, id}
 
 	commandTag, err := pool.Exec(ctx, query, args...)
 	if err != nil {
@@ -59,18 +52,11 @@ func (r *BaseRepo) SoftDeleteByField(ctx context.Context, table string, field st
 		return err
 	}
 
+	_ = userID
+
 	now := utils.Now()
-	query := fmt.Sprintf("UPDATE %s SET deleted_at = $1", table)
+	query := fmt.Sprintf("UPDATE %s SET deleted_at = $1 WHERE %s = $2 AND deleted_at IS NULL", table, field)
 	args := []any{now}
-
-	argCount := 2
-	if userID != nil {
-		query += fmt.Sprintf(", updated_by = $%d", argCount)
-		args = append(args, *userID)
-		argCount++
-	}
-
-	query += fmt.Sprintf(" WHERE %s = $%d AND deleted_at IS NULL", field, argCount)
 	args = append(args, value)
 
 	_, err = pool.Exec(ctx, query, args...)

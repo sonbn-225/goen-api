@@ -44,7 +44,7 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID uuid.UUID, 
 			t.account_id, t.from_account_id, t.to_account_id, t.exchange_rate::text,
 			a.currency AS account_currency, fa.currency AS from_currency, ta.currency AS to_currency,
 			t.status, t.created_at, t.updated_at, t.deleted_at,
-			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::text[]) AS tag_ids
+			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::uuid[]) AS tag_ids
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN accounts fa ON fa.id = t.from_account_id
@@ -95,7 +95,7 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID uuid.UUID, 
 	// Line Items
 	rows, err := pool.Query(ctx, `
 		SELECT li.id, li.category_id, li.amount::text, li.note,
-		       COALESCE((SELECT array_agg(tlit.tag_id ORDER BY tlit.tag_id) FROM transaction_line_item_tags tlit WHERE tlit.line_item_id = li.id), '{}'::text[])
+		       COALESCE((SELECT array_agg(tlit.tag_id ORDER BY tlit.tag_id) FROM transaction_line_item_tags tlit WHERE tlit.line_item_id = li.id), '{}'::uuid[])
 		FROM transaction_line_items li
 		WHERE li.transaction_id = $1 ORDER BY li.id ASC
 	`, t.ID)
@@ -194,8 +194,8 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID uuid.UUID
 			t.account_id, t.from_account_id, t.to_account_id, t.exchange_rate::text,
 			a.currency AS account_currency, fa.currency AS from_currency, ta.currency AS to_currency,
 			t.status, t.created_at, t.updated_at, t.deleted_at,
-			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::text[]) AS tag_ids,
-			COALESCE((SELECT array_agg(DISTINCT tli.category_id ORDER BY tli.category_id) FROM transaction_line_items tli WHERE tli.transaction_id = t.id AND tli.category_id IS NOT NULL), '{}'::text[]) AS category_ids
+			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::uuid[]) AS tag_ids,
+			COALESCE((SELECT array_agg(DISTINCT tli.category_id ORDER BY tli.category_id) FROM transaction_line_items tli WHERE tli.transaction_id = t.id AND tli.category_id IS NOT NULL), '{}'::uuid[]) AS category_ids
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN accounts fa ON fa.id = t.from_account_id

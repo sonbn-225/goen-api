@@ -8,6 +8,7 @@ import (
 type CategoryResponse struct {
 	ID               uuid.UUID  `json:"id"`
 	Key              string     `json:"key"`
+	ParentKey        *string    `json:"parent_key,omitempty"`
 	ParentCategoryID *uuid.UUID `json:"parent_category_id,omitempty"`
 	Type             *string    `json:"type,omitempty"`
 	SortOrder        *int       `index:"sort_order,omitempty" json:"sort_order,omitempty"`
@@ -20,6 +21,7 @@ func NewCategoryResponse(it entity.Category) CategoryResponse {
 	return CategoryResponse{
 		ID:               it.ID,
 		Key:              it.Key,
+		ParentKey:        it.ParentKey,
 		ParentCategoryID: it.ParentCategoryID,
 		Type:             it.Type,
 		SortOrder:        it.SortOrder,

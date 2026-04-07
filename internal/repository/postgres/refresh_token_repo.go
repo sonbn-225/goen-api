@@ -24,9 +24,9 @@ func (r *RefreshTokenRepo) Create(ctx context.Context, t *entity.RefreshToken) e
 	}
 
 	_, err = pool.Exec(ctx, `
-		INSERT INTO refresh_tokens (id, user_id, token, expires_at, created_at)
-		VALUES ($1, $2, $3, $4, $5)
-	`, t.ID, t.UserID, t.Token, t.ExpiresAt, t.CreatedAt)
+		INSERT INTO refresh_tokens (id, user_id, token, expires_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, t.ID, t.UserID, t.Token, t.ExpiresAt, t.CreatedAt, t.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to insert refresh token: %w", err)
 	}
@@ -41,12 +41,12 @@ func (r *RefreshTokenRepo) GetByToken(ctx context.Context, token string) (*entit
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, user_id, token, expires_at, created_at
+		SELECT id, user_id, token, expires_at, created_at, updated_at
 		FROM refresh_tokens WHERE token = $1
 	`, token)
 
 	var t entity.RefreshToken
-	err = row.Scan(&t.ID, &t.UserID, &t.Token, &t.ExpiresAt, &t.CreatedAt)
+	err = row.Scan(&t.ID, &t.UserID, &t.Token, &t.ExpiresAt, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get refresh token: %w", err)
 	}

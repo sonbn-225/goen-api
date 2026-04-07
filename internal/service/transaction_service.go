@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
@@ -99,6 +100,13 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 	}
 
 	lineItems := make([]entity.TransactionLineItem, 0, len(req.LineItems))
+	if kind == "income" && len(req.LineItems) > 1 {
+		return nil, errors.New("income transactions support a single line item only")
+	}
+	if kind == "income" && len(req.GroupParticipants) > 0 {
+		return nil, errors.New("group participants are only supported for expense transactions")
+	}
+
 	// If CategoryID is top-level and no line items, create a default one.
 	if len(req.LineItems) == 0 && req.CategoryID != nil && *req.CategoryID != uuid.Nil {
 		lineItems = append(lineItems, entity.TransactionLineItem{
@@ -165,7 +173,7 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 		FromAccountID: req.FromAccountID,
 		ToAccountID:   req.ToAccountID,
 		ExchangeRate:  utils.NormalizeOptionalString(req.ExchangeRate),
-		Status:        "pending",
+		Status:        "posted",
 	}
 
 	tagIDs, _ := s.ensureTags(ctx, userID, req.TagIDs, req.Lang)
@@ -194,6 +202,10 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 	}
 
 	if err := s.repo.CreateTransaction(ctx, userID, tx, lineItems, tagIDs, participants); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "fk_tli_category" {
+			return nil, errors.New("invalid category_id")
+		}
 		return nil, err
 	}
 

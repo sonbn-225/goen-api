@@ -22,7 +22,7 @@ func NewUserRepo(db *database.Postgres) *UserRepo {
 	return &UserRepo{db: db}
 }
 
-func (r *UserRepo) CreateUser(ctx context.Context, u entity.UserWithPassword) error {
+func (r *UserRepo) CreateUserWithRefreshToken(ctx context.Context, u entity.UserWithPassword, refreshToken entity.RefreshToken) error {
 	settingsJSON, err := json.Marshal(u.Settings)
 	if err != nil {
 		return fmt.Errorf("failed to marshal settings: %w", err)
@@ -57,20 +57,29 @@ func (r *UserRepo) CreateUser(ctx context.Context, u entity.UserWithPassword) er
 		// 2. Create initial cash account
 		cashAccountID := uuid.New()
 		_, err = tx.Exec(ctx, `
-			INSERT INTO accounts (id, name, account_type, currency, status, created_at, updated_at, created_by, updated_by)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		`, cashAccountID, "cash_account_name", "cash", defaultCurrency, "active", u.CreatedAt, u.UpdatedAt, u.ID, u.ID)
+			INSERT INTO accounts (id, name, account_type, currency, status, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`, cashAccountID, "cash_account_name", "cash", defaultCurrency, "active", u.CreatedAt, u.UpdatedAt)
 		if err != nil {
 			return fmt.Errorf("failed to create cash account: %w", err)
 		}
 
 		// 3. Link user to account
 		_, err = tx.Exec(ctx, `
-			INSERT INTO user_accounts (id, account_id, user_id, permission, status, created_at, updated_at, created_by, updated_by)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		`, uuid.New(), cashAccountID, u.ID, "owner", "active", u.CreatedAt, u.UpdatedAt, u.ID, u.ID)
+			INSERT INTO user_accounts (id, account_id, user_id, permission, status, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`, uuid.New(), cashAccountID, u.ID, "owner", "active", u.CreatedAt, u.UpdatedAt)
 		if err != nil {
 			return fmt.Errorf("failed to link user to account: %w", err)
+		}
+
+		// 4. Create bootstrap refresh token in the same transaction.
+		_, err = tx.Exec(ctx, `
+			INSERT INTO refresh_tokens (id, user_id, token, expires_at, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, refreshToken.ID, u.ID, refreshToken.Token, refreshToken.ExpiresAt, refreshToken.CreatedAt, refreshToken.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to insert refresh token: %w", err)
 		}
 
 		return nil
