@@ -15,25 +15,24 @@ import (
 )
 
 type AccountRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewAccountRepo(db *database.Postgres) *AccountRepo {
-	return &AccountRepo{db: db}
+	return &AccountRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-func (r *AccountRepo) CreateAccountWithOwner(ctx context.Context, account entity.Account, ownerUserID string) error {
+func (r *AccountRepo) CreateAccountWithOwner(ctx context.Context, account entity.Account, ownerUserID uuid.UUID) error {
 	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
 			INSERT INTO accounts (
-				id, client_id, name, account_number, color, account_type, currency, parent_account_id, status, closed_at,
-				created_at, updated_at, created_by, updated_by, deleted_at
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+				id, name, account_number, color, account_type, currency, parent_account_id, status, closed_at,
+				created_at, updated_at, deleted_at
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		`,
-			account.ID, account.ClientID, account.Name, account.AccountNumber, account.Color,
+			account.ID, account.Name, account.AccountNumber, account.Color,
 			account.AccountType, account.Currency, account.ParentAccountID, account.Status,
-			account.ClosedAt, account.CreatedAt, account.UpdatedAt, account.CreatedBy,
-			account.UpdatedBy, account.DeletedAt,
+			account.ClosedAt, account.CreatedAt, account.UpdatedAt, account.DeletedAt,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert account: %w", err)
@@ -41,11 +40,11 @@ func (r *AccountRepo) CreateAccountWithOwner(ctx context.Context, account entity
 
 		_, err = tx.Exec(ctx, `
 			INSERT INTO user_accounts (
-				id, account_id, user_id, permission, status, revoked_at, created_at, updated_at, created_by, updated_by
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+				id, account_id, user_id, permission, status, revoked_at, created_at, updated_at
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 		`,
-			uuid.NewString(), account.ID, ownerUserID, "owner", "active", nil,
-			account.CreatedAt, account.UpdatedAt, ownerUserID, ownerUserID,
+			uuid.New(), account.ID, ownerUserID, "owner", "active", nil,
+			account.CreatedAt, account.UpdatedAt,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to link user to account: %w", err)
@@ -55,7 +54,7 @@ func (r *AccountRepo) CreateAccountWithOwner(ctx context.Context, account entity
 			_, err := tx.Exec(ctx, `
 				INSERT INTO investment_accounts (id, account_id, created_at, updated_at)
 				VALUES ($1,$2,$3,$4)
-			`, uuid.NewString(), account.ID, account.CreatedAt, account.UpdatedAt)
+			`, uuid.New(), account.ID, account.CreatedAt, account.UpdatedAt)
 			if err != nil {
 				return fmt.Errorf("failed to create investment account extension: %w", err)
 			}
@@ -65,15 +64,15 @@ func (r *AccountRepo) CreateAccountWithOwner(ctx context.Context, account entity
 	})
 }
 
-func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID string) ([]entity.Account, error) {
+func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID uuid.UUID) ([]entity.Account, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT a.id, a.client_id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
-		       a.created_at, a.updated_at, a.created_by, a.updated_by, a.deleted_at,
+		SELECT a.id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
+		       a.created_at, a.updated_at, a.deleted_at,
 		       COALESCE(SUM(
 		         CASE
 		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
@@ -103,9 +102,9 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID string) ([
 	for rows.Next() {
 		var a entity.Account
 		err := rows.Scan(
-			&a.ID, &a.ClientID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
-			&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt, &a.CreatedBy,
-			&a.UpdatedBy, &a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
+			&a.ID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
+			&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
+			&a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
 		)
 		if err != nil {
 			return nil, err
@@ -115,15 +114,15 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID string) ([
 	return out, rows.Err()
 }
 
-func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID string, accountID string) (*entity.Account, error) {
+func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT a.id, a.client_id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
-		       a.created_at, a.updated_at, a.created_by, a.updated_by, a.deleted_at,
+		SELECT a.id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
+		       a.created_at, a.updated_at, a.deleted_at,
 		       COALESCE(SUM(
 		         CASE
 		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
@@ -146,9 +145,9 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID string, acco
 
 	var a entity.Account
 	err = row.Scan(
-		&a.ID, &a.ClientID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
-		&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt, &a.CreatedBy,
-		&a.UpdatedBy, &a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
+		&a.ID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
+		&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
+		&a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -159,7 +158,7 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID string, acco
 	return &a, nil
 }
 
-func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID string, accountID string, patch entity.AccountPatch) (*entity.Account, error) {
+func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID, patch entity.AccountPatch) (*entity.Account, error) {
 	var out *entity.Account
 	now := time.Now().UTC()
 
@@ -198,9 +197,9 @@ func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID string, acco
 
 		_, err = tx.Exec(ctx, `
 			UPDATE accounts
-			SET name = $1, color = $2, status = $3, closed_at = $4, updated_at = $5, updated_by = $6
-			WHERE id = $7 AND deleted_at IS NULL
-		`, name, color, status, closedAt, now, actorUserID, accountID)
+			SET name = $1, color = $2, status = $3, closed_at = $4, updated_at = $5
+			WHERE id = $6 AND deleted_at IS NULL
+		`, name, color, status, closedAt, now, accountID)
 		if err != nil {
 			return err
 		}
@@ -216,23 +215,24 @@ func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID string, acco
 	return out, err
 }
 
-func (r *AccountRepo) DeleteAccount(ctx context.Context, actorUserID string, accountID string) error {
-	now := time.Now().UTC()
+func (r *AccountRepo) DeleteAccount(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID) error {
 	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
 		if err := r.requireAccountOwner(ctx, tx, actorUserID, accountID); err != nil {
 			return err
 		}
 
+		// Use manual update here because we are in a transaction
+		now := time.Now().UTC()
 		_, err := tx.Exec(ctx, `
 			UPDATE accounts
-			SET deleted_at = $1, updated_at = $1, updated_by = $2
-			WHERE id = $3 AND deleted_at IS NULL
-		`, now, actorUserID, accountID)
+			SET deleted_at = $1, updated_at = $1
+			WHERE id = $2 AND deleted_at IS NULL
+		`, now, accountID)
 		return err
 	})
 }
 
-func (r *AccountRepo) HasRelatedTransferTransactionsForAccount(ctx context.Context, accountID string) (bool, error) {
+func (r *AccountRepo) HasRelatedTransferTransactionsForAccount(ctx context.Context, accountID uuid.UUID) (bool, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return false, err
@@ -249,7 +249,7 @@ func (r *AccountRepo) HasRelatedTransferTransactionsForAccount(ctx context.Conte
 	return exists, err
 }
 
-func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID string) ([]entity.AccountBalance, error) {
+func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID uuid.UUID) ([]entity.AccountBalance, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -291,7 +291,7 @@ func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID str
 	return out, rows.Err()
 }
 
-func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID string, accountID string) ([]entity.AccountShare, error) {
+func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID) ([]entity.AccountShare, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -299,7 +299,7 @@ func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID string,
 
 	rows, err := pool.Query(ctx, `
 		SELECT ua.id, ua.account_id, ua.user_id, ua.permission, ua.status, ua.revoked_at,
-		       ua.created_at, ua.updated_at, ua.created_by, ua.updated_by,
+		       ua.created_at, ua.updated_at,
 		       u.email, u.phone, u.display_name
 		FROM user_accounts ua
 		JOIN users u ON u.id = ua.user_id
@@ -316,7 +316,7 @@ func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID string,
 		var it entity.AccountShare
 		err := rows.Scan(
 			&it.ID, &it.AccountID, &it.UserID, &it.Permission, &it.Status, &it.RevokedAt,
-			&it.CreatedAt, &it.UpdatedAt, &it.CreatedBy, &it.UpdatedBy,
+			&it.CreatedAt, &it.UpdatedAt,
 			&it.UserEmail, &it.UserPhone, &it.UserDisplayName,
 		)
 		if err != nil {
@@ -327,7 +327,7 @@ func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID string,
 	return out, rows.Err()
 }
 
-func (r *AccountRepo) UpsertAccountShare(ctx context.Context, actorUserID string, accountID string, targetUserID string, permission string) (*entity.AccountShare, error) {
+func (r *AccountRepo) UpsertAccountShare(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID, targetUserID uuid.UUID, permission string) (*entity.AccountShare, error) {
 	now := time.Now().UTC()
 	var out *entity.AccountShare
 
@@ -336,21 +336,21 @@ func (r *AccountRepo) UpsertAccountShare(ctx context.Context, actorUserID string
 			return err
 		}
 
-		uaID := uuid.NewString()
+		uaID := uuid.New()
 		row := tx.QueryRow(ctx, `
 			INSERT INTO user_accounts (
 				id, account_id, user_id, permission, status, revoked_at,
-				created_at, updated_at, created_by, updated_by
-			) VALUES ($1,$2,$3,$4,'active',NULL,$5,$5,$6,$6)
+				created_at, updated_at
+			) VALUES ($1,$2,$3,$4,'active',NULL,$5,$5)
 			ON CONFLICT (account_id, user_id) DO UPDATE
-			SET permission = EXCLUDED.permission, status = 'active', revoked_at = NULL, updated_at = $5, updated_by = $6
-			RETURNING id, account_id, user_id, permission, status, revoked_at, created_at, updated_at, created_by, updated_by
-		`, uaID, accountID, targetUserID, permission, now, actorUserID)
+			SET permission = EXCLUDED.permission, status = 'active', revoked_at = NULL, updated_at = $5
+			RETURNING id, account_id, user_id, permission, status, revoked_at, created_at, updated_at
+		`, uaID, accountID, targetUserID, permission, now)
 
 		var it entity.AccountShare
 		if err := row.Scan(
 			&it.ID, &it.AccountID, &it.UserID, &it.Permission, &it.Status, &it.RevokedAt,
-			&it.CreatedAt, &it.UpdatedAt, &it.CreatedBy, &it.UpdatedBy,
+			&it.CreatedAt, &it.UpdatedAt,
 		); err != nil {
 			return err
 		}
@@ -363,7 +363,7 @@ func (r *AccountRepo) UpsertAccountShare(ctx context.Context, actorUserID string
 	return out, err
 }
 
-func (r *AccountRepo) RevokeAccountShare(ctx context.Context, actorUserID string, accountID string, targetUserID string) error {
+func (r *AccountRepo) RevokeAccountShare(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID, targetUserID uuid.UUID) error {
 	now := time.Now().UTC()
 	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
 		if err := r.requireAccountOwner(ctx, tx, actorUserID, accountID); err != nil {
@@ -372,14 +372,14 @@ func (r *AccountRepo) RevokeAccountShare(ctx context.Context, actorUserID string
 
 		_, err := tx.Exec(ctx, `
 			UPDATE user_accounts
-			SET status = 'revoked', revoked_at = $1, updated_at = $1, updated_by = $2
-			WHERE account_id = $3 AND user_id = $4 AND permission != 'owner'
-		`, now, actorUserID, accountID, targetUserID)
+			SET status = 'revoked', revoked_at = $1, updated_at = $1
+			WHERE account_id = $2 AND user_id = $3 AND permission != 'owner'
+		`, now, accountID, targetUserID)
 		return err
 	})
 }
 
-func (r *AccountRepo) ListAccountAuditEvents(ctx context.Context, actorUserID string, accountID string, limit int) ([]entity.AccountAuditEvent, error) {
+func (r *AccountRepo) ListAccountAuditEvents(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID, limit int) ([]entity.AccountAuditEvent, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -424,7 +424,7 @@ func (r *AccountRepo) ListAccountAuditEvents(ctx context.Context, actorUserID st
 	return out, nil
 }
 
-func (r *AccountRepo) requireAccountOwner(ctx context.Context, tx pgx.Tx, userID string, accountID string) error {
+func (r *AccountRepo) requireAccountOwner(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) error {
 	var one int
 	err := tx.QueryRow(ctx, `
 		SELECT 1 FROM user_accounts
@@ -439,10 +439,10 @@ func (r *AccountRepo) requireAccountOwner(ctx context.Context, tx pgx.Tx, userID
 	return nil
 }
 
-func (r *AccountRepo) getAccountInTx(ctx context.Context, tx pgx.Tx, userID, accountID string) (*entity.Account, error) {
+func (r *AccountRepo) getAccountInTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
 	row := tx.QueryRow(ctx, `
-		SELECT a.id, a.client_id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
-		       a.created_at, a.updated_at, a.created_by, a.updated_by, a.deleted_at,
+		SELECT a.id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
+		       a.created_at, a.updated_at, a.deleted_at,
 		       COALESCE(SUM(
 		         CASE
 		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
@@ -465,9 +465,9 @@ func (r *AccountRepo) getAccountInTx(ctx context.Context, tx pgx.Tx, userID, acc
 
 	var a entity.Account
 	err := row.Scan(
-		&a.ID, &a.ClientID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
-		&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt, &a.CreatedBy,
-		&a.UpdatedBy, &a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
+		&a.ID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
+		&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
+		&a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

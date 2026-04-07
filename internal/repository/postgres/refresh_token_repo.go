@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 )
@@ -63,7 +64,7 @@ func (r *RefreshTokenRepo) DeleteByToken(ctx context.Context, token string) erro
 	return err
 }
 
-func (r *RefreshTokenRepo) DeleteAllByUserID(ctx context.Context, userID string) error {
+func (r *RefreshTokenRepo) DeleteAllByUserID(ctx context.Context, userID uuid.UUID) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err

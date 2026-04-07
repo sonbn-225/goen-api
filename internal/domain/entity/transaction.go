@@ -2,20 +2,21 @@ package entity
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type TransactionLineItem struct {
-	ID            string   `json:"id"`
-	CategoryID    *string  `json:"category_id,omitempty"`
-	TagIDs        []string `json:"tag_ids,omitempty"`
-	Amount        string   `json:"amount"`
-	Note          *string  `json:"note,omitempty"`
-	TransactionID string   `json:"-"`
+	BaseEntity
+	CategoryID    *uuid.UUID  `json:"category_id,omitempty"`
+	TagIDs        []uuid.UUID `json:"tag_ids,omitempty"`
+	Amount        string      `json:"amount"`
+	Note          *string     `json:"note,omitempty"`
+	TransactionID uuid.UUID   `json:"-"`
 }
 
 type Transaction struct {
-	ID           string    `json:"id"`
-	ClientID     *string   `json:"client_id,omitempty"`
+	AuditEntity
 	ExternalRef  *string   `json:"external_ref,omitempty"`
 	Type         string    `json:"type"` // expense, income, transfer
 	OccurredAt   time.Time `json:"occurred_at"`
@@ -29,19 +30,14 @@ type Transaction struct {
 	FromCurrency    *string               `json:"from_currency,omitempty"`
 	ToCurrency      *string               `json:"to_currency,omitempty"`
 	Description     *string               `json:"description,omitempty"`
-	AccountID       *string               `json:"account_id,omitempty"`
-	FromAccountID   *string               `json:"from_account_id,omitempty"`
-	ToAccountID     *string               `json:"to_account_id,omitempty"`
+	AccountID       *uuid.UUID            `json:"account_id,omitempty"`
+	FromAccountID   *uuid.UUID            `json:"from_account_id,omitempty"`
+	ToAccountID     *uuid.UUID            `json:"to_account_id,omitempty"`
 	ExchangeRate    *string               `json:"exchange_rate,omitempty"`
 	Status          string                `json:"status"` // pending, posted, cancelled
-	CreatedAt       time.Time             `json:"created_at"`
-	UpdatedAt       time.Time             `json:"updated_at"`
-	CreatedBy       *string               `json:"created_by,omitempty"`
-	UpdatedBy       *string               `json:"updated_by,omitempty"`
-	DeletedAt       *time.Time            `json:"deleted_at,omitempty"`
 	LineItems       []TransactionLineItem `json:"line_items,omitempty"`
-	TagIDs          []string              `json:"tag_ids,omitempty"`
-	CategoryIDs     []string              `json:"category_ids,omitempty"`
+	TagIDs          []uuid.UUID           `json:"tag_ids,omitempty"`
+	CategoryIDs     []uuid.UUID           `json:"category_ids,omitempty"`
 
 	// Wrapper fields (enriched)
 	CategoryNames  []string `json:"category_names,omitempty"`
@@ -51,8 +47,8 @@ type Transaction struct {
 }
 
 type TransactionListFilter struct {
-	AccountID         *string
-	CategoryID        *string
+	AccountID         *uuid.UUID
+	CategoryID        *uuid.UUID
 	Type              *string
 	Search            *string
 	ExternalRefFamily *string
@@ -65,8 +61,8 @@ type TransactionListFilter struct {
 
 type TransactionPatch struct {
 	Description       *string
-	CategoryIDs       []string
-	TagIDs            []string
+	CategoryIDs       []uuid.UUID
+	TagIDs            []uuid.UUID
 	Amount            *string
 	Status            *string
 	OccurredAt        *time.Time

@@ -490,7 +490,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "Target User ID or Username",
+                        "description": "Target User ID",
                         "name": "userId",
                         "in": "path",
                         "required": true
@@ -5567,9 +5567,6 @@
                 "balance": {
                     "type": "string"
                 },
-                "client_id": {
-                    "type": "string"
-                },
                 "color": {
                     "type": "string"
                 },
@@ -5770,6 +5767,9 @@
                 "is_active": {
                     "type": "boolean"
                 },
+                "key_name": {
+                    "type": "string"
+                },
                 "parent_category_id": {
                     "type": "string"
                 },
@@ -5908,9 +5908,6 @@
                 "account_id": {
                     "type": "string"
                 },
-                "client_id": {
-                    "type": "string"
-                },
                 "contact_id": {
                     "type": "string"
                 },
@@ -5951,9 +5948,6 @@
                     "type": "string"
                 },
                 "category_id": {
-                    "type": "string"
-                },
-                "client_id": {
                     "type": "string"
                 },
                 "description": {
@@ -6119,9 +6113,6 @@
         "dto.CreateTradeRequest": {
             "type": "object",
             "properties": {
-                "client_id": {
-                    "type": "string"
-                },
                 "fee_category_id": {
                     "type": "string"
                 },
@@ -6192,9 +6183,6 @@
                     "type": "string"
                 },
                 "category_id": {
-                    "type": "string"
-                },
-                "client_id": {
                     "type": "string"
                 },
                 "description": {
@@ -6307,9 +6295,6 @@
                     "type": "string"
                 },
                 "accrued_interest": {
-                    "type": "string"
-                },
-                "client_id": {
                     "type": "string"
                 },
                 "contact_avatar_url": {
@@ -7256,9 +7241,6 @@
                 "broker_account_id": {
                     "type": "string"
                 },
-                "client_id": {
-                    "type": "string"
-                },
                 "fee_transaction_id": {
                     "type": "string"
                 },
@@ -7390,9 +7372,6 @@
                     "items": {
                         "type": "string"
                     }
-                },
-                "client_id": {
-                    "type": "string"
                 },
                 "description": {
                     "type": "string"

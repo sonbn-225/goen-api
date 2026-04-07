@@ -7,26 +7,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 )
 
 type GroupExpenseRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewGroupExpenseRepo(db *database.Postgres) *GroupExpenseRepo {
-	return &GroupExpenseRepo{db: db}
+	return &GroupExpenseRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-func (r *GroupExpenseRepo) CreateGroupExpense(ctx context.Context, userID string, tx entity.Transaction, lineItems []entity.TransactionLineItem, tagIDs []string, participants []entity.GroupExpenseParticipant) error {
+func (r *GroupExpenseRepo) CreateGroupExpense(ctx context.Context, userID uuid.UUID, tx entity.Transaction, lineItems []entity.TransactionLineItem, tagIDs []uuid.UUID, participants []entity.GroupExpenseParticipant) error {
 	return r.db.WithTx(ctx, func(txConn pgx.Tx) error {
 		return createTransactionTx(ctx, txConn, userID, tx, lineItems, tagIDs, participants)
 	})
 }
 
-func (r *GroupExpenseRepo) ListParticipantsByTransaction(ctx context.Context, userID, transactionID string) ([]entity.GroupExpenseParticipant, error) {
+func (r *GroupExpenseRepo) ListParticipantsByTransaction(ctx context.Context, userID, transactionID uuid.UUID) ([]entity.GroupExpenseParticipant, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -61,12 +62,12 @@ func (r *GroupExpenseRepo) ListParticipantsByTransaction(ctx context.Context, us
 	return results, nil
 }
 
-func (r *GroupExpenseRepo) SettleParticipant(ctx context.Context, userID, participantID string, settlementTx entity.Transaction, settlementLineItems []entity.TransactionLineItem, settlementTagIDs []string) (string, error) {
-	var createdID string
+func (r *GroupExpenseRepo) SettleParticipant(ctx context.Context, userID, participantID uuid.UUID, settlementTx entity.Transaction, settlementLineItems []entity.TransactionLineItem, settlementTagIDs []uuid.UUID) (uuid.UUID, error) {
+	var createdID uuid.UUID
 	err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {
 		var (
 			isSettled bool
-			txID      string
+			txID      uuid.UUID
 			shareAmt  string
 			name      string
 		)
@@ -119,12 +120,12 @@ func (r *GroupExpenseRepo) SettleParticipant(ctx context.Context, userID, partic
 	})
 	
 	if err != nil {
-		return "", err
+		return uuid.Nil, err
 	}
 	return createdID, nil
 }
 
-func (r *GroupExpenseRepo) ListUniqueParticipantNames(ctx context.Context, userID string, limit int) ([]string, error) {
+func (r *GroupExpenseRepo) ListUniqueParticipantNames(ctx context.Context, userID uuid.UUID, limit int) ([]string, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -157,7 +158,7 @@ func (r *GroupExpenseRepo) ListUniqueParticipantNames(ctx context.Context, userI
 	return names, nil
 }
 
-func (r *GroupExpenseRepo) ListUnsettledParticipantsByName(ctx context.Context, userID string, name string) ([]entity.GroupExpenseParticipant, error) {
+func (r *GroupExpenseRepo) ListUnsettledParticipantsByName(ctx context.Context, userID uuid.UUID, name string) ([]entity.GroupExpenseParticipant, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -192,7 +193,7 @@ func (r *GroupExpenseRepo) ListUnsettledParticipantsByName(ctx context.Context, 
 	return results, nil
 }
 
-func (r *GroupExpenseRepo) ListPublicParticipants(ctx context.Context, userID string) ([]string, error) {
+func (r *GroupExpenseRepo) ListPublicParticipants(ctx context.Context, userID uuid.UUID) ([]string, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -220,7 +221,7 @@ func (r *GroupExpenseRepo) ListPublicParticipants(ctx context.Context, userID st
 	return names, nil
 }
 
-func (r *GroupExpenseRepo) ListPublicDebtsByParticipant(ctx context.Context, userID string, name string) ([]entity.PublicDebt, error) {
+func (r *GroupExpenseRepo) ListPublicDebtsByParticipant(ctx context.Context, userID uuid.UUID, name string) ([]entity.PublicDebt, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -250,3 +251,4 @@ func (r *GroupExpenseRepo) ListPublicDebtsByParticipant(ctx context.Context, use
 	}
 	return results, nil
 }
+

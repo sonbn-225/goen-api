@@ -11,6 +11,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 type GroupExpenseService struct {
@@ -23,14 +24,14 @@ func NewGroupExpenseService(txSvc interfaces.TransactionService, debtSvc interfa
 	return &GroupExpenseService{txSvc: txSvc, debtSvc: debtSvc, repo: repo}
 }
 
-func (s *GroupExpenseService) Create(ctx context.Context, userID string, req dto.CreateGroupExpenseRequest) (*dto.CreateGroupExpenseResponse, error) {
-	accountID := strings.TrimSpace(req.AccountID)
-	if accountID == "" {
-		return nil, errors.New("account_id is required")
+func (s *GroupExpenseService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateGroupExpenseRequest) (*dto.CreateGroupExpenseResponse, error) {
+	accountID, err := uuid.Parse(strings.TrimSpace(req.AccountID))
+	if err != nil {
+		return nil, errors.New("invalid account_id")
 	}
-	categoryID := strings.TrimSpace(req.CategoryID)
-	if categoryID == "" {
-		return nil, errors.New("category_id is required")
+	categoryID, err := uuid.Parse(strings.TrimSpace(req.CategoryID))
+	if err != nil {
+		return nil, errors.New("invalid category_id")
 	}
 
 	amountStr := strings.TrimSpace(req.Amount)
@@ -129,16 +130,18 @@ func (s *GroupExpenseService) Create(ctx context.Context, userID string, req dto
 	}
 
 	// Build Transaction
-	now := time.Now().UTC()
-	txID := uuid.NewString()
+	txID := utils.NewID()
 	description := req.Description
 	if description == nil || *description == "" {
 		description = req.Notes
 	}
 
 	tx := entity.Transaction{
-		ID:           txID,
-		ClientID:     req.ClientID,
+		AuditEntity: entity.AuditEntity{
+			BaseEntity: entity.BaseEntity{
+				ID: txID,
+			},
+		},
 		ExternalRef:  req.ExternalRef,
 		Type:         "expense",
 		OccurredAt:   occurredAt,
@@ -147,18 +150,23 @@ func (s *GroupExpenseService) Create(ctx context.Context, userID string, req dto
 		Description:  description,
 		AccountID:    &accountID,
 		Status:       "posted",
-		CreatedAt:    now,
-		UpdatedAt:    now,
-		CreatedBy:    &userID,
-		UpdatedBy:    &userID,
 	}
 
 	lineItems := []entity.TransactionLineItem{
 		{
-			ID:         uuid.NewString(),
+			BaseEntity: entity.BaseEntity{
+				ID: utils.NewID(),
+			},
 			CategoryID: &categoryID,
 			Amount:     tx.Amount,
 		},
+	}
+
+	tagIDs := make([]uuid.UUID, 0, len(req.TagIDs))
+	for _, idStr := range req.TagIDs {
+		if id, err := uuid.Parse(idStr); err == nil {
+			tagIDs = append(tagIDs, id)
+		}
 	}
 
 	participants := []entity.GroupExpenseParticipant{}
@@ -171,20 +179,22 @@ func (s *GroupExpenseService) Create(ctx context.Context, userID string, req dto
 			continue
 		}
 		participants = append(participants, entity.GroupExpenseParticipant{
-			ID:              uuid.NewString(),
+			AuditEntity: entity.AuditEntity{
+				BaseEntity: entity.BaseEntity{
+					ID: utils.NewID(),
+				},
+			},
 			UserID:          userID,
 			TransactionID:   txID,
 			ParticipantName: *p.name,
 			OriginalAmount:  p.originalStr,
 			ShareAmount:     s.formatRatDecimalScale(share, 2),
 			IsSettled:       false,
-			CreatedAt:       now,
-			UpdatedAt:       now,
 		})
 	}
 
 	// Create in Repo
-	if err := s.repo.CreateGroupExpense(ctx, userID, tx, lineItems, req.TagIDs, participants); err != nil {
+	if err := s.repo.CreateGroupExpense(ctx, userID, tx, lineItems, tagIDs, participants); err != nil {
 		return nil, err
 	}
 
@@ -208,7 +218,7 @@ func (s *GroupExpenseService) Create(ctx context.Context, userID string, req dto
 		interest := "0"
 
 		_, _ = s.debtSvc.Create(ctx, userID, dto.CreateDebtRequest{
-			AccountID:    accountID,
+			AccountID:    accountID.String(),
 			Direction:    "lent",
 			Name:         &debtName,
 			Principal:    principal,
@@ -234,7 +244,7 @@ func (s *GroupExpenseService) Create(ctx context.Context, userID string, req dto
 	}, nil
 }
 
-func (s *GroupExpenseService) ListByTransaction(ctx context.Context, userID, transactionID string) ([]dto.GroupExpenseParticipantResponse, error) {
+func (s *GroupExpenseService) ListByTransaction(ctx context.Context, userID, transactionID uuid.UUID) ([]dto.GroupExpenseParticipantResponse, error) {
 	items, err := s.repo.ListParticipantsByTransaction(ctx, userID, transactionID)
 	if err != nil {
 		return nil, err
@@ -242,29 +252,44 @@ func (s *GroupExpenseService) ListByTransaction(ctx context.Context, userID, tra
 	return dto.NewGroupExpenseParticipantResponses(items), nil
 }
 
-func (s *GroupExpenseService) Settle(ctx context.Context, userID, participantID string, req dto.GroupExpenseSettleRequest) (*dto.TransactionResponse, error) {
+func (s *GroupExpenseService) Settle(ctx context.Context, userID, participantID uuid.UUID, req dto.GroupExpenseSettleRequest) (*dto.TransactionResponse, error) {
+	accountID, err := uuid.Parse(req.AccountID)
+	if err != nil {
+		return nil, errors.New("invalid account_id")
+	}
+
 	occurredAt, occurredDate, err := s.normalizeOccurredAt(req.OccurredAt, req.OccurredDate, req.OccurredTime)
 	if err != nil {
 		return nil, err
 	}
 
-	now := time.Now().UTC()
 	settleTx := entity.Transaction{
-		ID:           uuid.NewString(),
+		AuditEntity: entity.AuditEntity{
+			BaseEntity: entity.BaseEntity{
+				ID: utils.NewID(),
+			},
+		},
 		Type:         "income",
 		OccurredAt:   occurredAt,
 		OccurredDate: occurredDate,
-		AccountID:    &req.AccountID,
+		AccountID:    &accountID,
 		Status:       "posted",
-		CreatedAt:    now,
-		UpdatedAt:    now,
-		CreatedBy:    &userID,
-		UpdatedBy:    &userID,
 	}
 
-	catID := "cat_def_income_reimbursement"
+	catIDStr := "cat_def_income_reimbursement"
+	var categoryID *uuid.UUID
+	if cid, err := uuid.Parse(catIDStr); err == nil {
+		categoryID = &cid
+	}
+
 	settleLineItems := []entity.TransactionLineItem{
-		{ID: uuid.NewString(), CategoryID: &catID, Amount: "0.00"}, // filled by repo
+		{
+			BaseEntity: entity.BaseEntity{
+				ID: utils.NewID(),
+			},
+			CategoryID: categoryID,
+			Amount:     "0.00",
+		}, // filled by repo
 	}
 
 	id, err := s.repo.SettleParticipant(ctx, userID, participantID, settleTx, settleLineItems, nil)
@@ -275,7 +300,7 @@ func (s *GroupExpenseService) Settle(ctx context.Context, userID, participantID 
 	return s.txSvc.Get(ctx, userID, id)
 }
 
-func (s *GroupExpenseService) ListUniqueParticipantNames(ctx context.Context, userID string, limit int) ([]string, error) {
+func (s *GroupExpenseService) ListUniqueParticipantNames(ctx context.Context, userID uuid.UUID, limit int) ([]string, error) {
 	return s.repo.ListUniqueParticipantNames(ctx, userID, limit)
 }
 

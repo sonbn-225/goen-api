@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
@@ -17,7 +18,7 @@ func NewSavingsRepo(db *database.Postgres) *SavingsRepo {
 	return &SavingsRepo{db: db}
 }
 
-func (r *SavingsRepo) CreateSavings(ctx context.Context, userID string, s entity.Savings) error {
+func (r *SavingsRepo) CreateSavings(ctx context.Context, userID uuid.UUID, s entity.Savings) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -37,7 +38,7 @@ func (r *SavingsRepo) CreateSavings(ctx context.Context, userID string, s entity
 	return err
 }
 
-func (r *SavingsRepo) GetSavings(ctx context.Context, userID string, id string) (*entity.Savings, error) {
+func (r *SavingsRepo) GetSavings(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entity.Savings, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -67,7 +68,7 @@ func (r *SavingsRepo) GetSavings(ctx context.Context, userID string, id string) 
 	return &s, nil
 }
 
-func (r *SavingsRepo) ListSavings(ctx context.Context, userID string) ([]entity.Savings, error) {
+func (r *SavingsRepo) ListSavings(ctx context.Context, userID uuid.UUID) ([]entity.Savings, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -104,7 +105,7 @@ func (r *SavingsRepo) ListSavings(ctx context.Context, userID string) ([]entity.
 	return out, nil
 }
 
-func (r *SavingsRepo) UpdateSavings(ctx context.Context, userID string, s entity.Savings) error {
+func (r *SavingsRepo) UpdateSavings(ctx context.Context, userID uuid.UUID, s entity.Savings) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -125,7 +126,7 @@ func (r *SavingsRepo) UpdateSavings(ctx context.Context, userID string, s entity
 	return err
 }
 
-func (r *SavingsRepo) DeleteSavings(ctx context.Context, userID, id string) error {
+func (r *SavingsRepo) DeleteSavings(ctx context.Context, userID, id uuid.UUID) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err

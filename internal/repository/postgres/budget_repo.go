@@ -5,20 +5,21 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 )
 
 type BudgetRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewBudgetRepo(db *database.Postgres) *BudgetRepo {
-	return &BudgetRepo{db: db}
+	return &BudgetRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-func (r *BudgetRepo) CreateBudget(ctx context.Context, userID string, b entity.Budget) error {
+func (r *BudgetRepo) CreateBudget(ctx context.Context, userID uuid.UUID, b entity.Budget) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -36,7 +37,7 @@ func (r *BudgetRepo) CreateBudget(ctx context.Context, userID string, b entity.B
 	return err
 }
 
-func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID string) (*entity.Budget, error) {
+func (r *BudgetRepo) GetBudget(ctx context.Context, userID uuid.UUID, budgetID uuid.UUID) (*entity.Budget, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -48,9 +49,9 @@ func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID stri
 			CASE WHEN period_start IS NULL THEN NULL ELSE to_char(period_start, 'YYYY-MM-DD') END,
 			CASE WHEN period_end IS NULL THEN NULL ELSE to_char(period_end, 'YYYY-MM-DD') END,
 			amount::text, alert_threshold_percent, rollover_mode, category_id,
-			created_at, updated_at
+			created_at, updated_at, deleted_at
 		FROM budgets
-		WHERE id = $1 AND user_id = $2
+		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
 	`, budgetID, userID)
 
 	var b entity.Budget
@@ -58,7 +59,7 @@ func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID stri
 	if err := row.Scan(
 		&b.ID, &b.UserID, &b.Name, &b.Period, &b.PeriodStart, &b.PeriodEnd,
 		&b.Amount, &b.AlertThresholdPercent, &b.RolloverMode, &b.CategoryID,
-		&b.CreatedAt, &b.UpdatedAt,
+		&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("budget not found")
@@ -79,7 +80,7 @@ func (r *BudgetRepo) GetBudget(ctx context.Context, userID string, budgetID stri
 	return &b, nil
 }
 
-func (r *BudgetRepo) ListBudgets(ctx context.Context, userID string) ([]entity.Budget, error) {
+func (r *BudgetRepo) ListBudgets(ctx context.Context, userID uuid.UUID) ([]entity.Budget, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -91,9 +92,9 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID string) ([]entity.B
 			CASE WHEN period_start IS NULL THEN NULL ELSE to_char(period_start, 'YYYY-MM-DD') END,
 			CASE WHEN period_end IS NULL THEN NULL ELSE to_char(period_end, 'YYYY-MM-DD') END,
 			amount::text, alert_threshold_percent, rollover_mode, category_id,
-			created_at, updated_at
+			created_at, updated_at, deleted_at
 		FROM budgets
-		WHERE user_id = $1
+		WHERE user_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at DESC, id DESC
 	`, userID)
 	if err != nil {
@@ -107,7 +108,7 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID string) ([]entity.B
 		if err := rows.Scan(
 			&b.ID, &b.UserID, &b.Name, &b.Period, &b.PeriodStart, &b.PeriodEnd,
 			&b.Amount, &b.AlertThresholdPercent, &b.RolloverMode, &b.CategoryID,
-			&b.CreatedAt, &b.UpdatedAt,
+			&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -125,7 +126,7 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID string) ([]entity.B
 	return results, nil
 }
 
-func (r *BudgetRepo) UpdateBudget(ctx context.Context, userID string, b entity.Budget) error {
+func (r *BudgetRepo) UpdateBudget(ctx context.Context, userID uuid.UUID, b entity.Budget) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -134,22 +135,16 @@ func (r *BudgetRepo) UpdateBudget(ctx context.Context, userID string, b entity.B
 	_, err = pool.Exec(ctx, `
 		UPDATE budgets
 		SET name = $1, amount = $2::numeric, alert_threshold_percent = $3, rollover_mode = $4, updated_at = $5
-		WHERE id = $6 AND user_id = $7
+		WHERE id = $6 AND user_id = $7 AND deleted_at IS NULL
 	`, b.Name, b.Amount, b.AlertThresholdPercent, b.RolloverMode, b.UpdatedAt, b.ID, userID)
 	return err
 }
 
-func (r *BudgetRepo) DeleteBudget(ctx context.Context, userID string, budgetID string) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = pool.Exec(ctx, "DELETE FROM budgets WHERE id = $1 AND user_id = $2", budgetID, userID)
-	return err
+func (r *BudgetRepo) DeleteBudget(ctx context.Context, userID uuid.UUID, budgetID uuid.UUID) error {
+	return r.SoftDelete(ctx, "budgets", budgetID, &userID)
 }
 
-func (r *BudgetRepo) ComputeSpent(ctx context.Context, userID string, categoryID string, startDate string, endDate string) (string, error) {
+func (r *BudgetRepo) ComputeSpent(ctx context.Context, userID uuid.UUID, categoryID uuid.UUID, startDate string, endDate string) (string, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return "", err
@@ -185,3 +180,4 @@ func (r *BudgetRepo) ComputeSpent(ctx context.Context, userID string, categoryID
 	}
 	return spent, nil
 }
+

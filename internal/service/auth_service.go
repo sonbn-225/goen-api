@@ -15,6 +15,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/storage"
+	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -53,17 +54,18 @@ func (s *AuthService) Signup(ctx context.Context, req dto.SignupRequest) (*dto.A
 		return nil, err
 	}
 
-	now := time.Now().UTC()
 	u := entity.UserWithPassword{
 		User: entity.User{
-			ID:          uuid.NewString(),
+			AuditEntity: entity.AuditEntity{
+				BaseEntity: entity.BaseEntity{
+					ID: utils.NewID(),
+				},
+			},
 			Email:       &email,
 			Phone:       &phone,
 			DisplayName: &req.DisplayName,
 			Username:    username,
 			Status:      "active",
-			CreatedAt:   now,
-			UpdatedAt:   now,
 			Settings:    s.defaultUserSettings("en"), // Hardcoded for now
 		},
 		PasswordHash: string(hash),
@@ -179,7 +181,7 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 	return s.refreshRepo.DeleteByToken(ctx, refreshToken)
 }
 
-func (s *AuthService) GetMe(ctx context.Context, userID string) (*dto.UserResponse, error) {
+func (s *AuthService) GetMe(ctx context.Context, userID uuid.UUID) (*dto.UserResponse, error) {
 	u, err := s.userRepo.FindUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -188,7 +190,7 @@ func (s *AuthService) GetMe(ctx context.Context, userID string) (*dto.UserRespon
 	return &res, nil
 }
 
-func (s *AuthService) UpdateMySettings(ctx context.Context, userID string, patch map[string]any) (*dto.UserResponse, error) {
+func (s *AuthService) UpdateMySettings(ctx context.Context, userID uuid.UUID, patch map[string]any) (*dto.UserResponse, error) {
 	u, err := s.userRepo.UpdateUserSettings(ctx, userID, patch)
 	if err != nil {
 		return nil, err
@@ -197,12 +199,12 @@ func (s *AuthService) UpdateMySettings(ctx context.Context, userID string, patch
 	return &res, nil
 }
 
-func (s *AuthService) UploadAvatar(ctx context.Context, userID string, file *multipart.FileHeader) (*dto.UserResponse, error) {
+func (s *AuthService) UploadAvatar(ctx context.Context, userID uuid.UUID, file *multipart.FileHeader) (*dto.UserResponse, error) {
 	if s.s3 == nil {
 		return nil, errors.New("storage not configured")
 	}
 
-	key, err := s.s3.UploadAvatar(ctx, userID, file)
+	key, err := s.s3.UploadAvatar(ctx, userID.String(), file)
 	if err != nil {
 		return nil, err
 	}
@@ -218,12 +220,12 @@ func (s *AuthService) UploadAvatar(ctx context.Context, userID string, file *mul
 	return &res, nil
 }
 
-func (s *AuthService) GetMyAvatars(ctx context.Context, userID string) ([]dto.MediaResponse, error) {
+func (s *AuthService) GetMyAvatars(ctx context.Context, userID uuid.UUID) ([]dto.MediaResponse, error) {
 	if s.s3 == nil {
 		return nil, errors.New("storage not configured")
 	}
 
-	prefix := fmt.Sprintf("avatars/%s/", userID)
+	prefix := fmt.Sprintf("avatars/%s/", userID.String())
 	objects, err := s.s3.ListObjects(ctx, prefix)
 	if err != nil {
 		return nil, err
@@ -242,7 +244,7 @@ func (s *AuthService) GetMyAvatars(ctx context.Context, userID string) ([]dto.Me
 	return res, nil
 }
 
-func (s *AuthService) UpdateMyProfile(ctx context.Context, userID string, displayName, email, phone, username *string) (*dto.UserResponse, error) {
+func (s *AuthService) UpdateMyProfile(ctx context.Context, userID uuid.UUID, displayName, email, phone, username *string) (*dto.UserResponse, error) {
 	params := entity.UpdateUserParams{}
 	if displayName != nil {
 		v := strings.TrimSpace(*displayName)
@@ -269,7 +271,7 @@ func (s *AuthService) UpdateMyProfile(ctx context.Context, userID string, displa
 	return &res, nil
 }
 
-func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error {
 	u, err := s.userRepo.FindUserByID(ctx, userID)
 	if err != nil {
 		return err
@@ -308,7 +310,7 @@ func (s *AuthService) generateAccessToken(user entity.User) (string, int, error)
 	// Access tokens are short-lived
 	exp := time.Now().Add(time.Duration(s.cfg.JWTAccessTTL) * time.Minute)
 	claims := jwt.MapClaims{
-		"sub": user.ID,
+		"sub": user.ID.String(),
 		"iat": time.Now().Unix(),
 		"exp": exp.Unix(),
 	}
@@ -336,17 +338,20 @@ func (s *AuthService) mapToUserResponse(user entity.User) dto.UserResponse {
 	}
 }
 
-func (s *AuthService) generateAndSaveRefreshToken(ctx context.Context, userID string) (string, error) {
+func (s *AuthService) generateAndSaveRefreshToken(ctx context.Context, userID uuid.UUID) (string, error) {
 	token := uuid.NewString()
 	// Refresh tokens are long-lived (e.g. 7 days)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 
 	rt := &entity.RefreshToken{
-		ID:        uuid.NewString(),
+		AuditEntity: entity.AuditEntity{
+			BaseEntity: entity.BaseEntity{
+				ID: utils.NewID(),
+			},
+		},
 		UserID:    userID,
 		Token:     token,
 		ExpiresAt: expiresAt,
-		CreatedAt: time.Now(),
 	}
 
 	if err := s.refreshRepo.Create(ctx, rt); err != nil {
@@ -381,3 +386,4 @@ func isNumeric(s string) bool {
 	}
 	return true
 }
+

@@ -3,12 +3,14 @@ package service
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 type RotatingSavingsService struct {
@@ -29,16 +31,22 @@ func NewRotatingSavingsService(
 	}
 }
 
-func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID string, req dto.CreateRotatingSavingsGroupRequest) (*dto.RotatingSavingsGroupResponse, error) {
+func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID uuid.UUID, req dto.CreateRotatingSavingsGroupRequest) (*dto.RotatingSavingsGroupResponse, error) {
 	status := req.Status
 	if status == "" {
 		status = "active"
 	}
 
+	accountID := req.AccountID
+
 	g := entity.RotatingSavingsGroup{
-		ID:                  uuid.NewString(),
+		AuditEntity: entity.AuditEntity{
+			BaseEntity: entity.BaseEntity{
+				ID: utils.NewID(),
+			},
+		},
 		UserID:              userID,
-		AccountID:           req.AccountID,
+		AccountID:           accountID,
 		Name:                req.Name,
 		MemberCount:         req.MemberCount,
 		UserSlots:           req.UserSlots,
@@ -47,8 +55,6 @@ func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 		CycleFrequency:      req.CycleFrequency,
 		StartDate:           req.StartDate,
 		Status:              status,
-		CreatedAt:           time.Now().UTC(),
-		UpdatedAt:           time.Now().UTC(),
 	}
 
 	if g.UserSlots <= 0 {
@@ -68,7 +74,9 @@ func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 	}
 
 	_ = s.repo.AddAuditLog(ctx, entity.RotatingSavingsAuditLog{
-		ID:        uuid.NewString(),
+		BaseEntity: entity.BaseEntity{
+			ID: utils.NewID(),
+		},
 		UserID:    userID,
 		GroupID:   &g.ID,
 		Action:    "group_created",
@@ -80,7 +88,7 @@ func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID string,
 	return &resp, nil
 }
 
-func (s *RotatingSavingsService) GetGroup(ctx context.Context, userID, groupID string) (*dto.RotatingSavingsGroupResponse, error) {
+func (s *RotatingSavingsService) GetGroup(ctx context.Context, userID, groupID uuid.UUID) (*dto.RotatingSavingsGroupResponse, error) {
 	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
 	if err != nil {
 		return nil, err
@@ -92,7 +100,7 @@ func (s *RotatingSavingsService) GetGroup(ctx context.Context, userID, groupID s
 	return &resp, nil
 }
 
-func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupID string, req dto.UpdateRotatingSavingsGroupRequest) (*dto.RotatingSavingsGroupResponse, error) {
+func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupID uuid.UUID, req dto.UpdateRotatingSavingsGroupRequest) (*dto.RotatingSavingsGroupResponse, error) {
 	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
 	if err != nil {
 		return nil, err
@@ -120,8 +128,6 @@ func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupI
 		g.Status = *req.Status
 	}
 
-	g.UpdatedAt = time.Now().UTC()
-
 	if err := s.repo.UpdateRotatingGroup(ctx, *g); err != nil {
 		return nil, err
 	}
@@ -135,7 +141,9 @@ func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupI
 	}
 
 	_ = s.repo.AddAuditLog(ctx, entity.RotatingSavingsAuditLog{
-		ID:        uuid.NewString(),
+		BaseEntity: entity.BaseEntity{
+			ID: utils.NewID(),
+		},
 		UserID:    userID,
 		GroupID:   &g.ID,
 		Action:    "group_updated",
@@ -147,7 +155,7 @@ func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupI
 	return &resp, nil
 }
 
-func (s *RotatingSavingsService) GetGroupDetail(ctx context.Context, userID, groupID string) (*dto.RotatingSavingsGroupDetailResponse, error) {
+func (s *RotatingSavingsService) GetGroupDetail(ctx context.Context, userID, groupID uuid.UUID) (*dto.RotatingSavingsGroupDetailResponse, error) {
 	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
 	if err != nil {
 		return nil, err
@@ -274,7 +282,7 @@ func (s *RotatingSavingsService) generateSchedule(g entity.RotatingSavingsGroup,
 
 		ch := histMap[i]
 		isPaid := ch.C != nil
-		var contribID *string
+		var contribID *uuid.UUID
 		kind := "uncollected"
 		if isPaid {
 			contribID = &ch.C.ID
@@ -283,7 +291,7 @@ func (s *RotatingSavingsService) generateSchedule(g entity.RotatingSavingsGroup,
 		}
 
 		isPayout := ch.P != nil
-		var payoutID *string
+		var payoutID *uuid.UUID
 		if isPayout {
 			payoutID = &ch.P.ID
 			payoutAmount = ch.P.Amount
@@ -298,7 +306,7 @@ func (s *RotatingSavingsService) generateSchedule(g entity.RotatingSavingsGroup,
 	return schedule
 }
 
-func (s *RotatingSavingsService) ListGroups(ctx context.Context, userID string) ([]dto.RotatingSavingsGroupSummary, error) {
+func (s *RotatingSavingsService) ListGroups(ctx context.Context, userID uuid.UUID) ([]dto.RotatingSavingsGroupSummary, error) {
 	groups, err := s.repo.ListRotatingGroups(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -341,7 +349,7 @@ func (s *RotatingSavingsService) ListGroups(ctx context.Context, userID string) 
 	return summaries, nil
 }
 
-func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID, groupID string, req dto.RotatingSavingsContributionRequest) (*dto.RotatingSavingsContributionResponse, error) {
+func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID, groupID uuid.UUID, req dto.RotatingSavingsContributionRequest) (*dto.RotatingSavingsContributionResponse, error) {
 	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
 	if err != nil {
 		return nil, err
@@ -360,9 +368,11 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 		desc = "Lĩnh hụi"
 	}
 
-	catID := "cat_sys_rotating_savings_contribution"
+	var catID uuid.UUID
 	if req.Kind == "payout" {
-		catID = "cat_sys_rotating_savings_payout"
+		catID, _ = uuid.Parse("00000000-0000-0000-0000-000000000005")
+	} else {
+		catID, _ = uuid.Parse("00000000-0000-0000-0000-000000000006")
 	}
 
 	if req.Note != nil && *req.Note != "" {
@@ -376,11 +386,23 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 		return nil, err
 	}
 
-	parsedAmount := 0.0 // Simplified for brevity, should use decimal utils
+	parsedAmount, _ := strconv.ParseFloat(req.Amount, 64)
 
 	c := entity.RotatingSavingsContribution{
-		ID: uuid.NewString(), GroupID: groupID, TransactionID: tx.ID, Kind: req.Kind, CycleNo: req.CycleNo, DueDate: req.DueDate,
-		Amount: parsedAmount, SlotsTaken: req.SlotsTaken, CollectedFeePerSlot: req.CollectedFeePerSlot, OccurredAt: time.Now().UTC(), Note: req.Note, CreatedAt: time.Now().UTC(),
+		BaseEntity: entity.BaseEntity{
+			ID: utils.NewID(),
+		},
+		GroupID:             groupID,
+		TransactionID:       tx.ID,
+		Kind:                req.Kind,
+		CycleNo:             req.CycleNo,
+		DueDate:             req.DueDate,
+		Amount:              parsedAmount,
+		SlotsTaken:          req.SlotsTaken,
+		CollectedFeePerSlot: req.CollectedFeePerSlot,
+		OccurredAt:          time.Now().UTC(),
+		Note:                req.Note,
+		CreatedAt:           time.Now().UTC(),
 	}
 
 	if err := s.repo.CreateContribution(ctx, c); err != nil {
@@ -388,14 +410,21 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 	}
 
 	_ = s.repo.AddAuditLog(ctx, entity.RotatingSavingsAuditLog{
-		ID: uuid.NewString(), UserID: userID, GroupID: &groupID, Action: "contribution_created", Details: map[string]any{"kind": c.Kind, "amount": req.Amount}, CreatedAt: time.Now().UTC(),
+		BaseEntity: entity.BaseEntity{
+			ID: utils.NewID(),
+		},
+		UserID:    userID,
+		GroupID:   &groupID,
+		Action:    "contribution_created",
+		Details:   map[string]any{"kind": c.Kind, "amount": req.Amount},
+		CreatedAt: time.Now().UTC(),
 	})
 
 	resp := dto.NewRotatingSavingsContributionResponse(c)
 	return &resp, nil
 }
 
-func (s *RotatingSavingsService) DeleteContribution(ctx context.Context, userID, groupID, id string) error {
+func (s *RotatingSavingsService) DeleteContribution(ctx context.Context, userID, groupID, id uuid.UUID) error {
 	// Finding contribution in group because GetContribution was removed from interface for consolidation
 	conts, err := s.repo.GetContributions(ctx, groupID)
 	if err != nil {
@@ -414,19 +443,20 @@ func (s *RotatingSavingsService) DeleteContribution(ctx context.Context, userID,
 		return errors.New("contribution not found")
 	}
 
-	if target.TransactionID != "" {
+	if target.TransactionID != uuid.Nil {
 		_ = s.txSvc.Delete(ctx, userID, target.TransactionID)
 	}
 
 	return s.repo.DeleteContribution(ctx, id)
 }
 
-func (s *RotatingSavingsService) DeleteGroup(ctx context.Context, userID, groupID string) error {
+func (s *RotatingSavingsService) DeleteGroup(ctx context.Context, userID, groupID uuid.UUID) error {
 	conts, _ := s.repo.GetContributions(ctx, groupID)
 	for _, c := range conts {
-		if c.TransactionID != "" {
+		if c.TransactionID != uuid.Nil {
 			_ = s.txSvc.Delete(ctx, userID, c.TransactionID)
 		}
 	}
 	return s.repo.DeleteRotatingGroup(ctx, userID, groupID)
 }
+

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
@@ -22,7 +21,7 @@ func NewAccountService(repo interfaces.AccountRepository, userRepo interfaces.Us
 	return &AccountService{repo: repo, userRepo: userRepo}
 }
 
-func (s *AccountService) List(ctx context.Context, userID string) ([]dto.AccountResponse, error) {
+func (s *AccountService) List(ctx context.Context, userID uuid.UUID) ([]dto.AccountResponse, error) {
 	items, err := s.repo.ListAccountsForUser(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -30,7 +29,7 @@ func (s *AccountService) List(ctx context.Context, userID string) ([]dto.Account
 	return dto.NewAccountResponses(items), nil
 }
 
-func (s *AccountService) Get(ctx context.Context, userID, accountID string) (*dto.AccountResponse, error) {
+func (s *AccountService) Get(ctx context.Context, userID, accountID uuid.UUID) (*dto.AccountResponse, error) {
 	it, err := s.repo.GetAccountForUser(ctx, userID, accountID)
 	if err != nil {
 		return nil, err
@@ -42,7 +41,7 @@ func (s *AccountService) Get(ctx context.Context, userID, accountID string) (*dt
 	return &resp, nil
 }
 
-func (s *AccountService) Create(ctx context.Context, userID string, req dto.CreateAccountRequest) (*dto.AccountResponse, error) {
+func (s *AccountService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateAccountRequest) (*dto.AccountResponse, error) {
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
 		return nil, errors.New("account name is required")
@@ -59,18 +58,28 @@ func (s *AccountService) Create(ctx context.Context, userID string, req dto.Crea
 	}
 
 	color := utils.NormalizeOptionalString(req.Color)
-	parentID := utils.NormalizeOptionalString(req.ParentAccountID)
+	var parentID *uuid.UUID
+	if req.ParentAccountID != nil && *req.ParentAccountID != "" {
+		parsed, err := uuid.Parse(*req.ParentAccountID)
+		if err != nil {
+			return nil, errors.New("invalid parent account ID")
+		}
+		parentID = &parsed
+	}
 
 	// Basic validation for sub-accounts
 	if (accountType == "card" || accountType == "savings") && parentID == nil {
 		return nil, errors.New("parent account ID is required for card or savings accounts")
 	}
 
-	now := time.Now().UTC()
-	id := uuid.NewString()
+	id := utils.NewID()
 
 	account := entity.Account{
-		ID:              id,
+		AuditEntity: entity.AuditEntity{
+			BaseEntity: entity.BaseEntity{
+				ID: id,
+			},
+		},
 		Name:            name,
 		AccountNumber:   utils.NormalizeOptionalString(req.AccountNumber),
 		Color:           color,
@@ -78,10 +87,6 @@ func (s *AccountService) Create(ctx context.Context, userID string, req dto.Crea
 		Currency:        currency,
 		ParentAccountID: parentID,
 		Status:          "active",
-		CreatedAt:       now,
-		UpdatedAt:       now,
-		CreatedBy:       &userID,
-		UpdatedBy:       &userID,
 	}
 
 	if err := s.repo.CreateAccountWithOwner(ctx, account, userID); err != nil {
@@ -92,7 +97,7 @@ func (s *AccountService) Create(ctx context.Context, userID string, req dto.Crea
 	return &resp, nil
 }
 
-func (s *AccountService) Patch(ctx context.Context, userID, accountID string, req dto.PatchAccountRequest) (*dto.AccountResponse, error) {
+func (s *AccountService) Patch(ctx context.Context, userID, accountID uuid.UUID, req dto.PatchAccountRequest) (*dto.AccountResponse, error) {
 	patch := entity.AccountPatch{
 		Name:   req.Name,
 		Color:  req.Color,
@@ -110,7 +115,7 @@ func (s *AccountService) Patch(ctx context.Context, userID, accountID string, re
 	return &resp, nil
 }
 
-func (s *AccountService) Delete(ctx context.Context, userID, accountID string) error {
+func (s *AccountService) Delete(ctx context.Context, userID, accountID uuid.UUID) error {
 	acc, err := s.repo.GetAccountForUser(ctx, userID, accountID)
 	if err != nil {
 		return err
@@ -134,7 +139,7 @@ func (s *AccountService) Delete(ctx context.Context, userID, accountID string) e
 	return s.repo.DeleteAccount(ctx, userID, accountID)
 }
 
-func (s *AccountService) ListShares(ctx context.Context, userID, accountID string) ([]dto.AccountShareResponse, error) {
+func (s *AccountService) ListShares(ctx context.Context, userID, accountID uuid.UUID) ([]dto.AccountShareResponse, error) {
 	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
 		return nil, err
 	}
@@ -145,7 +150,7 @@ func (s *AccountService) ListShares(ctx context.Context, userID, accountID strin
 	return dto.NewAccountShareResponses(items), nil
 }
 
-func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID, login, permission string) (*dto.AccountShareResponse, error) {
+func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID uuid.UUID, login, permission string) (*dto.AccountShareResponse, error) {
 	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
 		return nil, err
 	}
@@ -178,14 +183,14 @@ func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID, log
 	return &resp, nil
 }
 
-func (s *AccountService) RevokeShare(ctx context.Context, userID, accountID, targetUserID string) error {
+func (s *AccountService) RevokeShare(ctx context.Context, userID, accountID, targetUserID uuid.UUID) error {
 	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
 		return err
 	}
 	return s.repo.RevokeAccountShare(ctx, userID, accountID, targetUserID)
 }
 
-func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID string, limit int) ([]dto.AccountAuditEventResponse, error) {
+func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID uuid.UUID, limit int) ([]dto.AccountAuditEventResponse, error) {
 	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
 		return nil, err
 	}
@@ -204,7 +209,7 @@ func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID 
 	return dto.NewAccountAuditEventResponses(items), nil
 }
 
-func (s *AccountService) defaultCurrencyForUser(ctx context.Context, userID string) string {
+func (s *AccountService) defaultCurrencyForUser(ctx context.Context, userID uuid.UUID) string {
 	u, err := s.userRepo.FindUserByID(ctx, userID)
 	if err != nil || u == nil || u.Settings == nil {
 		return "VND"
@@ -225,3 +230,4 @@ func isValidAccountType(t string) bool {
 		return false
 	}
 }
+

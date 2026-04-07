@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
@@ -19,7 +20,7 @@ func NewMarketDataRepo(db *database.Postgres) *MarketDataRepo {
 	return &MarketDataRepo{db: db}
 }
 
-func (r *MarketDataRepo) LoadSecurityIDsBySymbols(ctx context.Context, symbols []string) (map[string]string, error) {
+func (r *MarketDataRepo) LoadSecurityIDsBySymbols(ctx context.Context, symbols []string) (map[string]uuid.UUID, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -35,9 +36,10 @@ func (r *MarketDataRepo) LoadSecurityIDsBySymbols(ctx context.Context, symbols [
 	}
 	defer rows.Close()
 
-	out := map[string]string{}
+	out := map[string]uuid.UUID{}
 	for rows.Next() {
-		var sym, id string
+		var sym string
+		var id uuid.UUID
 		if err := rows.Scan(&sym, &id); err != nil {
 			return nil, err
 		}

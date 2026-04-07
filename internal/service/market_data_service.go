@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
@@ -36,7 +37,7 @@ func NewMarketDataService(
 	}
 }
 
-func (s *MarketDataService) EnqueueSecurityPricesDaily(ctx context.Context, userID string, req dto.RefreshPriceRequest) (dto.RefreshOneResponse, error) {
+func (s *MarketDataService) EnqueueSecurityPricesDaily(ctx context.Context, userID uuid.UUID, req dto.RefreshPriceRequest) (dto.RefreshOneResponse, error) {
 	if s.redis == nil {
 		return dto.RefreshOneResponse{}, errors.New("redis is not configured")
 	}
@@ -48,13 +49,21 @@ func (s *MarketDataService) EnqueueSecurityPricesDaily(ctx context.Context, user
 	stream := "goen:market_data:jobs"
 	values := map[string]any{
 		"job_type":             "vnstock.prices_daily",
-		"security_id":          req.SecurityID,
-		"requested_by_user_id": userID,
+		"security_id":          req.SecurityID.String(),
+		"requested_by_user_id": userID.String(),
 	}
-	if req.Force != nil { values["force"] = *req.Force }
-	if req.Full != nil { values["full"] = *req.Full }
-	if req.From != nil { values["from"] = *req.From }
-	if req.To != nil { values["to"] = *req.To }
+	if req.Force != nil {
+		values["force"] = *req.Force
+	}
+	if req.Full != nil {
+		values["full"] = *req.Full
+	}
+	if req.From != nil {
+		values["from"] = *req.From
+	}
+	if req.To != nil {
+		values["to"] = *req.To
+	}
 
 	id, err := s.redis.XAdd(ctx, stream, values)
 	if err != nil {
@@ -63,7 +72,7 @@ func (s *MarketDataService) EnqueueSecurityPricesDaily(ctx context.Context, user
 	return dto.RefreshOneResponse{Stream: stream, MessageID: id}, nil
 }
 
-func (s *MarketDataService) EnqueueSecurityEvents(ctx context.Context, userID string, req dto.RefreshEventRequest) (dto.RefreshOneResponse, error) {
+func (s *MarketDataService) EnqueueSecurityEvents(ctx context.Context, userID uuid.UUID, req dto.RefreshEventRequest) (dto.RefreshOneResponse, error) {
 	if s.redis == nil {
 		return dto.RefreshOneResponse{}, errors.New("redis is not configured")
 	}
@@ -75,10 +84,12 @@ func (s *MarketDataService) EnqueueSecurityEvents(ctx context.Context, userID st
 	stream := "goen:market_data:jobs"
 	values := map[string]any{
 		"job_type":             "vnstock.security_events",
-		"security_id":          req.SecurityID,
-		"requested_by_user_id": userID,
+		"security_id":          req.SecurityID.String(),
+		"requested_by_user_id": userID.String(),
 	}
-	if req.Force != nil { values["force"] = *req.Force }
+	if req.Force != nil {
+		values["force"] = *req.Force
+	}
 
 	id, err := s.redis.XAdd(ctx, stream, values)
 	if err != nil {
@@ -87,7 +98,7 @@ func (s *MarketDataService) EnqueueSecurityEvents(ctx context.Context, userID st
 	return dto.RefreshOneResponse{Stream: stream, MessageID: id}, nil
 }
 
-func (s *MarketDataService) EnqueueMarketSync(ctx context.Context, userID string, req dto.MarketSyncRequest) (dto.RefreshOneResponse, error) {
+func (s *MarketDataService) EnqueueMarketSync(ctx context.Context, userID uuid.UUID, req dto.MarketSyncRequest) (dto.RefreshOneResponse, error) {
 	if s.redis == nil {
 		return dto.RefreshOneResponse{}, errors.New("redis is not configured")
 	}
@@ -97,9 +108,11 @@ func (s *MarketDataService) EnqueueMarketSync(ctx context.Context, userID string
 		"job_type":             "vnstock.market_sync",
 		"include_prices":       boolTo01(req.IncludePrices),
 		"include_events":       boolTo01(req.IncludeEvents),
-		"requested_by_user_id": userID,
+		"requested_by_user_id": userID.String(),
 	}
-	if req.Force != nil { values["force"] = *req.Force }
+	if req.Force != nil {
+		values["force"] = *req.Force
+	}
 	if req.Full && req.IncludePrices {
 		values["full"] = "1"
 	}
@@ -111,7 +124,7 @@ func (s *MarketDataService) EnqueueMarketSync(ctx context.Context, userID string
 	return dto.RefreshOneResponse{Stream: stream, MessageID: id}, nil
 }
 
-func (s *MarketDataService) EnqueueBySymbols(ctx context.Context, userID string, req dto.RefreshSymbolsRequest) (dto.RefreshManyResponse, error) {
+func (s *MarketDataService) EnqueueBySymbols(ctx context.Context, userID uuid.UUID, req dto.RefreshSymbolsRequest) (dto.RefreshManyResponse, error) {
 	if s.redis == nil {
 		return dto.RefreshManyResponse{}, errors.New("redis is not configured")
 	}
@@ -136,25 +149,29 @@ func (s *MarketDataService) EnqueueBySymbols(ctx context.Context, userID string,
 
 	for _, sym := range cleaned {
 		securityID, ok := idsBySymbol[sym]
-		if !ok || securityID == "" {
+		if !ok || securityID == uuid.Nil {
 			notFound = append(notFound, sym)
 			continue
 		}
 
 		if req.IncludePrices {
 			v := map[string]any{
-				"job_type": "vnstock.prices_daily", "security_id": securityID, "requested_by_user_id": userID,
+				"job_type": "vnstock.prices_daily", "security_id": securityID.String(), "requested_by_user_id": userID.String(),
 			}
-			if req.Force != nil { v["force"] = *req.Force }
+			if req.Force != nil {
+				v["force"] = *req.Force
+			}
 			id, _ := s.redis.XAdd(ctx, stream, v)
 			messageIDs = append(messageIDs, id)
 			enqueued++
 		}
 		if req.IncludeEvents {
 			v := map[string]any{
-				"job_type": "vnstock.security_events", "security_id": securityID, "requested_by_user_id": userID,
+				"job_type": "vnstock.security_events", "security_id": securityID.String(), "requested_by_user_id": userID.String(),
 			}
-			if req.Force != nil { v["force"] = *req.Force }
+			if req.Force != nil {
+				v["force"] = *req.Force
+			}
 			id, _ := s.redis.XAdd(ctx, stream, v)
 			messageIDs = append(messageIDs, id)
 			enqueued++
@@ -164,13 +181,13 @@ func (s *MarketDataService) EnqueueBySymbols(ctx context.Context, userID string,
 	return dto.RefreshManyResponse{Stream: stream, Enqueued: enqueued, MessageIDs: messageIDs, NotFound: notFound}, nil
 }
 
-func (s *MarketDataService) GetSecurityStatus(ctx context.Context, userID, securityID string) (dto.SecurityStatus, error) {
+func (s *MarketDataService) GetSecurityStatus(ctx context.Context, userID, securityID uuid.UUID) (dto.SecurityStatus, error) {
 	if _, err := s.investSvc.GetSecurity(ctx, securityID); err != nil {
 		return dto.SecurityStatus{}, err
 	}
 
-	prices, _ := s.repo.LoadSyncState(ctx, "vnstock.prices_daily:"+securityID)
-	events, _ := s.repo.LoadSyncState(ctx, "vnstock.security_events:"+securityID)
+	prices, _ := s.repo.LoadSyncState(ctx, "vnstock.prices_daily:"+securityID.String())
+	events, _ := s.repo.LoadSyncState(ctx, "vnstock.security_events:"+securityID.String())
 	rateLimit, _ := s.fetchRateLimit(ctx)
 
 	return dto.SecurityStatus{SecurityID: securityID, Prices: prices, Events: events, RateLimit: rateLimit}, nil
@@ -208,6 +225,8 @@ func (s *MarketDataService) fetchRateLimit(ctx context.Context) (*entity.RateLim
 }
 
 func boolTo01(v bool) string {
-	if v { return "1" }
+	if v {
+		return "1"
+	}
 	return "0"
 }

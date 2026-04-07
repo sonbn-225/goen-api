@@ -3,19 +3,19 @@ package postgres
 import (
 	"context"
 	"errors"
-	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 )
 
 type ContactRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewContactRepo(db *database.Postgres) *ContactRepo {
-	return &ContactRepo{db: db}
+	return &ContactRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
 func (r *ContactRepo) CreateContact(ctx context.Context, c entity.Contact) error {
@@ -31,7 +31,7 @@ func (r *ContactRepo) CreateContact(ctx context.Context, c entity.Contact) error
 	return err
 }
 
-func (r *ContactRepo) GetContact(ctx context.Context, userID, contactID string) (*entity.Contact, error) {
+func (r *ContactRepo) GetContact(ctx context.Context, userID uuid.UUID, contactID uuid.UUID) (*entity.Contact, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func (r *ContactRepo) GetContact(ctx context.Context, userID, contactID string) 
 	return &c, nil
 }
 
-func (r *ContactRepo) ListContacts(ctx context.Context, userID string) ([]entity.Contact, error) {
+func (r *ContactRepo) ListContacts(ctx context.Context, userID uuid.UUID) ([]entity.Contact, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (r *ContactRepo) ListContacts(ctx context.Context, userID string) ([]entity
 	return results, nil
 }
 
-func (r *ContactRepo) UpdateContact(ctx context.Context, userID string, c entity.Contact) error {
+func (r *ContactRepo) UpdateContact(ctx context.Context, userID uuid.UUID, c entity.Contact) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -102,21 +102,13 @@ func (r *ContactRepo) UpdateContact(ctx context.Context, userID string, c entity
 	_, err = pool.Exec(ctx, `
 		UPDATE contacts
 		SET name = $1, email = $2, phone = $3, avatar_url = $4, linked_user_id = $5, notes = $6, updated_at = $7
-		WHERE id = $8 AND user_id = $9
+		WHERE id = $8 AND user_id = $9 AND deleted_at IS NULL
 	`, c.Name, c.Email, c.Phone, c.AvatarURL, c.LinkedUserID, c.Notes, c.UpdatedAt, c.ID, userID)
 	return err
 }
 
-func (r *ContactRepo) DeleteContact(ctx context.Context, userID, contactID string) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = pool.Exec(ctx, `
-		UPDATE contacts SET deleted_at = $1, updated_at = $1 WHERE id = $2 AND user_id = $3
-	`, time.Now().UTC(), contactID, userID)
-	return err
+func (r *ContactRepo) DeleteContact(ctx context.Context, userID uuid.UUID, contactID uuid.UUID) error {
+	return r.SoftDeleteByField(ctx, "contacts", "id", contactID, &userID)
 }
 
 func (r *ContactRepo) FindUserByEmail(ctx context.Context, email string) (*entity.User, error) {
@@ -125,9 +117,9 @@ func (r *ContactRepo) FindUserByEmail(ctx context.Context, email string) (*entit
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, "SELECT id, email, display_name, avatar_url FROM users WHERE email = $1", email)
+	row := pool.QueryRow(ctx, "SELECT id, email, display_name, avatar_url, created_at, updated_at FROM users WHERE email = $1", email)
 	var u entity.User
-	err = row.Scan(&u.ID, &u.Email, &u.DisplayName, &u.AvatarURL)
+	err = row.Scan(&u.ID, &u.Email, &u.DisplayName, &u.AvatarURL, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil // Not found is not an error here
@@ -143,9 +135,9 @@ func (r *ContactRepo) FindUserByPhone(ctx context.Context, phone string) (*entit
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, "SELECT id, email, display_name, avatar_url FROM users WHERE phone = $1", phone)
+	row := pool.QueryRow(ctx, "SELECT id, email, display_name, avatar_url, created_at, updated_at FROM users WHERE phone = $1", phone)
 	var u entity.User
-	err = row.Scan(&u.ID, &u.Email, &u.DisplayName, &u.AvatarURL)
+	err = row.Scan(&u.ID, &u.Email, &u.DisplayName, &u.AvatarURL, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil // Not found is not an error here
@@ -154,3 +146,4 @@ func (r *ContactRepo) FindUserByPhone(ctx context.Context, phone string) (*entit
 	}
 	return &u, nil
 }
+

@@ -1,10 +1,12 @@
 package entity
 
+import "github.com/google/uuid"
+
 type PublicProfile struct {
-	ID          string  `json:"id"`
-	Username    string  `json:"username"`
-	DisplayName string  `json:"display_name"`
-	AvatarURL   *string `json:"avatar_url"`
+	ID          uuid.UUID `json:"id"`
+	Username    string    `json:"username"`
+	DisplayName string    `json:"display_name"`
+	AvatarURL   *string   `json:"avatar_url"`
 }
 
 type PaymentInfo struct {
@@ -13,10 +15,10 @@ type PaymentInfo struct {
 }
 
 type PublicDebt struct {
-	ID          string  `json:"id"`
-	CreatedAt   string  `json:"created_at"`
-	ShareAmount string  `json:"share_amount"`
-	Status      *string `json:"status,omitempty"`
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   string    `json:"created_at"`
+	ShareAmount string    `json:"share_amount"`
+	Status      *string   `json:"status,omitempty"`
 }
 
 type Diagnostics struct {

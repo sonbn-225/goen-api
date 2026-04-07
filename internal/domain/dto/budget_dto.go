@@ -3,6 +3,7 @@ package dto
 import (
 	"math/big"
 
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
@@ -26,19 +27,19 @@ type UpdateBudgetRequest struct {
 }
 
 type BudgetWithStatsResponse struct {
-	ID                    string    `json:"id"`
-	UserID                string    `json:"user_id"`
-	Name                  *string   `json:"name,omitempty"`
-	Period                string    `json:"period"`
-	PeriodStart           *string   `json:"period_start,omitempty"`
-	PeriodEnd             *string   `json:"period_end,omitempty"`
-	Amount                string    `json:"amount"`
-	AlertThresholdPercent *int      `json:"alert_threshold_percent,omitempty"`
-	RolloverMode          *string   `json:"rollover_mode,omitempty"`
-	CategoryID            *string   `json:"category_id,omitempty"`
-	Spent                 string    `json:"spent"`
-	Remaining             string    `json:"remaining"`
-	PercentUsed           int       `json:"percent_used"`
+	ID                    uuid.UUID  `json:"id"`
+	UserID                uuid.UUID  `json:"user_id"`
+	Name                  *string    `json:"name,omitempty"`
+	Period                string     `json:"period"`
+	PeriodStart           *string    `json:"period_start,omitempty"`
+	PeriodEnd             *string    `json:"period_end,omitempty"`
+	Amount                string     `json:"amount"`
+	AlertThresholdPercent *int       `json:"alert_threshold_percent,omitempty"`
+	RolloverMode          *string    `json:"rollover_mode,omitempty"`
+	CategoryID            *uuid.UUID `json:"category_id,omitempty"`
+	Spent                 string     `json:"spent"`
+	Remaining             string     `json:"remaining"`
+	PercentUsed           int        `json:"percent_used"`
 }
 
 func NewBudgetWithStatsResponse(b entity.Budget) BudgetWithStatsResponse {
@@ -46,7 +47,7 @@ func NewBudgetWithStatsResponse(b entity.Budget) BudgetWithStatsResponse {
 	if utils.IsValidDecimal(b.Amount) && utils.IsValidDecimal(b.Spent) {
 		amt, _ := new(big.Rat).SetString(b.Amount)
 		spent, _ := new(big.Rat).SetString(b.Spent)
-		if amt.Sign() > 0 {
+		if amt != nil && amt.Sign() > 0 {
 			res := new(big.Rat).Quo(spent, amt)
 			res.Mul(res, big.NewRat(100, 1))
 			f, _ := res.Float64()
@@ -78,3 +79,4 @@ func NewBudgetWithStatsResponses(items []entity.Budget) []BudgetWithStatsRespons
 	}
 	return out
 }
+

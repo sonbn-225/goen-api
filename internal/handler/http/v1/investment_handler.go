@@ -1,42 +1,43 @@
 package v1
-
+ 
 import (
 	"encoding/json"
 	"net/http"
-
+ 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
 )
-
+ 
 type InvestmentHandler struct {
 	svc interfaces.InvestmentService
 }
-
+ 
 func NewInvestmentHandler(svc interfaces.InvestmentService) *InvestmentHandler {
 	return &InvestmentHandler{svc: svc}
 }
-
+ 
 func (h *InvestmentHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
-
+ 
 		r.Route("/investments/accounts", func(r chi.Router) {
 			r.Get("/", h.ListInvestmentAccounts)
 			r.Route("/{id}", func(r chi.Router) {
 				r.Get("/", h.GetInvestmentAccount)
 				r.Patch("/", h.UpdateInvestmentAccountSettings)
-
+ 
 				r.Route("/trades", func(r chi.Router) {
 					r.Get("/", h.ListTrades)
 					r.Post("/", h.CreateTrade)
 					r.Patch("/{tradeId}", h.UpdateTrade)
 					r.Delete("/{tradeId}", h.DeleteTrade)
 				})
-
+ 
 				r.Get("/holdings", h.ListHoldings)
 				r.Get("/reports/realized-pnl", h.GetRealizedPNLReport)
 				r.Get("/eligible-actions", h.ListEligibleActions)
@@ -44,7 +45,7 @@ func (h *InvestmentHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 				r.Post("/backfill-cash", h.BackfillCash)
 			})
 		})
-
+ 
 		r.Route("/investments/securities", func(r chi.Router) {
 			r.Get("/", h.ListSecurities)
 			r.Route("/{securityId}", func(r chi.Router) {
@@ -55,7 +56,7 @@ func (h *InvestmentHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 		})
 	})
 }
-
+ 
 // ListInvestmentAccounts godoc
 // @Summary List Investment Accounts
 // @Description Retrieve a list of investment accounts for the current user
@@ -78,7 +79,7 @@ func (h *InvestmentHandler) ListInvestmentAccounts(w http.ResponseWriter, r *htt
 	}
 	response.WriteSuccess(w, http.StatusOK, accounts)
 }
-
+ 
 // GetInvestmentAccount godoc
 // @Summary Get Investment Account
 // @Description Retrieve a specific investment account by ID
@@ -95,15 +96,23 @@ func (h *InvestmentHandler) GetInvestmentAccount(w http.ResponseWriter, r *http.
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
-	id := chi.URLParam(r, "id")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
+		return
+	}
 	account, err := h.svc.GetInvestmentAccount(r.Context(), userID, id)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
+	if account == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "investment account not found", nil)
+		return
+	}
 	response.WriteSuccess(w, http.StatusOK, account)
 }
-
+ 
 // UpdateInvestmentAccountSettings godoc
 // @Summary Update Investment Account Settings
 // @Description Partially update settings like automated tracking for an investment account
@@ -123,7 +132,11 @@ func (h *InvestmentHandler) UpdateInvestmentAccountSettings(w http.ResponseWrite
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
-	id := chi.URLParam(r, "id")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
+		return
+	}
 	var req dto.PatchInvestmentAccountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
@@ -134,9 +147,13 @@ func (h *InvestmentHandler) UpdateInvestmentAccountSettings(w http.ResponseWrite
 		response.WriteInternalError(w, err)
 		return
 	}
+	if account == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "investment account not found", nil)
+		return
+	}
 	response.WriteSuccess(w, http.StatusOK, account)
 }
-
+ 
 // ListTrades godoc
 // @Summary List Trades
 // @Description Retrieve trades associated with an investment account
@@ -153,7 +170,11 @@ func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
-	id := chi.URLParam(r, "id")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
+		return
+	}
 	trades, err := h.svc.ListTrades(r.Context(), userID, id)
 	if err != nil {
 		response.WriteInternalError(w, err)
@@ -161,7 +182,7 @@ func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 	}
 	response.WriteSuccess(w, http.StatusOK, trades)
 }
-
+ 
 // CreateTrade godoc
 // @Summary Create Trade
 // @Description Create a new trade for an investment account
@@ -181,7 +202,11 @@ func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) 
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
-	id := chi.URLParam(r, "id")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
+		return
+	}
 	var req dto.CreateTradeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
@@ -194,7 +219,7 @@ func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) 
 	}
 	response.WriteSuccess(w, http.StatusCreated, trade)
 }
-
+ 
 // UpdateTrade godoc
 // @Summary Update Trade
 // @Description Update an existing trade record
@@ -215,8 +240,16 @@ func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) 
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
-	id := chi.URLParam(r, "id")
-	tradeID := chi.URLParam(r, "tradeId")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
+		return
+	}
+	tradeID, err := uuid.Parse(chi.URLParam(r, "tradeId"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid trade id format", nil)
+		return
+	}
 	var req dto.CreateTradeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
@@ -227,9 +260,13 @@ func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) 
 		response.WriteInternalError(w, err)
 		return
 	}
+	if trade == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "trade not found", nil)
+		return
+	}
 	response.WriteSuccess(w, http.StatusOK, trade)
 }
-
+ 
 // DeleteTrade godoc
 // @Summary Delete Trade
 // @Description Delete a trade from an investment account
@@ -247,16 +284,24 @@ func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) 
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
-	id := chi.URLParam(r, "id")
-	tradeID := chi.URLParam(r, "tradeId")
-	err := h.svc.DeleteTrade(r.Context(), userID, id, tradeID)
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
+		return
+	}
+	tradeID, err := uuid.Parse(chi.URLParam(r, "tradeId"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid trade id format", nil)
+		return
+	}
+	err = h.svc.DeleteTrade(r.Context(), userID, id, tradeID)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Trade deleted"})
 }
-
+ 
 // ListHoldings godoc
 // @Summary List Holdings
 // @Description Retrieve current holdings for an investment account
@@ -273,7 +318,11 @@ func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request)
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
-	id := chi.URLParam(r, "id")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
+		return
+	}
 	holdings, err := h.svc.ListHoldings(r.Context(), userID, id)
 	if err != nil {
 		response.WriteInternalError(w, err)
@@ -281,7 +330,7 @@ func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request)
 	}
 	response.WriteSuccess(w, http.StatusOK, holdings)
 }
-
+ 
 // GetRealizedPNLReport godoc
 // @Summary Get Realized P&L Report
 // @Description Realized profit/loss report for an investment account
@@ -298,7 +347,11 @@ func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
-	id := chi.URLParam(r, "id")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
+		return
+	}
 	report, err := h.svc.GetRealizedPNLReport(r.Context(), userID, id)
 	if err != nil {
 		response.WriteInternalError(w, err)
@@ -306,14 +359,18 @@ func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.
 	}
 	response.WriteSuccess(w, http.StatusOK, report)
 }
-
+ 
 func (h *InvestmentHandler) ListEligibleActions(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
-	id := chi.URLParam(r, "id")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
+		return
+	}
 	items, err := h.svc.ListEligibleCorporateActions(r.Context(), userID, id)
 	if err != nil {
 		response.WriteInternalError(w, err)
@@ -321,22 +378,30 @@ func (h *InvestmentHandler) ListEligibleActions(w http.ResponseWriter, r *http.R
 	}
 	response.WriteSuccess(w, http.StatusOK, items)
 }
-
+ 
 func (h *InvestmentHandler) ClaimAction(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
-	id := chi.URLParam(r, "id")
-	eventID := chi.URLParam(r, "eventId")
-
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
+		return
+	}
+	eventID, err := uuid.Parse(chi.URLParam(r, "eventId"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid event id format", nil)
+		return
+	}
+ 
 	var req dto.ClaimCorporateActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
 		return
 	}
-
+ 
 	trade, err := h.svc.ClaimCorporateAction(r.Context(), userID, id, eventID, req)
 	if err != nil {
 		response.WriteInternalError(w, err)
@@ -344,14 +409,18 @@ func (h *InvestmentHandler) ClaimAction(w http.ResponseWriter, r *http.Request) 
 	}
 	response.WriteSuccess(w, http.StatusOK, trade)
 }
-
+ 
 func (h *InvestmentHandler) BackfillCash(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
-	id := chi.URLParam(r, "id")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
+		return
+	}
 	result, err := h.svc.BackfillTradePrincipalTransactions(r.Context(), userID, id)
 	if err != nil {
 		response.WriteInternalError(w, err)
@@ -359,7 +428,7 @@ func (h *InvestmentHandler) BackfillCash(w http.ResponseWriter, r *http.Request)
 	}
 	response.WriteSuccess(w, http.StatusOK, result)
 }
-
+ 
 // ListSecurities godoc
 // @Summary List Securities
 // @Description Retrieve list of all available securities in the system
@@ -376,7 +445,7 @@ func (h *InvestmentHandler) ListSecurities(w http.ResponseWriter, r *http.Reques
 	}
 	response.WriteSuccess(w, http.StatusOK, securities)
 }
-
+ 
 // GetSecurity godoc
 // @Summary Get Security
 // @Description Retrieve details of a specific security by ID
@@ -387,15 +456,23 @@ func (h *InvestmentHandler) ListSecurities(w http.ResponseWriter, r *http.Reques
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /investments/securities/{securityId} [get]
 func (h *InvestmentHandler) GetSecurity(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "securityId")
+	id, err := uuid.Parse(chi.URLParam(r, "securityId"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid security id format", nil)
+		return
+	}
 	security, err := h.svc.GetSecurity(r.Context(), id)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
+	if security == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "security not found", nil)
+		return
+	}
 	response.WriteSuccess(w, http.StatusOK, security)
 }
-
+ 
 // ListSecurityPrices godoc
 // @Summary List Security Prices
 // @Description Retrieve historical/daily prices for a security between dates
@@ -408,7 +485,11 @@ func (h *InvestmentHandler) GetSecurity(w http.ResponseWriter, r *http.Request) 
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /investments/securities/{securityId}/prices-daily [get]
 func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "securityId")
+	id, err := uuid.Parse(chi.URLParam(r, "securityId"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid security id format", nil)
+		return
+	}
 	from := r.URL.Query().Get("from")
 	to := r.URL.Query().Get("to")
 	var fromPtr, toPtr *string
@@ -418,7 +499,7 @@ func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Re
 	if to != "" {
 		toPtr = &to
 	}
-
+ 
 	prices, err := h.svc.ListSecurityPrices(r.Context(), id, fromPtr, toPtr)
 	if err != nil {
 		response.WriteInternalError(w, err)
@@ -426,7 +507,7 @@ func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Re
 	}
 	response.WriteSuccess(w, http.StatusOK, prices)
 }
-
+ 
 // ListSecurityEvents godoc
 // @Summary List Security Events
 // @Description Retrieve events (dividends, splits, etc) mapping to a security
@@ -439,7 +520,11 @@ func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Re
 // @Failure 500 {object} response.ErrorEnvelope
 // @Router /investments/securities/{securityId}/events [get]
 func (h *InvestmentHandler) ListSecurityEvents(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "securityId")
+	id, err := uuid.Parse(chi.URLParam(r, "securityId"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid security id format", nil)
+		return
+	}
 	from := r.URL.Query().Get("from")
 	to := r.URL.Query().Get("to")
 	var fromPtr, toPtr *string
@@ -449,7 +534,7 @@ func (h *InvestmentHandler) ListSecurityEvents(w http.ResponseWriter, r *http.Re
 	if to != "" {
 		toPtr = &to
 	}
-
+ 
 	events, err := h.svc.ListSecurityEvents(r.Context(), id, fromPtr, toPtr)
 	if err != nil {
 		response.WriteInternalError(w, err)
