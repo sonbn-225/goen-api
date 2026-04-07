@@ -10,7 +10,7 @@ import (
 )
 
 type UserRepository interface {
-	CreateUser(ctx context.Context, user entity.UserWithPassword) error
+	CreateUserWithRefreshToken(ctx context.Context, user entity.UserWithPassword, refreshToken entity.RefreshToken) error
 	FindUserByEmail(ctx context.Context, email string) (*entity.UserWithPassword, error)
 	FindUserByPhone(ctx context.Context, phone string) (*entity.UserWithPassword, error)
 	FindUserByUsername(ctx context.Context, username string) (*entity.UserWithPassword, error)
@@ -38,4 +38,3 @@ type AuthService interface {
 	UpdateMyProfile(ctx context.Context, userID uuid.UUID, displayName, email, phone, username *string) (*dto.UserResponse, error)
 	ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error
 }
-

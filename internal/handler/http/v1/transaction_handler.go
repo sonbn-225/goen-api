@@ -1,10 +1,11 @@
 package v1
- 
+
 import (
 	"encoding/json"
 	"net/http"
 	"strconv"
- 
+	"strings"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
@@ -15,19 +16,19 @@ import (
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
- 
+
 type TransactionHandler struct {
 	svc interfaces.TransactionService
 }
- 
+
 func NewTransactionHandler(svc interfaces.TransactionService) *TransactionHandler {
 	return &TransactionHandler{svc: svc}
 }
- 
+
 func (h *TransactionHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(cfg))
- 
+
 		r.Route("/transactions", func(r chi.Router) {
 			r.Get("/", h.List)
 			r.Post("/", h.Create)
@@ -57,7 +58,7 @@ func (h *TransactionHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 		})
 	})
 }
- 
+
 // List godoc
 // @Summary List Transactions
 // @Description Retrieve a paginated list of transactions for the authenticated user
@@ -73,15 +74,15 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	q := r.URL.Query()
 	page, _ := strconv.Atoi(q.Get("page"))
 	limit, _ := strconv.Atoi(q.Get("limit"))
- 
+
 	normalize := func(s string) *string {
 		return utils.NormalizeOptionalString(&s)
 	}
- 
+
 	var accID *uuid.UUID
 	if val := q.Get("account_id"); val != "" {
 		if id, err := uuid.Parse(val); err == nil {
@@ -94,7 +95,7 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 			catID = &id
 		}
 	}
- 
+
 	req := dto.ListTransactionsRequest{
 		AccountID:  accID,
 		CategoryID: catID,
@@ -105,18 +106,18 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 		Page:       page,
 		Limit:      limit,
 	}
- 
+
 	items, cursor, total, err := h.svc.List(r.Context(), userID, req)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	totalPages := 0
 	if limit > 0 {
 		totalPages = (total + limit - 1) / limit
 	}
- 
+
 	response.WriteSuccess(w, http.StatusOK, dto.ListTransactionsResponse{
 		Data:       items,
 		TotalCount: total,
@@ -126,7 +127,7 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 		Limit:      limit,
 	})
 }
- 
+
 // Create godoc
 // @Summary Create Transaction
 // @Description Create a new financial transaction with optional line items and tags
@@ -145,22 +146,35 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	var req dto.CreateTransactionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
 		return
 	}
- 
+
 	tx, err := h.svc.Create(r.Context(), userID, req)
 	if err != nil {
+		msg := strings.TrimSpace(err.Error())
+		if strings.HasPrefix(msg, "forbidden:") {
+			response.WriteError(w, http.StatusForbidden, "forbidden", msg, nil)
+			return
+		}
+		if strings.HasPrefix(msg, "invalid ") ||
+			strings.Contains(msg, "is required") ||
+			strings.Contains(msg, "must be provided") ||
+			strings.Contains(msg, "single line item only") ||
+			strings.Contains(msg, "only supported for expense") {
+			response.WriteError(w, http.StatusBadRequest, "validation_error", msg, nil)
+			return
+		}
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusCreated, tx)
 }
- 
+
 // Get godoc
 // @Summary Get Transaction
 // @Description Retrieve details of a specific transaction by its ID
@@ -178,27 +192,27 @@ func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	transactionID, err := uuid.Parse(chi.URLParam(r, "transactionId"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid transaction id format", nil)
 		return
 	}
- 
+
 	tx, err := h.svc.Get(r.Context(), userID, transactionID)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	if tx == nil {
 		response.WriteError(w, http.StatusNotFound, "not_found", "transaction not found", nil)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusOK, tx)
 }
- 
+
 // Patch godoc
 // @Summary Update Transaction
 // @Description Update fields of an existing transaction
@@ -218,33 +232,33 @@ func (h *TransactionHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	transactionID, err := uuid.Parse(chi.URLParam(r, "transactionId"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid transaction id format", nil)
 		return
 	}
- 
+
 	var req dto.TransactionPatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
 		return
 	}
- 
+
 	tx, err := h.svc.Patch(r.Context(), userID, transactionID, req)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	if tx == nil {
 		response.WriteError(w, http.StatusNotFound, "not_found", "transaction not found", nil)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusOK, tx)
 }
- 
+
 // Delete godoc
 // @Summary Delete Transaction
 // @Description Remove a transaction record permanently
@@ -261,21 +275,21 @@ func (h *TransactionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	transactionID, err := uuid.Parse(chi.URLParam(r, "transactionId"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid transaction id format", nil)
 		return
 	}
- 
+
 	if err := h.svc.Delete(r.Context(), userID, transactionID); err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	w.WriteHeader(http.StatusNoContent)
 }
- 
+
 // BatchPatch godoc
 // @Summary Batch Update Transactions
 // @Description Update multiple transactions at once (e.g. category assignment)
@@ -294,22 +308,22 @@ func (h *TransactionHandler) BatchPatch(w http.ResponseWriter, r *http.Request) 
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	var req dto.BatchPatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
 		return
 	}
- 
+
 	res, err := h.svc.BatchPatch(r.Context(), userID, req)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusOK, res)
 }
- 
+
 // StageImport godoc
 // @Summary Stage Imported Transactions
 // @Description Stage generic transaction data for manual mapping and review
@@ -326,26 +340,26 @@ func (h *TransactionHandler) StageImport(w http.ResponseWriter, r *http.Request)
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	var req dto.StageImportRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
 		return
 	}
- 
+
 	staged, skipped, errors, err := h.svc.StageImport(r.Context(), userID, req.Items)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusOK, map[string]any{
 		"staged_count":  staged,
 		"skipped_count": skipped,
 		"errors":        errors,
 	})
 }
- 
+
 // ListImported godoc
 // @Summary List Staged Imports
 // @Description Retrieve all transactions currently in the staging area
@@ -360,16 +374,16 @@ func (h *TransactionHandler) ListImported(w http.ResponseWriter, r *http.Request
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	items, err := h.svc.ListImported(r.Context(), userID)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusOK, items)
 }
- 
+
 // PatchImported godoc
 // @Summary Update Staged Import Mapping
 // @Description Manually map a staged import to an account and category
@@ -387,33 +401,33 @@ func (h *TransactionHandler) PatchImported(w http.ResponseWriter, r *http.Reques
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	importID, err := uuid.Parse(chi.URLParam(r, "importId"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid import id format", nil)
 		return
 	}
- 
+
 	var req dto.PatchImportedRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
 		return
 	}
- 
+
 	patch := entity.ImportedTransactionPatch{
 		MappedAccountID:  req.MappedAccountID,
 		MappedCategoryID: req.MappedCategoryID,
 	}
- 
+
 	res, err := h.svc.PatchImported(r.Context(), userID, importID, patch)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusOK, res)
 }
- 
+
 // DeleteImported godoc
 // @Summary Delete Staged Import
 // @Description Remove an item from the staging area without creating a transaction
@@ -428,21 +442,21 @@ func (h *TransactionHandler) DeleteImported(w http.ResponseWriter, r *http.Reque
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	importID, err := uuid.Parse(chi.URLParam(r, "importId"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid import id format", nil)
 		return
 	}
- 
+
 	if err := h.svc.DeleteImported(r.Context(), userID, importID); err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	w.WriteHeader(http.StatusNoContent)
 }
- 
+
 // ClearImported godoc
 // @Summary Clear All Staged Imports
 // @Description Remove all items from the staging area
@@ -456,15 +470,15 @@ func (h *TransactionHandler) ClearImported(w http.ResponseWriter, r *http.Reques
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	if err := h.svc.ClearImported(r.Context(), userID); err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	w.WriteHeader(http.StatusNoContent)
 }
- 
+
 // CreateFromImported godoc
 // @Summary Create Transaction from Staged Import
 // @Description Finalize a staged import by creating a real transaction
@@ -480,22 +494,22 @@ func (h *TransactionHandler) CreateFromImported(w http.ResponseWriter, r *http.R
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	importID, err := uuid.Parse(chi.URLParam(r, "importId"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid import id format", nil)
 		return
 	}
- 
+
 	tx, err := h.svc.CreateFromImported(r.Context(), userID, importID)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusCreated, tx)
 }
- 
+
 // CreateManyFromImported godoc
 // @Summary Create Multiple Transactions from Staged Imports
 // @Description Finalize multiple staged imports at once
@@ -512,22 +526,22 @@ func (h *TransactionHandler) CreateManyFromImported(w http.ResponseWriter, r *ht
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	var req dto.CreateManyImportedRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
 		return
 	}
- 
+
 	res, err := h.svc.CreateManyFromImported(r.Context(), userID, req.ImportIDs)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusOK, res)
 }
- 
+
 // ListMappingRules godoc
 // @Summary List Import Mapping Rules
 // @Description Retrieve all auto-mapping rules for the authenticated user
@@ -542,16 +556,16 @@ func (h *TransactionHandler) ListMappingRules(w http.ResponseWriter, r *http.Req
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	rules, err := h.svc.ListMappingRules(r.Context(), userID)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusOK, rules)
 }
- 
+
 // UpsertMappingRules godoc
 // @Summary Upsert Import Mapping Rules
 // @Description Create or update multiple auto-mapping rules
@@ -568,22 +582,22 @@ func (h *TransactionHandler) UpsertMappingRules(w http.ResponseWriter, r *http.R
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	var req dto.UpsertMappingRulesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
 		return
 	}
- 
+
 	res, err := h.svc.UpsertMappingRules(r.Context(), userID, req.Rules)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusOK, res)
 }
- 
+
 // DeleteMappingRule godoc
 // @Summary Delete Import Mapping Rule
 // @Description Remove an auto-mapping rule
@@ -598,21 +612,21 @@ func (h *TransactionHandler) DeleteMappingRule(w http.ResponseWriter, r *http.Re
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	ruleID, err := uuid.Parse(chi.URLParam(r, "ruleId"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid rule id format", nil)
 		return
 	}
- 
+
 	if err := h.svc.DeleteMappingRule(r.Context(), userID, ruleID); err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	w.WriteHeader(http.StatusNoContent)
 }
- 
+
 // ApplyRulesAndCreate godoc
 // @Summary Apply Rules and Create Transactions
 // @Description Automatically map all staged imports using rules and create transactions for fully mapped items
@@ -627,12 +641,12 @@ func (h *TransactionHandler) ApplyRulesAndCreate(w http.ResponseWriter, r *http.
 		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
 		return
 	}
- 
+
 	res, err := h.svc.ApplyRulesAndCreate(r.Context(), userID)
 	if err != nil {
 		response.WriteInternalError(w, err)
 		return
 	}
- 
+
 	response.WriteSuccess(w, http.StatusOK, res)
 }

@@ -72,17 +72,13 @@ func (s *AuthService) Signup(ctx context.Context, req dto.SignupRequest) (*dto.A
 	}
 	u.PublicShareURL = s.generatePublicShareURL(u.Username)
 
-	if err := s.userRepo.CreateUser(ctx, u); err != nil {
-		return nil, err
-	}
-
 	accessToken, expiresIn, err := s.generateAccessToken(u.User)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := s.generateAndSaveRefreshToken(ctx, u.ID)
-	if err != nil {
+	refreshTokenEntity, refreshToken := s.newRefreshToken(u.ID)
+	if err := s.userRepo.CreateUserWithRefreshToken(ctx, u, *refreshTokenEntity); err != nil {
 		return nil, err
 	}
 
@@ -97,7 +93,7 @@ func (s *AuthService) Signup(ctx context.Context, req dto.SignupRequest) (*dto.A
 
 func (s *AuthService) Signin(ctx context.Context, req dto.SigninRequest) (*dto.AuthResponse, error) {
 	login := strings.ToLower(strings.TrimSpace(req.Login))
-	
+
 	var u *entity.UserWithPassword
 	var err error
 
@@ -339,26 +335,29 @@ func (s *AuthService) mapToUserResponse(user entity.User) dto.UserResponse {
 }
 
 func (s *AuthService) generateAndSaveRefreshToken(ctx context.Context, userID uuid.UUID) (string, error) {
-	token := uuid.NewString()
-	// Refresh tokens are long-lived (e.g. 7 days)
-	expiresAt := time.Now().Add(7 * 24 * time.Hour)
-
-	rt := &entity.RefreshToken{
-		AuditEntity: entity.AuditEntity{
-			BaseEntity: entity.BaseEntity{
-				ID: utils.NewID(),
-			},
-		},
-		UserID:    userID,
-		Token:     token,
-		ExpiresAt: expiresAt,
-	}
+	rt, token := s.newRefreshToken(userID)
 
 	if err := s.refreshRepo.Create(ctx, rt); err != nil {
 		return "", err
 	}
 
 	return token, nil
+}
+
+func (s *AuthService) newRefreshToken(userID uuid.UUID) (*entity.RefreshToken, string) {
+	token := uuid.NewString()
+	now := utils.Now()
+
+	return &entity.RefreshToken{
+		AuditEntity: entity.AuditEntity{
+			BaseEntity: entity.BaseEntity{ID: utils.NewID()},
+			CreatedAt:  now,
+			UpdatedAt:  now,
+		},
+		UserID:    userID,
+		Token:     token,
+		ExpiresAt: now.Add(7 * 24 * time.Hour),
+	}, token
 }
 
 func (s *AuthService) generatePublicShareURL(username string) *string {
@@ -386,4 +385,3 @@ func isNumeric(s string) bool {
 	}
 	return true
 }
-

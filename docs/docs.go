@@ -5773,10 +5773,13 @@ const docTemplate = `{
                 "is_active": {
                     "type": "boolean"
                 },
-                "key_name": {
+                "key": {
                     "type": "string"
                 },
                 "parent_category_id": {
+                    "type": "string"
+                },
+                "parent_key": {
                     "type": "string"
                 },
                 "sort_order": {

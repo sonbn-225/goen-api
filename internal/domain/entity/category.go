@@ -7,6 +7,7 @@ import (
 type Category struct {
 	AuditEntity
 	Key              string     `json:"key"`
+	ParentKey        *string    `json:"parent_key,omitempty"`
 	ParentCategoryID *uuid.UUID `json:"parent_category_id,omitempty"`
 	Type             *string    `json:"type,omitempty"`
 	SortOrder        *int       `json:"sort_order,omitempty"`

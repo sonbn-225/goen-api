@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
@@ -55,11 +56,23 @@ func (h *ProfileHandler) Me(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.svc.GetMe(r.Context(), userID)
 	if err != nil {
+		if isMissingUserError(err) {
+			response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid or expired session", nil)
+			return
+		}
 		response.WriteInternalError(w, err)
 		return
 	}
 
 	response.WriteSuccess(w, http.StatusOK, res)
+}
+
+func isMissingUserError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return strings.Contains(strings.ToLower(err.Error()), "user not found")
 }
 
 // PatchMyProfile godoc

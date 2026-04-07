@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	CategoryCacheKey = "goen:categories:all"
+	CategoryCacheKey = "goen:categories:all5"
 	CategoryCacheTTL = 24 * time.Hour
 )
 
@@ -96,4 +96,3 @@ func (s *CategoryService) filterByType(cats []dto.CategoryResponse, txType strin
 	}
 	return filtered
 }
-
