@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
@@ -19,7 +20,7 @@ func NewInvestmentRepo(db *database.Postgres) *InvestmentRepo {
 	return &InvestmentRepo{db: db}
 }
 
-func (r *InvestmentRepo) GetInvestmentAccount(ctx context.Context, userID string, investmentAccountID string) (*entity.InvestmentAccount, error) {
+func (r *InvestmentRepo) GetInvestmentAccount(ctx context.Context, userID uuid.UUID, investmentAccountID uuid.UUID) (*entity.InvestmentAccount, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -43,7 +44,7 @@ func (r *InvestmentRepo) GetInvestmentAccount(ctx context.Context, userID string
 	return &out, nil
 }
 
-func (r *InvestmentRepo) ListInvestmentAccounts(ctx context.Context, userID string) ([]entity.InvestmentAccount, error) {
+func (r *InvestmentRepo) ListInvestmentAccounts(ctx context.Context, userID uuid.UUID) ([]entity.InvestmentAccount, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -73,7 +74,7 @@ func (r *InvestmentRepo) ListInvestmentAccounts(ctx context.Context, userID stri
 	return results, nil
 }
 
-func (r *InvestmentRepo) UpdateInvestmentAccountSettings(ctx context.Context, userID string, investmentAccountID string, feeSettings any, taxSettings any) (*entity.InvestmentAccount, error) {
+func (r *InvestmentRepo) UpdateInvestmentAccountSettings(ctx context.Context, userID uuid.UUID, investmentAccountID uuid.UUID, feeSettings any, taxSettings any) (*entity.InvestmentAccount, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -108,7 +109,7 @@ func (r *InvestmentRepo) UpdateInvestmentAccountSettings(ctx context.Context, us
 	return r.GetInvestmentAccount(ctx, userID, out.ID)
 }
 
-func (r *InvestmentRepo) GetSecurity(ctx context.Context, securityID string) (*entity.Security, error) {
+func (r *InvestmentRepo) GetSecurity(ctx context.Context, securityID uuid.UUID) (*entity.Security, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -157,7 +158,7 @@ func (r *InvestmentRepo) ListSecurities(ctx context.Context) ([]entity.Security,
 	return results, nil
 }
 
-func (r *InvestmentRepo) ListSecurityPrices(ctx context.Context, securityID string, from *string, to *string) ([]entity.SecurityPriceDaily, error) {
+func (r *InvestmentRepo) ListSecurityPrices(ctx context.Context, securityID uuid.UUID, from *string, to *string) ([]entity.SecurityPriceDaily, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -206,7 +207,7 @@ func (r *InvestmentRepo) ListSecurityPrices(ctx context.Context, securityID stri
 	return results, nil
 }
 
-func (r *InvestmentRepo) ListSecurityEvents(ctx context.Context, securityID string, from *string, to *string) ([]entity.SecurityEvent, error) {
+func (r *InvestmentRepo) ListSecurityEvents(ctx context.Context, securityID uuid.UUID, from *string, to *string) ([]entity.SecurityEvent, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -271,7 +272,7 @@ func (r *InvestmentRepo) ListSecurityEvents(ctx context.Context, securityID stri
 	return results, nil
 }
 
-func (r *InvestmentRepo) GetSecurityEvent(ctx context.Context, securityEventID string) (*entity.SecurityEvent, error) {
+func (r *InvestmentRepo) GetSecurityEvent(ctx context.Context, securityEventID uuid.UUID) (*entity.SecurityEvent, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -328,7 +329,7 @@ func (r *InvestmentRepo) GetSecurityEvent(ctx context.Context, securityEventID s
 	return &e, nil
 }
 
-func (r *InvestmentRepo) UpsertSecurityEventElection(ctx context.Context, userID string, e entity.SecurityEventElection) (*entity.SecurityEventElection, error) {
+func (r *InvestmentRepo) UpsertSecurityEventElection(ctx context.Context, userID uuid.UUID, e entity.SecurityEventElection) (*entity.SecurityEventElection, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -375,7 +376,7 @@ func (r *InvestmentRepo) UpsertSecurityEventElection(ctx context.Context, userID
 	return &out, nil
 }
 
-func (r *InvestmentRepo) ListSecurityEventElections(ctx context.Context, userID string, brokerAccountID string, status *string) ([]entity.SecurityEventElection, error) {
+func (r *InvestmentRepo) ListSecurityEventElections(ctx context.Context, userID uuid.UUID, brokerAccountID uuid.UUID, status *string) ([]entity.SecurityEventElection, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -416,7 +417,7 @@ func (r *InvestmentRepo) ListSecurityEventElections(ctx context.Context, userID 
 	return results, nil
 }
 
-func (r *InvestmentRepo) CreateTrade(ctx context.Context, userID string, t entity.Trade) error {
+func (r *InvestmentRepo) CreateTrade(ctx context.Context, userID uuid.UUID, t entity.Trade) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -424,19 +425,19 @@ func (r *InvestmentRepo) CreateTrade(ctx context.Context, userID string, t entit
 
 	cmd, err := pool.Exec(ctx, `
 		INSERT INTO trades (
-			id, client_id, broker_account_id, security_id, fee_transaction_id, tax_transaction_id,
+			id, broker_account_id, security_id, fee_transaction_id, tax_transaction_id,
 			side, quantity, price, fees, taxes, occurred_at, note, created_at, updated_at
 		)
-		SELECT $1,$2,$3,$4,$5,$6,$7,$8::numeric,$9::numeric,$10::numeric,$11::numeric,$12,$13,$14,$15
+		SELECT $1,$2,$3,$4,$5,$6,$7::numeric,$8::numeric,$9::numeric,$10::numeric,$11,$12,$13,$14
 		WHERE EXISTS (
 			SELECT 1
 			FROM investment_accounts ia
 			JOIN accounts a ON a.id = ia.account_id
 			JOIN user_accounts ua ON ua.account_id = a.id
-			WHERE ia.id = $3 AND ua.user_id = $16 AND ua.status = 'active' AND a.deleted_at IS NULL
+			WHERE ia.id = $2 AND ua.user_id = $15 AND ua.status = 'active' AND a.deleted_at IS NULL
 			  AND ua.permission IN ('owner','editor')
 		)
-	`, t.ID, t.ClientID, t.BrokerAccountID, t.SecurityID, t.FeeTransactionID, t.TaxTransactionID, t.Side, t.Quantity, t.Price, t.Fees, t.Taxes, t.OccurredAt, t.Note, t.CreatedAt, t.UpdatedAt, userID)
+	`, t.ID, t.BrokerAccountID, t.SecurityID, t.FeeTransactionID, t.TaxTransactionID, t.Side, t.Quantity, t.Price, t.Fees, t.Taxes, t.OccurredAt, t.Note, t.CreatedAt, t.UpdatedAt, userID)
 	if err != nil {
 		return err
 	}
@@ -446,14 +447,14 @@ func (r *InvestmentRepo) CreateTrade(ctx context.Context, userID string, t entit
 	return nil
 }
 
-func (r *InvestmentRepo) GetTrade(ctx context.Context, userID string, tradeID string) (*entity.Trade, error) {
+func (r *InvestmentRepo) GetTrade(ctx context.Context, userID uuid.UUID, tradeID uuid.UUID) (*entity.Trade, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT t.id, t.client_id, t.broker_account_id, t.security_id,
+		SELECT t.id, t.broker_account_id, t.security_id,
 		       t.fee_transaction_id, t.tax_transaction_id,
 		       t.side, t.quantity::text, t.price::text, t.fees::text, t.taxes::text,
 		       t.occurred_at, t.note, t.created_at, t.updated_at
@@ -466,7 +467,7 @@ func (r *InvestmentRepo) GetTrade(ctx context.Context, userID string, tradeID st
 
 	var t entity.Trade
 	if err := row.Scan(
-		&t.ID, &t.ClientID, &t.BrokerAccountID, &t.SecurityID, &t.FeeTransactionID, &t.TaxTransactionID,
+		&t.ID, &t.BrokerAccountID, &t.SecurityID, &t.FeeTransactionID, &t.TaxTransactionID,
 		&t.Side, &t.Quantity, &t.Price, &t.Fees, &t.Taxes, &t.OccurredAt, &t.Note, &t.CreatedAt, &t.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -477,14 +478,14 @@ func (r *InvestmentRepo) GetTrade(ctx context.Context, userID string, tradeID st
 	return &t, nil
 }
 
-func (r *InvestmentRepo) ListTrades(ctx context.Context, userID string, brokerAccountID string) ([]entity.Trade, error) {
+func (r *InvestmentRepo) ListTrades(ctx context.Context, userID uuid.UUID, brokerAccountID uuid.UUID) ([]entity.Trade, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT t.id, t.client_id, t.broker_account_id, t.security_id, t.fee_transaction_id, t.tax_transaction_id,
+		SELECT t.id, t.broker_account_id, t.security_id, t.fee_transaction_id, t.tax_transaction_id,
 		       t.side, t.quantity::text, t.price::text, t.fees::text, t.taxes::text, t.occurred_at,
 		       t.note, t.created_at, t.updated_at
 		FROM trades t
@@ -503,7 +504,7 @@ func (r *InvestmentRepo) ListTrades(ctx context.Context, userID string, brokerAc
 	for rows.Next() {
 		var t entity.Trade
 		if err := rows.Scan(
-			&t.ID, &t.ClientID, &t.BrokerAccountID, &t.SecurityID, &t.FeeTransactionID, &t.TaxTransactionID,
+			&t.ID, &t.BrokerAccountID, &t.SecurityID, &t.FeeTransactionID, &t.TaxTransactionID,
 			&t.Side, &t.Quantity, &t.Price, &t.Fees, &t.Taxes, &t.OccurredAt, &t.Note, &t.CreatedAt, &t.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -513,7 +514,7 @@ func (r *InvestmentRepo) ListTrades(ctx context.Context, userID string, brokerAc
 	return results, nil
 }
 
-func (r *InvestmentRepo) DeleteTrade(ctx context.Context, userID string, tradeID string) error {
+func (r *InvestmentRepo) DeleteTrade(ctx context.Context, userID uuid.UUID, tradeID uuid.UUID) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -540,7 +541,7 @@ func (r *InvestmentRepo) DeleteTrade(ctx context.Context, userID string, tradeID
 	return nil
 }
 
-func (r *InvestmentRepo) ListHoldings(ctx context.Context, userID string, brokerAccountID string) ([]entity.Holding, error) {
+func (r *InvestmentRepo) ListHoldings(ctx context.Context, userID uuid.UUID, brokerAccountID uuid.UUID) ([]entity.Holding, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -577,7 +578,7 @@ func (r *InvestmentRepo) ListHoldings(ctx context.Context, userID string, broker
 	return results, nil
 }
 
-func (r *InvestmentRepo) GetHolding(ctx context.Context, userID string, brokerAccountID string, securityID string) (*entity.Holding, error) {
+func (r *InvestmentRepo) GetHolding(ctx context.Context, userID uuid.UUID, brokerAccountID uuid.UUID, securityID uuid.UUID) (*entity.Holding, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -608,7 +609,7 @@ func (r *InvestmentRepo) GetHolding(ctx context.Context, userID string, brokerAc
 	return &h, nil
 }
 
-func (r *InvestmentRepo) UpsertHolding(ctx context.Context, userID string, h entity.Holding) (*entity.Holding, error) {
+func (r *InvestmentRepo) UpsertHolding(ctx context.Context, userID uuid.UUID, h entity.Holding) (*entity.Holding, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -641,7 +642,7 @@ func (r *InvestmentRepo) UpsertHolding(ctx context.Context, userID string, h ent
 	return &out, nil
 }
 
-func (r *InvestmentRepo) ListShareLots(ctx context.Context, userID string, brokerAccountID string, securityID string) ([]entity.ShareLot, error) {
+func (r *InvestmentRepo) ListShareLots(ctx context.Context, userID uuid.UUID, brokerAccountID uuid.UUID, securityID uuid.UUID) ([]entity.ShareLot, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -680,7 +681,7 @@ func (r *InvestmentRepo) ListShareLots(ctx context.Context, userID string, broke
 	return results, nil
 }
 
-func (r *InvestmentRepo) CreateShareLot(ctx context.Context, userID string, lot entity.ShareLot) error {
+func (r *InvestmentRepo) CreateShareLot(ctx context.Context, userID uuid.UUID, lot entity.ShareLot) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -695,7 +696,7 @@ func (r *InvestmentRepo) CreateShareLot(ctx context.Context, userID string, lot 
 	return err
 }
 
-func (r *InvestmentRepo) UpdateShareLotQuantity(ctx context.Context, userID string, lotID string, quantity string) error {
+func (r *InvestmentRepo) UpdateShareLotQuantity(ctx context.Context, userID uuid.UUID, lotID uuid.UUID, quantity string) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -714,7 +715,7 @@ func (r *InvestmentRepo) UpdateShareLotQuantity(ctx context.Context, userID stri
 	return err
 }
 
-func (r *InvestmentRepo) DeleteShareLotsByTradeID(ctx context.Context, userID string, tradeID string) error {
+func (r *InvestmentRepo) DeleteShareLotsByTradeID(ctx context.Context, userID uuid.UUID, tradeID uuid.UUID) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -724,7 +725,7 @@ func (r *InvestmentRepo) DeleteShareLotsByTradeID(ctx context.Context, userID st
 	return err
 }
 
-func (r *InvestmentRepo) CreateRealizedTradeLog(ctx context.Context, userID string, log entity.RealizedTradeLog) error {
+func (r *InvestmentRepo) CreateRealizedTradeLog(ctx context.Context, userID uuid.UUID, log entity.RealizedTradeLog) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -740,7 +741,7 @@ func (r *InvestmentRepo) CreateRealizedTradeLog(ctx context.Context, userID stri
 	return err
 }
 
-func (r *InvestmentRepo) ListRealizedLogsByTradeID(ctx context.Context, userID string, tradeID string) ([]entity.RealizedTradeLog, error) {
+func (r *InvestmentRepo) ListRealizedLogsByTradeID(ctx context.Context, userID uuid.UUID, tradeID uuid.UUID) ([]entity.RealizedTradeLog, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -776,7 +777,7 @@ func (r *InvestmentRepo) ListRealizedLogsByTradeID(ctx context.Context, userID s
 	return results, nil
 }
 
-func (r *InvestmentRepo) DeleteRealizedLogsByTradeID(ctx context.Context, userID string, tradeID string) error {
+func (r *InvestmentRepo) DeleteRealizedLogsByTradeID(ctx context.Context, userID uuid.UUID, tradeID uuid.UUID) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -786,7 +787,7 @@ func (r *InvestmentRepo) DeleteRealizedLogsByTradeID(ctx context.Context, userID
 	return err
 }
 
-func (r *InvestmentRepo) ListRealizedLogs(ctx context.Context, userID string, brokerAccountID string) ([]entity.RealizedTradeLog, error) {
+func (r *InvestmentRepo) ListRealizedLogs(ctx context.Context, userID uuid.UUID, brokerAccountID uuid.UUID) ([]entity.RealizedTradeLog, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err

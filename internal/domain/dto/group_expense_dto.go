@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
@@ -11,7 +12,6 @@ type GroupExpenseParticipantRequest struct {
 }
 
 type CreateGroupExpenseRequest struct {
-	ClientID            *string                          `json:"client_id,omitempty"`
 	ExternalRef         *string                          `json:"external_ref,omitempty"`
 	OccurredAt          *string                          `json:"occurred_at,omitempty"`
 	OccurredDate        *string                          `json:"occurred_date,omitempty"`
@@ -32,14 +32,14 @@ type CreateGroupExpenseResponse struct {
 }
 
 type GroupExpenseParticipantResponse struct {
-	ID                      string  `json:"id"`
-	UserID                  string  `json:"user_id"`
-	TransactionID           string  `json:"transaction_id"`
-	ParticipantName         string  `json:"participant_name"`
-	OriginalAmount          string  `json:"original_amount"`
-	ShareAmount             string  `json:"share_amount"`
-	IsSettled               bool    `json:"is_settled"`
-	SettlementTransactionID *string `json:"settlement_transaction_id,omitempty"`
+	ID                      uuid.UUID  `json:"id"`
+	UserID                  uuid.UUID  `json:"user_id"`
+	TransactionID           uuid.UUID  `json:"transaction_id"`
+	ParticipantName         string     `json:"participant_name"`
+	OriginalAmount          string     `json:"original_amount"`
+	ShareAmount             string     `json:"share_amount"`
+	IsSettled               bool       `json:"is_settled"`
+	SettlementTransactionID *uuid.UUID `json:"settlement_transaction_id,omitempty"`
 }
 
 type GroupExpenseSettleRequest struct {

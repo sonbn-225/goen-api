@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
@@ -37,7 +38,7 @@ func (r *RotatingSavingsRepo) CreateRotatingGroup(ctx context.Context, g entity.
 	return err
 }
 
-func (r *RotatingSavingsRepo) GetRotatingGroup(ctx context.Context, userID, groupID string) (*entity.RotatingSavingsGroup, error) {
+func (r *RotatingSavingsRepo) GetRotatingGroup(ctx context.Context, userID, groupID uuid.UUID) (*entity.RotatingSavingsGroup, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -66,7 +67,7 @@ func (r *RotatingSavingsRepo) GetRotatingGroup(ctx context.Context, userID, grou
 	return &g, nil
 }
 
-func (r *RotatingSavingsRepo) ListRotatingGroups(ctx context.Context, userID string) ([]entity.RotatingSavingsGroup, error) {
+func (r *RotatingSavingsRepo) ListRotatingGroups(ctx context.Context, userID uuid.UUID) ([]entity.RotatingSavingsGroup, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -131,7 +132,7 @@ func (r *RotatingSavingsRepo) UpdateRotatingGroup(ctx context.Context, g entity.
 	return err
 }
 
-func (r *RotatingSavingsRepo) DeleteRotatingGroup(ctx context.Context, userID, groupID string) error {
+func (r *RotatingSavingsRepo) DeleteRotatingGroup(ctx context.Context, userID, groupID uuid.UUID) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -159,7 +160,7 @@ func (r *RotatingSavingsRepo) CreateContribution(ctx context.Context, c entity.R
 	return err
 }
 
-func (r *RotatingSavingsRepo) GetContributions(ctx context.Context, groupID string) ([]entity.RotatingSavingsContribution, error) {
+func (r *RotatingSavingsRepo) GetContributions(ctx context.Context, groupID uuid.UUID) ([]entity.RotatingSavingsContribution, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -192,7 +193,7 @@ func (r *RotatingSavingsRepo) GetContributions(ctx context.Context, groupID stri
 	return out, nil
 }
 
-func (r *RotatingSavingsRepo) DeleteContribution(ctx context.Context, contributionID string) error {
+func (r *RotatingSavingsRepo) DeleteContribution(ctx context.Context, contributionID uuid.UUID) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -215,7 +216,7 @@ func (r *RotatingSavingsRepo) AddAuditLog(ctx context.Context, log entity.Rotati
 	return err
 }
 
-func (r *RotatingSavingsRepo) GetAuditLogs(ctx context.Context, groupID string) ([]entity.RotatingSavingsAuditLog, error) {
+func (r *RotatingSavingsRepo) GetAuditLogs(ctx context.Context, groupID uuid.UUID) ([]entity.RotatingSavingsAuditLog, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err

@@ -23,13 +23,13 @@ func NewTransactionRepo(db *database.Postgres) *TransactionRepo {
 	return &TransactionRepo{db: db}
 }
 
-func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID string, tx entity.Transaction, lineItems []entity.TransactionLineItem, tagIDs []string, participants []entity.GroupExpenseParticipant) error {
+func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID uuid.UUID, tx entity.Transaction, lineItems []entity.TransactionLineItem, tagIDs []uuid.UUID, participants []entity.GroupExpenseParticipant) error {
 	return r.db.WithTx(ctx, func(txConn pgx.Tx) error {
 		return createTransactionTx(ctx, txConn, userID, tx, lineItems, tagIDs, participants)
 	})
 }
 
-func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, id string) (*entity.Transaction, error) {
+func (r *TransactionRepo) GetTransaction(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -37,13 +37,13 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, id 
 
 	row := pool.QueryRow(ctx, `
 		SELECT
-			t.id, t.client_id, t.external_ref, t.type, t.occurred_at,
+			t.id, t.external_ref, t.type, t.occurred_at,
 			to_char(t.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS occurred_date,
 			t.amount::text, t.from_amount::text, t.to_amount::text,
 			(SELECT li.note FROM transaction_line_items li WHERE li.transaction_id = t.id ORDER BY li.id LIMIT 1) AS description,
 			t.account_id, t.from_account_id, t.to_account_id, t.exchange_rate::text,
 			a.currency AS account_currency, fa.currency AS from_currency, ta.currency AS to_currency,
-			t.status, t.created_at, t.updated_at, t.created_by, t.updated_by, t.deleted_at,
+			t.status, t.created_at, t.updated_at, t.deleted_at,
 			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::text[]) AS tag_ids
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
@@ -61,10 +61,10 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, id 
 	var t entity.Transaction
 	var catNames, catColors, tagNames, tagColors []string
 	err = row.Scan(
-		&t.ID, &t.ClientID, &t.ExternalRef, &t.Type, &t.OccurredAt, &t.OccurredDate,
+		&t.ID, &t.ExternalRef, &t.Type, &t.OccurredAt, &t.OccurredDate,
 		&t.Amount, &t.FromAmount, &t.ToAmount, &t.Description, &t.AccountID, &t.FromAccountID, &t.ToAccountID,
 		&t.ExchangeRate, &t.AccountCurrency, &t.FromCurrency, &t.ToCurrency, &t.Status,
-		&t.CreatedAt, &t.UpdatedAt, &t.CreatedBy, &t.UpdatedBy, &t.DeletedAt, &t.TagIDs,
+		&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt, &t.TagIDs,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -86,7 +86,7 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, id 
 		LEFT JOIN tags tg ON tg.id = tt.tag_id
 		WHERE li.transaction_id = $1
 	`, t.ID).Scan(&catNames, &catColors, &tagNames, &tagColors)
-	
+
 	t.CategoryNames = catNames
 	t.CategoryColors = catColors
 	t.TagNames = tagNames
@@ -115,7 +115,7 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID string, id 
 	return &t, nil
 }
 
-func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, filter entity.TransactionListFilter) ([]entity.Transaction, *string, int, error) {
+func (r *TransactionRepo) ListTransactions(ctx context.Context, userID uuid.UUID, filter entity.TransactionListFilter) ([]entity.Transaction, *string, int, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, nil, 0, err
@@ -187,13 +187,13 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 
 	querySQL := fmt.Sprintf(`
 		SELECT
-			t.id, t.client_id, t.external_ref, t.type, t.occurred_at,
+			t.id, t.external_ref, t.type, t.occurred_at,
 			to_char(t.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS occurred_date,
 			t.amount::text, t.from_amount::text, t.to_amount::text,
 			(SELECT li.note FROM transaction_line_items li WHERE li.transaction_id = t.id ORDER BY li.id LIMIT 1) AS description,
 			t.account_id, t.from_account_id, t.to_account_id, t.exchange_rate::text,
 			a.currency AS account_currency, fa.currency AS from_currency, ta.currency AS to_currency,
-			t.status, t.created_at, t.updated_at, t.created_by, t.updated_by, t.deleted_at,
+			t.status, t.created_at, t.updated_at, t.deleted_at,
 			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::text[]) AS tag_ids,
 			COALESCE((SELECT array_agg(DISTINCT tli.category_id ORDER BY tli.category_id) FROM transaction_line_items tli WHERE tli.transaction_id = t.id AND tli.category_id IS NOT NULL), '{}'::text[]) AS category_ids
 		FROM transactions t
@@ -221,10 +221,10 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 	for rows.Next() {
 		var t entity.Transaction
 		err := rows.Scan(
-			&t.ID, &t.ClientID, &t.ExternalRef, &t.Type, &t.OccurredAt, &t.OccurredDate,
+			&t.ID, &t.ExternalRef, &t.Type, &t.OccurredAt, &t.OccurredDate,
 			&t.Amount, &t.FromAmount, &t.ToAmount, &t.Description, &t.AccountID, &t.FromAccountID, &t.ToAccountID,
 			&t.ExchangeRate, &t.AccountCurrency, &t.FromCurrency, &t.ToCurrency, &t.Status,
-			&t.CreatedAt, &t.UpdatedAt, &t.CreatedBy, &t.UpdatedBy, &t.DeletedAt, &t.TagIDs, &t.CategoryIDs,
+			&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt, &t.TagIDs, &t.CategoryIDs,
 		)
 		if err != nil {
 			return nil, nil, 0, err
@@ -258,7 +258,7 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID string, f
 	return results, nextCursor, total, nil
 }
 
-func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, transactionID string, patch entity.TransactionPatch) (*entity.Transaction, error) {
+func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID, patch entity.TransactionPatch) (*entity.Transaction, error) {
 	now := time.Now().UTC()
 	err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {
 		var err error
@@ -267,8 +267,8 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 		}
 
 		// Basic SQL update
-		set := []string{"updated_at = $1", "updated_by = $2"}
-		args := []any{now, userID}
+		set := []string{"updated_at = $1"}
+		args := []any{now}
 
 		if patch.Amount != nil {
 			args = append(args, *patch.Amount)
@@ -299,8 +299,8 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 			}
 			for _, li := range *patch.LineItems {
 				liID := li.ID
-				if liID == "" {
-					liID = uuid.NewString()
+				if liID == uuid.Nil {
+					liID = uuid.New()
 				}
 				_, err = txConn.Exec(ctx, "INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note) VALUES ($1,$2,$3,$4,$5)",
 					liID, transactionID, li.CategoryID, li.Amount, li.Note)
@@ -309,7 +309,7 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 				}
 				if len(li.TagIDs) > 0 {
 					for _, tid := range li.TagIDs {
-						_, err = txConn.Exec(ctx, "INSERT INTO transaction_line_item_tags (line_item_id, tag_id, created_at) VALUES ($1, $2, $3)", liID, tid, now)
+						_, err = txConn.Exec(ctx, "INSERT INTO transaction_line_item_tags (line_item_id, tag_id, created_at, updated_at) VALUES ($1, $2, $3, $4)", liID, tid, now, now)
 						if err != nil {
 							return err
 						}
@@ -325,7 +325,7 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 				return err
 			}
 			for _, tid := range patch.TagIDs {
-				_, err = txConn.Exec(ctx, "INSERT INTO transaction_tags (transaction_id, tag_id, created_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", transactionID, tid, now)
+				_, err = txConn.Exec(ctx, "INSERT INTO transaction_tags (transaction_id, tag_id, created_at, updated_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", transactionID, tid, now, now)
 				if err != nil {
 					return err
 				}
@@ -342,32 +342,40 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID string, t
 	return r.GetTransaction(ctx, userID, transactionID)
 }
 
-func (r *TransactionRepo) BatchPatchTransactions(ctx context.Context, userID string, transactionIDs []string, patches map[string]entity.TransactionPatch, mode string) ([]string, []string, error) {
-	// Simple implementation: iterate and patch. 
+func (r *TransactionRepo) BatchPatchTransactions(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID, patches map[uuid.UUID]entity.TransactionPatch, mode string) ([]uuid.UUID, []uuid.UUID, error) {
+	// Simple implementation: iterate and patch.
 	// In "atomic" mode, use one big transaction. In "partial", individual transactions.
-	
+
 	if mode == "atomic" {
-		var updated []string
+		var updated []uuid.UUID
 		err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {
 			for _, id := range transactionIDs {
 				p, ok := patches[id]
-				if !ok { continue }
+				if !ok {
+					continue
+				}
 				_, err := r.PatchTransaction(ctx, userID, id, p)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				updated = append(updated, id)
 			}
 			return nil
 		})
-		if err != nil { return nil, transactionIDs, err }
-		return updated, []string{}, nil
+		if err != nil {
+			return nil, transactionIDs, err
+		}
+		return updated, []uuid.UUID{}, nil
 	}
 
 	// Partial mode
-	var updated []string
-	var failed []string
+	var updated []uuid.UUID
+	var failed []uuid.UUID
 	for _, id := range transactionIDs {
 		p, ok := patches[id]
-		if !ok { continue }
+		if !ok {
+			continue
+		}
 		_, err := r.PatchTransaction(ctx, userID, id, p)
 		if err != nil {
 			failed = append(failed, id)
@@ -378,49 +386,61 @@ func (r *TransactionRepo) BatchPatchTransactions(ctx context.Context, userID str
 	return updated, failed, nil
 }
 
-func (r *TransactionRepo) DeleteTransaction(ctx context.Context, userID string, transactionID string) error {
+func (r *TransactionRepo) DeleteTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID) error {
 	now := time.Now().UTC()
 	return r.db.WithTx(ctx, func(txConn pgx.Tx) error {
 		// Verify owner
 		_, err := r.GetTransaction(ctx, userID, transactionID)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
-		_, err = txConn.Exec(ctx, "UPDATE transactions SET deleted_at = $1, updated_at = $1, updated_by = $2 WHERE id = $3", now, userID, transactionID)
+		_, err = txConn.Exec(ctx, "UPDATE transactions SET deleted_at = $1, updated_at = $1 WHERE id = $2", now, transactionID)
 		return err
 	})
 }
 
 // Helper: requireAccountPermission
-func (r *TransactionRepo) requireAccountPermission(ctx context.Context, tx pgx.Tx, userID, accountID string) error {
+func (r *TransactionRepo) requireAccountPermission(ctx context.Context, tx pgx.Tx, userID, accountID uuid.UUID) error {
 	return requireAccountPermission(ctx, tx, userID, accountID)
 }
 
 // Cursor Encoding/Decoding
-func encodeCursor(t time.Time, id string) string {
-	s := fmt.Sprintf("%d,%s", t.UnixNano(), id)
+func encodeCursor(t time.Time, id uuid.UUID) string {
+	s := fmt.Sprintf("%d,%s", t.UnixNano(), id.String())
 	return base64.StdEncoding.EncodeToString([]byte(s))
 }
 
-func decodeCursor(c string) (*time.Time, *string, error) {
+func decodeCursor(c string) (*time.Time, *uuid.UUID, error) {
 	b, err := base64.StdEncoding.DecodeString(c)
-	if err != nil { return nil, nil, err }
+	if err != nil {
+		return nil, nil, err
+	}
 	parts := strings.Split(string(b), ",")
-	if len(parts) != 2 { return nil, nil, errors.New("invalid cursor") }
+	if len(parts) != 2 {
+		return nil, nil, errors.New("invalid cursor")
+	}
 
 	nano, err := database.ParseInt64(parts[0])
-	if err != nil { return nil, nil, err }
+	if err != nil {
+		return nil, nil, err
+	}
 	t := time.Unix(0, nano).UTC()
-	return &t, &parts[1], nil
+	uid, err := uuid.Parse(parts[1])
+	if err != nil {
+		return nil, nil, err
+	}
+	return &t, &uid, nil
 }
 
 // Imported Transactions
-func (r *TransactionRepo) CreateImportedTransactions(ctx context.Context, userID string, items []entity.ImportedTransactionCreate) ([]entity.ImportedTransaction, error) {
+func (r *TransactionRepo) CreateImportedTransactions(ctx context.Context, userID uuid.UUID, items []entity.ImportedTransactionCreate) ([]entity.ImportedTransaction, error) {
 	now := time.Now().UTC()
 	created := make([]entity.ImportedTransaction, 0, len(items))
 
 	err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {
 		for _, item := range items {
-			id := uuid.NewString()
+			id := uuid.New()
 
 			// Payload to JSON
 			payloadBytes, err := json.Marshal(item.RawPayload)
@@ -428,15 +448,15 @@ func (r *TransactionRepo) CreateImportedTransactions(ctx context.Context, userID
 				return err
 			}
 
-			if item.MappedAccountID != nil && strings.TrimSpace(*item.MappedAccountID) != "" {
-				if err := requireAccountPermission(ctx, txConn, userID, strings.TrimSpace(*item.MappedAccountID)); err != nil {
+			if item.MappedAccountID != nil && *item.MappedAccountID != uuid.Nil {
+				if err := requireAccountPermission(ctx, txConn, userID, *item.MappedAccountID); err != nil {
 					return err
 				}
 			}
 
-			if item.MappedCategoryID != nil && strings.TrimSpace(*item.MappedCategoryID) != "" {
+			if item.MappedCategoryID != nil && *item.MappedCategoryID != uuid.Nil {
 				var exists bool
-				err := txConn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM categories WHERE id = $1 AND deleted_at IS NULL)`, strings.TrimSpace(*item.MappedCategoryID)).Scan(&exists)
+				err := txConn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM categories WHERE id = $1 AND deleted_at IS NULL)`, *item.MappedCategoryID).Scan(&exists)
 				if err != nil {
 					return err
 				}
@@ -454,7 +474,7 @@ func (r *TransactionRepo) CreateImportedTransactions(ctx context.Context, userID
 			`,
 				id, userID, item.Source, item.TransactionDate, item.Amount, item.Description, item.TransactionType,
 				item.ImportedAccountName, item.ImportedCategoryName,
-				normalizeOptionalImportString(item.MappedAccountID), normalizeOptionalImportString(item.MappedCategoryID),
+				normalizeOptionalImportUUID(item.MappedAccountID), normalizeOptionalImportUUID(item.MappedCategoryID),
 				payloadBytes, now, now,
 			)
 			if err != nil {
@@ -462,7 +482,13 @@ func (r *TransactionRepo) CreateImportedTransactions(ctx context.Context, userID
 			}
 
 			created = append(created, entity.ImportedTransaction{
-				ID:                   id,
+				AuditEntity: entity.AuditEntity{
+					BaseEntity: entity.BaseEntity{
+						ID: id,
+					},
+					CreatedAt: now,
+					UpdatedAt: now,
+				},
 				UserID:               userID,
 				Source:               item.Source,
 				TransactionDate:      item.TransactionDate,
@@ -471,11 +497,9 @@ func (r *TransactionRepo) CreateImportedTransactions(ctx context.Context, userID
 				TransactionType:      item.TransactionType,
 				ImportedAccountName:  item.ImportedAccountName,
 				ImportedCategoryName: item.ImportedCategoryName,
-				MappedAccountID:      normalizeOptionalImportString(item.MappedAccountID),
-				MappedCategoryID:     normalizeOptionalImportString(item.MappedCategoryID),
+				MappedAccountID:      normalizeOptionalImportUUID(item.MappedAccountID),
+				MappedCategoryID:     normalizeOptionalImportUUID(item.MappedCategoryID),
 				RawPayload:           item.RawPayload,
-				CreatedAt:            now,
-				UpdatedAt:            now,
 			})
 		}
 		return nil
@@ -487,7 +511,7 @@ func (r *TransactionRepo) CreateImportedTransactions(ctx context.Context, userID
 	return created, nil
 }
 
-func (r *TransactionRepo) ListImportedTransactions(ctx context.Context, userID string) ([]entity.ImportedTransaction, error) {
+func (r *TransactionRepo) ListImportedTransactions(ctx context.Context, userID uuid.UUID) ([]entity.ImportedTransaction, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -528,19 +552,19 @@ func (r *TransactionRepo) ListImportedTransactions(ctx context.Context, userID s
 	return items, nil
 }
 
-func (r *TransactionRepo) PatchImportedTransaction(ctx context.Context, userID string, importID string, patch entity.ImportedTransactionPatch) (*entity.ImportedTransaction, error) {
+func (r *TransactionRepo) PatchImportedTransaction(ctx context.Context, userID uuid.UUID, importID uuid.UUID, patch entity.ImportedTransactionPatch) (*entity.ImportedTransaction, error) {
 	now := time.Now().UTC()
 	var it entity.ImportedTransaction
 
 	err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {
-		if patch.MappedAccountID != nil && strings.TrimSpace(*patch.MappedAccountID) != "" {
-			if err := requireAccountPermission(ctx, txConn, userID, strings.TrimSpace(*patch.MappedAccountID)); err != nil {
+		if patch.MappedAccountID != nil && *patch.MappedAccountID != uuid.Nil {
+			if err := requireAccountPermission(ctx, txConn, userID, *patch.MappedAccountID); err != nil {
 				return err
 			}
 		}
-		if patch.MappedCategoryID != nil && strings.TrimSpace(*patch.MappedCategoryID) != "" {
+		if patch.MappedCategoryID != nil && *patch.MappedCategoryID != uuid.Nil {
 			var exists bool
-			err := txConn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM categories WHERE id = $1 AND deleted_at IS NULL)`, strings.TrimSpace(*patch.MappedCategoryID)).Scan(&exists)
+			err := txConn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM categories WHERE id = $1 AND deleted_at IS NULL)`, *patch.MappedCategoryID).Scan(&exists)
 			if err != nil {
 				return err
 			}
@@ -560,7 +584,7 @@ func (r *TransactionRepo) PatchImportedTransaction(ctx context.Context, userID s
 			RETURNING id, source, transaction_date, amount::text, description, transaction_type,
 			          imported_account_name, imported_category_name, mapped_account_id, mapped_category_id,
 			          raw_payload, created_at, updated_at
-		`, normalizeOptionalImportString(patch.MappedAccountID), normalizeOptionalImportString(patch.MappedCategoryID), now, importID, userID).Scan(
+		`, normalizeOptionalImportUUID(patch.MappedAccountID), normalizeOptionalImportUUID(patch.MappedCategoryID), now, importID, userID).Scan(
 			&it.ID, &it.Source, &tDate, &it.Amount, &it.Description, &it.TransactionType,
 			&it.ImportedAccountName, &it.ImportedCategoryName, &it.MappedAccountID, &it.MappedCategoryID,
 			&raw, &it.CreatedAt, &it.UpdatedAt,
@@ -581,7 +605,7 @@ func (r *TransactionRepo) PatchImportedTransaction(ctx context.Context, userID s
 	return &it, nil
 }
 
-func (r *TransactionRepo) DeleteImportedTransaction(ctx context.Context, userID string, importID string) error {
+func (r *TransactionRepo) DeleteImportedTransaction(ctx context.Context, userID uuid.UUID, importID uuid.UUID) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -596,7 +620,7 @@ func (r *TransactionRepo) DeleteImportedTransaction(ctx context.Context, userID 
 	return nil
 }
 
-func (r *TransactionRepo) GetImportedTransaction(ctx context.Context, userID string, importID string) (*entity.ImportedTransaction, error) {
+func (r *TransactionRepo) GetImportedTransaction(ctx context.Context, userID uuid.UUID, importID uuid.UUID) (*entity.ImportedTransaction, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -630,7 +654,7 @@ func (r *TransactionRepo) GetImportedTransaction(ctx context.Context, userID str
 	return &it, nil
 }
 
-func (r *TransactionRepo) DeleteAllImportedTransactions(ctx context.Context, userID string) (int64, error) {
+func (r *TransactionRepo) DeleteAllImportedTransactions(ctx context.Context, userID uuid.UUID) (int64, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return 0, err
@@ -643,7 +667,7 @@ func (r *TransactionRepo) DeleteAllImportedTransactions(ctx context.Context, use
 }
 
 // Import Mapping Rules
-func (r *TransactionRepo) UpsertImportMappingRules(ctx context.Context, userID string, rules []entity.ImportMappingRuleUpsert) ([]entity.ImportMappingRule, error) {
+func (r *TransactionRepo) UpsertImportMappingRules(ctx context.Context, userID uuid.UUID, rules []entity.ImportMappingRuleUpsert) ([]entity.ImportMappingRule, error) {
 	now := time.Now().UTC()
 	out := make([]entity.ImportMappingRule, 0, len(rules))
 
@@ -651,8 +675,8 @@ func (r *TransactionRepo) UpsertImportMappingRules(ctx context.Context, userID s
 		for _, rule := range rules {
 			kind := strings.ToLower(strings.TrimSpace(rule.Kind))
 			sourceName := strings.TrimSpace(rule.SourceName)
-			mappedID := strings.TrimSpace(rule.MappedID)
-			if sourceName == "" || mappedID == "" {
+			mappedID := rule.MappedID
+			if sourceName == "" || mappedID == uuid.Nil {
 				continue
 			}
 
@@ -663,7 +687,7 @@ func (r *TransactionRepo) UpsertImportMappingRules(ctx context.Context, userID s
 				}
 			case "category":
 				var exists bool
-				err := txConn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM categories WHERE id = $1 AND deleted_at IS NULL)` , mappedID).Scan(&exists)
+				err := txConn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM categories WHERE id = $1 AND deleted_at IS NULL)`, mappedID).Scan(&exists)
 				if err != nil {
 					return err
 				}
@@ -686,7 +710,7 @@ func (r *TransactionRepo) UpsertImportMappingRules(ctx context.Context, userID s
 					mapped_id = EXCLUDED.mapped_id,
 					updated_at = EXCLUDED.updated_at
 				RETURNING id, kind, source_name, mapped_id, created_at, updated_at
-			`, uuid.NewString(), userID, kind, sourceName, normalized, mappedID, now, now).Scan(
+			`, uuid.New(), userID, kind, sourceName, normalized, mappedID, now, now).Scan(
 				&outRule.ID, &outRule.Kind, &outRule.SourceName, &outRule.MappedID, &outRule.CreatedAt, &outRule.UpdatedAt,
 			)
 			if err != nil {
@@ -703,7 +727,7 @@ func (r *TransactionRepo) UpsertImportMappingRules(ctx context.Context, userID s
 	return out, nil
 }
 
-func (r *TransactionRepo) ListImportMappingRules(ctx context.Context, userID string) ([]entity.ImportMappingRule, error) {
+func (r *TransactionRepo) ListImportMappingRules(ctx context.Context, userID uuid.UUID) ([]entity.ImportMappingRule, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -731,7 +755,7 @@ func (r *TransactionRepo) ListImportMappingRules(ctx context.Context, userID str
 	return out, nil
 }
 
-func (r *TransactionRepo) DeleteImportMappingRule(ctx context.Context, userID string, ruleID string) error {
+func (r *TransactionRepo) DeleteImportMappingRule(ctx context.Context, userID uuid.UUID, ruleID uuid.UUID) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -747,15 +771,11 @@ func (r *TransactionRepo) DeleteImportMappingRule(ctx context.Context, userID st
 }
 
 // Helpers
-func normalizeOptionalImportString(v *string) *string {
-	if v == nil {
+func normalizeOptionalImportUUID(v *uuid.UUID) *uuid.UUID {
+	if v == nil || *v == uuid.Nil {
 		return nil
 	}
-	s := strings.TrimSpace(*v)
-	if s == "" {
-		return nil
-	}
-	return &s
+	return v
 }
 
 func normalizeRuleSourceName(v string) string {

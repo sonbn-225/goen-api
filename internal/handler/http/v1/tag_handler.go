@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
@@ -110,9 +111,9 @@ func (h *TagHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := chi.URLParam(r, "tagId")
-	if id == "" {
-		response.WriteError(w, http.StatusBadRequest, "validation_error", "tagId is required", nil)
+	id, err := uuid.Parse(chi.URLParam(r, "tagId"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid tag id format", nil)
 		return
 	}
 

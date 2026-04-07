@@ -2,13 +2,15 @@ package entity
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // RotatingSavingsGroup represents a "Choi Ho/Hui/Phuong" group.
 type RotatingSavingsGroup struct {
-	ID                  string    `json:"id"`
-	UserID              string    `json:"user_id"`
-	AccountID           string    `json:"account_id"`
+	AuditEntity
+	UserID              uuid.UUID `json:"user_id"`
+	AccountID           uuid.UUID `json:"account_id"`
 	Name                string    `json:"name"`
 	Currency            *string   `json:"currency"`
 	MemberCount         int       `json:"member_count"`
@@ -19,15 +21,13 @@ type RotatingSavingsGroup struct {
 	CycleFrequency      string    `json:"cycle_frequency"` // weekly, monthly
 	StartDate           string    `json:"start_date"`      // YYYY-MM-DD
 	Status              string    `json:"status"`          // active, completed, closed
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // RotatingSavingsContribution represents an individual payment or payout in a group.
 type RotatingSavingsContribution struct {
-	ID                  string    `json:"id"`
-	GroupID             string    `json:"group_id"`
-	TransactionID       string    `json:"transaction_id"`
+	BaseEntity
+	GroupID             uuid.UUID `json:"group_id"`
+	TransactionID       uuid.UUID `json:"transaction_id"`
 	Kind                string    `json:"kind"` // contribution, payout, collected
 	CycleNo             *int      `json:"cycle_no"`
 	DueDate             *string   `json:"due_date"`
@@ -41,10 +41,11 @@ type RotatingSavingsContribution struct {
 
 // RotatingSavingsAuditLog tracks changes and actions within a group.
 type RotatingSavingsAuditLog struct {
-	ID        string         `json:"id"`
-	UserID    string         `json:"user_id"`
-	GroupID   *string        `json:"group_id"`
+	BaseEntity
+	UserID    uuid.UUID      `json:"user_id"`
+	GroupID   *uuid.UUID     `json:"group_id"`
 	Action    string         `json:"action"`
 	Details   map[string]any `json:"details"`
 	CreatedAt time.Time      `json:"created_at"`
 }
+

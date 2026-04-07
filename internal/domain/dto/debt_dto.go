@@ -3,11 +3,11 @@ package dto
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
 type CreateDebtRequest struct {
-	ClientID     *string `json:"client_id,omitempty"`
 	AccountID    string  `json:"account_id" binding:"required"`
 	Direction    string  `json:"direction" binding:"required"` // lent, borrowed
 	Name         *string `json:"name,omitempty"`
@@ -35,13 +35,12 @@ type DebtPaymentRequest struct {
 }
 
 type DebtResponse struct {
-	ID                   string     `json:"id"`
-	ClientID             *string    `json:"client_id,omitempty"`
-	UserID               string     `json:"user_id"`
-	AccountID            *string    `json:"account_id,omitempty"`
+	ID                   uuid.UUID  `json:"id"`
+	UserID               uuid.UUID  `json:"user_id"`
+	AccountID            *uuid.UUID `json:"account_id,omitempty"`
 	Direction            string     `json:"direction"`
 	Name                 *string    `json:"name,omitempty"`
-	ContactID            *string    `json:"contact_id,omitempty"`
+	ContactID            *uuid.UUID `json:"contact_id,omitempty"`
 	ContactName          *string    `json:"contact_name,omitempty"`
 	ContactAvatarURL     *string    `json:"contact_avatar_url,omitempty"`
 	Principal            string     `json:"principal"`
@@ -59,7 +58,6 @@ type DebtResponse struct {
 func NewDebtResponse(d entity.Debt) DebtResponse {
 	return DebtResponse{
 		ID:                   d.ID,
-		ClientID:             d.ClientID,
 		UserID:               d.UserID,
 		AccountID:            d.AccountID,
 		Direction:            d.Direction,
@@ -89,9 +87,9 @@ func NewDebtResponses(items []entity.Debt) []DebtResponse {
 }
 
 type DebtPaymentLinkResponse struct {
-	ID            string    `json:"id"`
-	DebtID        string    `json:"debt_id"`
-	TransactionID string    `json:"transaction_id"`
+	ID            uuid.UUID `json:"id"`
+	DebtID        uuid.UUID `json:"debt_id"`
+	TransactionID uuid.UUID `json:"transaction_id"`
 	PrincipalPaid *string   `json:"principal_paid,omitempty"`
 	InterestPaid  *string   `json:"interest_paid,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`

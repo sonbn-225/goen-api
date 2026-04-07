@@ -7,6 +7,7 @@
 -- The Postgres image in this workspace preloads TimescaleDB.
 -- This makes the extension available to CREATE EXTENSION here.
 CREATE EXTENSION IF NOT EXISTS timescaledb;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Enums
 -- +goose StatementBegin
@@ -158,7 +159,7 @@ END $$;
 
 -- Tables
 CREATE TABLE IF NOT EXISTS users (
-  id text PRIMARY KEY,
+  id uuid PRIMARY KEY,
   username text NOT NULL UNIQUE,
   email text NULL,
   phone text NULL,
@@ -169,20 +170,36 @@ CREATE TABLE IF NOT EXISTS users (
   settings jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
   CONSTRAINT users_email_or_phone_chk CHECK (email IS NOT NULL OR phone IS NOT NULL)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_uq ON users (lower(email)) WHERE email IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS users_phone_uq ON users (phone) WHERE phone IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
+  token text NOT NULL UNIQUE,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
+
+  CONSTRAINT fk_refresh_tokens_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+
 CREATE TABLE IF NOT EXISTS contacts (
-  id text PRIMARY KEY,
-  user_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
   name text NOT NULL,
   email text,
   phone text,
   avatar_url text, -- Local override or synced from linked user
-  linked_user_id text,
+  linked_user_id uuid,
   notes text,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
@@ -198,48 +215,39 @@ CREATE INDEX IF NOT EXISTS idx_contacts_phone ON contacts(phone);
 CREATE INDEX IF NOT EXISTS idx_contacts_linked_user_id ON contacts(linked_user_id);
 
 CREATE TABLE IF NOT EXISTS accounts (
-  id text PRIMARY KEY,
-  client_id text,
+  id uuid PRIMARY KEY,
   name varchar NOT NULL,
   account_type account_type NOT NULL,
   currency varchar NOT NULL,
-  parent_account_id text,
+  parent_account_id uuid,
   status account_status NOT NULL DEFAULT 'active',
   account_number text,
   color varchar,
   closed_at timestamptz,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
-  created_by text,
-  updated_by text,
   deleted_at timestamptz,
 
-  CONSTRAINT fk_accounts_parent FOREIGN KEY (parent_account_id) REFERENCES accounts(id),
-  CONSTRAINT fk_accounts_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_accounts_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON UPDATE CASCADE
+  CONSTRAINT fk_accounts_parent FOREIGN KEY (parent_account_id) REFERENCES accounts(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_accounts_parent_account_id ON accounts(parent_account_id);
-CREATE INDEX IF NOT EXISTS idx_accounts_created_by ON accounts(created_by);
 CREATE INDEX IF NOT EXISTS idx_accounts_account_number ON accounts(account_number);
 CREATE INDEX IF NOT EXISTS idx_accounts_color ON accounts(color);
 
 CREATE TABLE IF NOT EXISTS user_accounts (
-  id text PRIMARY KEY,
-  account_id text NOT NULL,
-  user_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  account_id uuid NOT NULL,
+  user_id uuid NOT NULL,
   permission user_account_permission NOT NULL,
   status user_account_status NOT NULL DEFAULT 'active',
   revoked_at timestamptz,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
-  created_by text,
-  updated_by text,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_user_accounts_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_user_accounts_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_user_accounts_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_user_accounts_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON UPDATE CASCADE,
   CONSTRAINT uq_user_accounts_account_user UNIQUE (account_id, user_id)
 );
 
@@ -251,8 +259,7 @@ CREATE INDEX IF NOT EXISTS idx_user_accounts_user_id ON user_accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_accounts_account_id ON user_accounts(account_id);
 
 CREATE TABLE IF NOT EXISTS transactions (
-  id text PRIMARY KEY,
-  client_id text,
+  id uuid PRIMARY KEY,
   external_ref text,
 
   type transaction_type NOT NULL,
@@ -261,23 +268,19 @@ CREATE TABLE IF NOT EXISTS transactions (
   from_amount numeric(18,2),
   to_amount numeric(18,2),
 
-  account_id text,
-  from_account_id text,
-  to_account_id text,
+  account_id uuid,
+  from_account_id uuid,
+  to_account_id uuid,
   exchange_rate numeric(18,8),
   status transaction_status NOT NULL DEFAULT 'pending',
 
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
-  created_by text,
-  updated_by text,
   deleted_at timestamptz,
 
   CONSTRAINT fk_transactions_account_id FOREIGN KEY (account_id) REFERENCES accounts(id),
   CONSTRAINT fk_transactions_from_account_id FOREIGN KEY (from_account_id) REFERENCES accounts(id),
   CONSTRAINT fk_transactions_to_account_id FOREIGN KEY (to_account_id) REFERENCES accounts(id),
-  CONSTRAINT fk_transactions_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_transactions_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON UPDATE CASCADE,
   CONSTRAINT ck_transactions_amount_positive CHECK (amount > 0),
   CONSTRAINT ck_transactions_from_amount_positive CHECK (from_amount IS NULL OR from_amount > 0),
   CONSTRAINT ck_transactions_to_amount_positive CHECK (to_amount IS NULL OR to_amount > 0),
@@ -334,9 +337,9 @@ CREATE INDEX IF NOT EXISTS idx_transactions_to_account_occurred_at_id
   WHERE deleted_at IS NULL AND to_account_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS transaction_line_items (
-  id text PRIMARY KEY,
-  transaction_id text NOT NULL,
-  category_id text,
+  id uuid PRIMARY KEY,
+  transaction_id uuid NOT NULL,
+  category_id uuid,
   amount numeric(18,2) NOT NULL,
   note text,
 
@@ -374,16 +377,17 @@ FOR EACH ROW
 EXECUTE FUNCTION enforce_tli_non_transfer();
 
 CREATE TABLE IF NOT EXISTS group_expense_participants (
-  id text PRIMARY KEY,
-  user_id text NOT NULL,
-  transaction_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
+  transaction_id uuid NOT NULL,
   participant_name text NOT NULL,
   original_amount numeric(18,2) NOT NULL,
   share_amount numeric(18,2) NOT NULL,
   is_settled boolean NOT NULL DEFAULT false,
-  settlement_transaction_id text,
+  settlement_transaction_id uuid,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_gep_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_gep_transaction_id FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
@@ -397,8 +401,9 @@ CREATE INDEX IF NOT EXISTS idx_gep_user_settled ON group_expense_participants(us
 CREATE INDEX IF NOT EXISTS idx_gep_user_participant_name ON group_expense_participants(user_id, lower(participant_name));
 
 CREATE TABLE IF NOT EXISTS categories (
-  id text PRIMARY KEY,
-  parent_category_id text,
+  id uuid PRIMARY KEY DEFAULT uuidv7(),
+  key text NOT NULL UNIQUE,
+  parent_category_id uuid,
   type text,
   sort_order int,
   is_active boolean NOT NULL DEFAULT true,
@@ -432,13 +437,14 @@ END $$;
 
 
 CREATE TABLE IF NOT EXISTS tags (
-  id text PRIMARY KEY,
-  user_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
   name_vi text,
   name_en text,
   color text,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_tags_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE,
   CONSTRAINT ck_tags_names_present CHECK (name_vi IS NOT NULL OR name_en IS NOT NULL)
@@ -450,9 +456,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_tags_user_name_en ON tags(user_id, lower(na
 CREATE INDEX IF NOT EXISTS idx_tags_user_id ON tags(user_id);
 
 CREATE TABLE IF NOT EXISTS transaction_tags (
-  transaction_id text NOT NULL,
-  tag_id text NOT NULL,
+  transaction_id uuid NOT NULL,
+  tag_id uuid NOT NULL,
   created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT pk_transaction_tags PRIMARY KEY (transaction_id, tag_id),
   CONSTRAINT fk_transaction_tags_transaction_id FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
@@ -463,9 +471,11 @@ CREATE INDEX IF NOT EXISTS idx_transaction_tags_transaction_id ON transaction_ta
 CREATE INDEX IF NOT EXISTS idx_transaction_tags_tag_id ON transaction_tags(tag_id);
 
 CREATE TABLE IF NOT EXISTS transaction_line_item_tags (
-  line_item_id text NOT NULL,
-  tag_id text NOT NULL,
+  line_item_id uuid NOT NULL,
+  tag_id uuid NOT NULL,
   created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT pk_transaction_line_item_tags PRIMARY KEY (line_item_id, tag_id),
   CONSTRAINT fk_tlit_line_item FOREIGN KEY (line_item_id) REFERENCES transaction_line_items(id) ON DELETE CASCADE,
@@ -476,8 +486,8 @@ CREATE INDEX IF NOT EXISTS idx_transaction_line_item_tags_line_item_id ON transa
 CREATE INDEX IF NOT EXISTS idx_transaction_line_item_tags_tag_id ON transaction_line_item_tags(tag_id);
 
 CREATE TABLE IF NOT EXISTS budgets (
-  id text PRIMARY KEY,
-  user_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
   name text,
   period budget_period NOT NULL,
   period_start date,
@@ -485,9 +495,10 @@ CREATE TABLE IF NOT EXISTS budgets (
   amount numeric(18,2) NOT NULL,
   alert_threshold_percent int,
   rollover_mode budget_rollover_mode,
-  category_id text,
+  category_id uuid,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_budgets_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE,
   CONSTRAINT fk_budgets_category_id FOREIGN KEY (category_id) REFERENCES categories(id),
@@ -498,9 +509,9 @@ CREATE INDEX IF NOT EXISTS idx_budgets_user_period ON budgets(user_id, period, p
 CREATE INDEX IF NOT EXISTS idx_budgets_user_category ON budgets(user_id, category_id);
 
 CREATE TABLE IF NOT EXISTS savings_instruments (
-  id text PRIMARY KEY,
-  savings_account_id text NOT NULL UNIQUE,
-  parent_account_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  savings_account_id uuid NOT NULL UNIQUE,
+  parent_account_id uuid NOT NULL,
   principal numeric(18,2) NOT NULL,
   interest_rate numeric(18,8),
   term_months int,
@@ -512,6 +523,7 @@ CREATE TABLE IF NOT EXISTS savings_instruments (
   closed_at timestamptz,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_savings_instruments_savings_account FOREIGN KEY (savings_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_savings_instruments_parent_account FOREIGN KEY (parent_account_id) REFERENCES accounts(id)
@@ -521,9 +533,9 @@ CREATE INDEX IF NOT EXISTS idx_savings_instruments_parent_account_id ON savings_
 CREATE INDEX IF NOT EXISTS idx_savings_instruments_status ON savings_instruments(status);
 
 CREATE TABLE IF NOT EXISTS rotating_savings_groups (
-  id text PRIMARY KEY,
-  user_id text NOT NULL,
-  account_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
+  account_id uuid NOT NULL,
   name text NOT NULL,
   member_count int NOT NULL,
   user_slots int NOT NULL,
@@ -535,6 +547,7 @@ CREATE TABLE IF NOT EXISTS rotating_savings_groups (
   status rotating_savings_group_status NOT NULL DEFAULT 'active',
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_rotating_savings_groups_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_rotating_savings_groups_account_id FOREIGN KEY (account_id) REFERENCES accounts(id)
@@ -543,9 +556,9 @@ CREATE TABLE IF NOT EXISTS rotating_savings_groups (
 CREATE INDEX IF NOT EXISTS idx_rotating_savings_groups_user_status ON rotating_savings_groups(user_id, status);
 
 CREATE TABLE IF NOT EXISTS rotating_savings_contributions (
-  id text PRIMARY KEY,
-  group_id text NOT NULL,
-  transaction_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  group_id uuid NOT NULL,
+  transaction_id uuid NOT NULL,
   kind rotating_savings_contribution_kind NOT NULL,
   cycle_no int,
   due_date date,
@@ -555,6 +568,8 @@ CREATE TABLE IF NOT EXISTS rotating_savings_contributions (
   occurred_at timestamptz NOT NULL,
   note text,
   created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_rotating_savings_contributions_group_id FOREIGN KEY (group_id) REFERENCES rotating_savings_groups(id) ON DELETE CASCADE,
   CONSTRAINT fk_rotating_savings_contributions_transaction_id FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
@@ -570,12 +585,14 @@ CREATE INDEX IF NOT EXISTS idx_rotating_savings_contributions_group_cycle_no
   ON rotating_savings_contributions(group_id, cycle_no);
 
 CREATE TABLE IF NOT EXISTS rotating_savings_audit_logs (
-  id text PRIMARY KEY,
-  user_id text NOT NULL,
-  group_id text,
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
+  group_id uuid,
   action text NOT NULL,
   details jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_rotating_savings_audit_logs_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_rotating_savings_audit_logs_group_id FOREIGN KEY (group_id) REFERENCES rotating_savings_groups(id) ON DELETE SET NULL
@@ -585,10 +602,9 @@ CREATE INDEX IF NOT EXISTS idx_rotating_savings_audit_logs_group_id ON rotating_
 CREATE INDEX IF NOT EXISTS idx_rotating_savings_audit_logs_user_id ON rotating_savings_audit_logs(user_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS debts (
-  id text PRIMARY KEY,
-  client_id text,
-  user_id text NOT NULL,
-  account_id text,
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
+  account_id uuid,
   direction debt_direction NOT NULL,
   name text,
   principal numeric(18,2) NOT NULL,
@@ -599,10 +615,11 @@ CREATE TABLE IF NOT EXISTS debts (
   outstanding_principal numeric(18,2) NOT NULL,
   accrued_interest numeric(18,2) NOT NULL DEFAULT 0,
   status debt_status NOT NULL DEFAULT 'active',
-  contact_id text,
+  contact_id uuid,
   closed_at timestamptz,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_debts_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_debts_account_id FOREIGN KEY (account_id) REFERENCES accounts(id),
@@ -617,12 +634,14 @@ CREATE INDEX IF NOT EXISTS idx_debts_user_due_date ON debts(user_id, due_date);
 CREATE INDEX IF NOT EXISTS idx_debts_account_id ON debts(account_id);
 
 CREATE TABLE IF NOT EXISTS debt_payment_links (
-  id text PRIMARY KEY,
-  debt_id text NOT NULL,
-  transaction_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  debt_id uuid NOT NULL,
+  transaction_id uuid NOT NULL,
   principal_paid numeric(18,2),
   interest_paid numeric(18,2),
   created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_debt_payment_links_debt_id FOREIGN KEY (debt_id) REFERENCES debts(id) ON DELETE CASCADE,
   CONSTRAINT fk_debt_payment_links_transaction_id FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
@@ -635,8 +654,8 @@ CREATE INDEX IF NOT EXISTS idx_debt_payment_links_debt_id
   ON debt_payment_links(debt_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS debt_installments (
-  id text PRIMARY KEY,
-  debt_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  debt_id uuid NOT NULL,
   installment_no int NOT NULL,
   due_date date NOT NULL,
   amount_due numeric(18,2) NOT NULL,
@@ -655,12 +674,13 @@ CREATE INDEX IF NOT EXISTS idx_debt_installments_debt_due_date
   ON debt_installments(debt_id, due_date);
 
 CREATE TABLE IF NOT EXISTS investment_accounts (
-  id text PRIMARY KEY,
-  account_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  account_id uuid NOT NULL,
   fee_settings jsonb,
   tax_settings jsonb,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_investment_accounts_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 );
@@ -669,21 +689,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_investment_accounts_account_id
   ON investment_accounts(account_id);
 
 CREATE TABLE IF NOT EXISTS securities (
-  id text PRIMARY KEY,
+  id uuid PRIMARY KEY,
   symbol varchar NOT NULL,
   name varchar,
   asset_class security_asset_class,
   currency varchar,
   created_at timestamptz NOT NULL,
-  updated_at timestamptz NOT NULL
+  updated_at timestamptz NOT NULL,
+  deleted_at timestamptz
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_securities_symbol
   ON securities(symbol);
 
 CREATE TABLE IF NOT EXISTS security_price_dailies (
-  id text NOT NULL,
-  security_id text NOT NULL,
+  id uuid NOT NULL,
+  security_id uuid NOT NULL,
   price_date date NOT NULL,
   open numeric(18,8),
   high numeric(18,8),
@@ -692,6 +713,7 @@ CREATE TABLE IF NOT EXISTS security_price_dailies (
   volume numeric(18,2),
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   PRIMARY KEY (id, price_date),
   CONSTRAINT fk_security_price_dailies_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE
@@ -704,8 +726,8 @@ CREATE INDEX IF NOT EXISTS idx_security_price_dailies_price_date
   ON security_price_dailies(price_date);
 
 CREATE TABLE IF NOT EXISTS security_events (
-  id text PRIMARY KEY,
-  security_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  security_id uuid NOT NULL,
   event_type security_event_type NOT NULL,
   ex_date date,
   record_date date,
@@ -720,6 +742,7 @@ CREATE TABLE IF NOT EXISTS security_events (
   note varchar,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_security_events_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE
 );
@@ -743,18 +766,19 @@ CREATE TABLE IF NOT EXISTS market_data_sync_states (
   last_status text NOT NULL DEFAULT 'never',
   last_error text,
   created_at timestamptz NOT NULL,
-  updated_at timestamptz NOT NULL
+  updated_at timestamptz NOT NULL,
+  deleted_at timestamptz
 );
 
 CREATE INDEX IF NOT EXISTS idx_market_data_sync_states_last_success_at
   ON market_data_sync_states(last_success_at);
 
 CREATE TABLE IF NOT EXISTS security_event_elections (
-  id text PRIMARY KEY,
-  user_id text NOT NULL,
-  broker_account_id text NOT NULL,
-  security_event_id text NOT NULL,
-  security_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
+  broker_account_id uuid NOT NULL,
+  security_event_id uuid NOT NULL,
+  security_id uuid NOT NULL,
   entitlement_date date NOT NULL,
   holding_quantity_at_entitlement_date numeric(18,8) NOT NULL,
   entitled_quantity numeric(18,8) NOT NULL,
@@ -764,6 +788,7 @@ CREATE TABLE IF NOT EXISTS security_event_elections (
   note varchar,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_security_event_elections_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_security_event_elections_broker_account_id FOREIGN KEY (broker_account_id) REFERENCES investment_accounts(id) ON DELETE CASCADE,
@@ -780,12 +805,11 @@ CREATE INDEX IF NOT EXISTS idx_security_event_elections_user_status
   ON security_event_elections(user_id, status);
 
 CREATE TABLE IF NOT EXISTS trades (
-  id text PRIMARY KEY,
-  client_id text,
-  broker_account_id text NOT NULL,
-  security_id text NOT NULL,
-  fee_transaction_id text,
-  tax_transaction_id text,
+  id uuid PRIMARY KEY,
+  broker_account_id uuid NOT NULL,
+  security_id uuid NOT NULL,
+  fee_transaction_id uuid,
+  tax_transaction_id uuid,
   side trade_side NOT NULL,
   quantity numeric(18,8) NOT NULL,
   price numeric(18,8) NOT NULL,
@@ -795,6 +819,7 @@ CREATE TABLE IF NOT EXISTS trades (
   note varchar,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_trades_broker_account_id FOREIGN KEY (broker_account_id) REFERENCES investment_accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_trades_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE,
@@ -814,9 +839,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_trades_tax_transaction_id
   WHERE tax_transaction_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS holdings (
-  id text PRIMARY KEY,
-  broker_account_id text NOT NULL,
-  security_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  broker_account_id uuid NOT NULL,
+  security_id uuid NOT NULL,
   quantity numeric(18,8) NOT NULL,
   cost_basis_total numeric(18,2),
   avg_cost numeric(18,8),
@@ -827,6 +852,7 @@ CREATE TABLE IF NOT EXISTS holdings (
   source_of_truth holding_source_of_truth NOT NULL,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_holdings_broker_account_id FOREIGN KEY (broker_account_id) REFERENCES investment_accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_holdings_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE
@@ -836,17 +862,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_holdings_broker_security
   ON holdings(broker_account_id, security_id);
 
 CREATE TABLE IF NOT EXISTS share_lots (
-  id text PRIMARY KEY,
-  broker_account_id text NOT NULL,
-  security_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  broker_account_id uuid NOT NULL,
+  security_id uuid NOT NULL,
   quantity numeric(18,8) NOT NULL,
   acquisition_date date NOT NULL,
   cost_basis_per_share numeric(18,8) NOT NULL DEFAULT 0,
   provenance lot_provenance NOT NULL DEFAULT 'regular_buy',
   status lot_status NOT NULL DEFAULT 'active',
-  buy_trade_id text,
+  buy_trade_id uuid,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_share_lots_broker_account_id FOREIGN KEY (broker_account_id) REFERENCES investment_accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_share_lots_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE,
@@ -861,11 +888,11 @@ CREATE INDEX IF NOT EXISTS idx_share_lots_status
   ON share_lots(status);
 
 CREATE TABLE IF NOT EXISTS realized_trade_logs (
-  id text PRIMARY KEY,
-  broker_account_id text NOT NULL,
-  security_id text NOT NULL,
-  sell_trade_id text NOT NULL,
-  source_share_lot_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  broker_account_id uuid NOT NULL,
+  security_id uuid NOT NULL,
+  sell_trade_id uuid NOT NULL,
+  source_share_lot_id uuid NOT NULL,
   quantity numeric(18,8) NOT NULL,
   acquisition_date date NOT NULL,
   cost_basis_total numeric(18,2) NOT NULL,
@@ -874,6 +901,8 @@ CREATE TABLE IF NOT EXISTS realized_trade_logs (
   realized_pnl numeric(18,2) NOT NULL,
   provenance lot_provenance NOT NULL,
   created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_realized_trade_logs_broker_account_id FOREIGN KEY (broker_account_id) REFERENCES investment_accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_realized_trade_logs_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE,
@@ -886,12 +915,12 @@ CREATE INDEX IF NOT EXISTS idx_realized_trade_logs_broker_security_sell
   ON realized_trade_logs(broker_account_id, security_id, sell_trade_id);
 
 CREATE TABLE IF NOT EXISTS audit_events (
-  id text NOT NULL,
-  account_id text NOT NULL,
-  actor_user_id text NOT NULL,
+  id uuid NOT NULL,
+  account_id uuid NOT NULL,
+  actor_user_id uuid NOT NULL,
   action varchar NOT NULL,
   entity_type varchar NOT NULL,
-  entity_id text NOT NULL,
+  entity_id uuid NOT NULL,
   occurred_at timestamptz NOT NULL,
   diff jsonb,
 
@@ -908,8 +937,8 @@ CREATE INDEX IF NOT EXISTS idx_audit_events_account_entity
   ON audit_events(account_id, entity_type, entity_id, occurred_at DESC);
 
 CREATE TABLE IF NOT EXISTS imported_transactions (
-  id text PRIMARY KEY,
-  user_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
   source text NOT NULL DEFAULT 'goen-v1',
 
   transaction_date date NOT NULL,
@@ -920,13 +949,14 @@ CREATE TABLE IF NOT EXISTS imported_transactions (
   imported_account_name text,
   imported_category_name text,
 
-  mapped_account_id text,
-  mapped_category_id text,
+  mapped_account_id uuid,
+  mapped_category_id uuid,
 
   raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
 
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_imported_transactions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_imported_transactions_mapped_account_id FOREIGN KEY (mapped_account_id) REFERENCES accounts(id),
@@ -943,14 +973,15 @@ CREATE INDEX IF NOT EXISTS idx_imported_transactions_raw_payload_gin
   ON imported_transactions USING GIN (raw_payload);
 
 CREATE TABLE IF NOT EXISTS import_mapping_rules (
-  id text PRIMARY KEY,
-  user_id text NOT NULL,
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
   kind text NOT NULL,
   source_name text NOT NULL,
   normalized_source_name text NOT NULL,
-  mapped_id text NOT NULL,
+  mapped_id uuid NOT NULL,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
+  deleted_at timestamptz,
 
   CONSTRAINT fk_import_mapping_rules_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT chk_import_mapping_rules_kind CHECK (kind IN ('account', 'category')),

@@ -55,7 +55,7 @@ func (r *UserRepo) CreateUser(ctx context.Context, u entity.UserWithPassword) er
 		}
 
 		// 2. Create initial cash account
-		cashAccountID := uuid.NewString()
+		cashAccountID := uuid.New()
 		_, err = tx.Exec(ctx, `
 			INSERT INTO accounts (id, name, account_type, currency, status, created_at, updated_at, created_by, updated_by)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -68,7 +68,7 @@ func (r *UserRepo) CreateUser(ctx context.Context, u entity.UserWithPassword) er
 		_, err = tx.Exec(ctx, `
 			INSERT INTO user_accounts (id, account_id, user_id, permission, status, created_at, updated_at, created_by, updated_by)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		`, uuid.NewString(), cashAccountID, u.ID, "owner", "active", u.CreatedAt, u.UpdatedAt, u.ID, u.ID)
+		`, uuid.New(), cashAccountID, u.ID, "owner", "active", u.CreatedAt, u.UpdatedAt, u.ID, u.ID)
 		if err != nil {
 			return fmt.Errorf("failed to link user to account: %w", err)
 		}
@@ -89,7 +89,7 @@ func (r *UserRepo) FindUserByUsername(ctx context.Context, username string) (*en
 	return r.findOneUser(ctx, "username = $1", username)
 }
 
-func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*entity.User, error) {
+func (r *UserRepo) FindUserByID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id string) (*entity.User, e
 	return &u, nil
 }
 
-func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID string, patch map[string]any) (*entity.User, error) {
+func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID uuid.UUID, patch map[string]any) (*entity.User, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID string, patch 
 	return &u, nil
 }
 
-func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID string, params entity.UpdateUserParams) (*entity.User, error) {
+func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID uuid.UUID, params entity.UpdateUserParams) (*entity.User, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err

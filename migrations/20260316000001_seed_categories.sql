@@ -4,7 +4,7 @@
 -- Policy: cat_sys_* IDs are reserved system categories and must remain stable.
 -- Taxonomy expansion/adjustment should be done via cat_def_* categories only.
 
-INSERT INTO categories (id, parent_category_id, type, sort_order, is_active, icon, color, created_at, updated_at)
+WITH seed_categories (key, parent_key, type, sort_order, is_active, icon, color, created_at, updated_at) AS (
 VALUES
   -- ============ SYSTEM CATEGORIES ============
   ('cat_sys_internal', NULL, 'both', 10000, true, 'settings', 'gray', now(), now()),
@@ -290,7 +290,19 @@ VALUES
 
   ('cat_sys_rotating_savings_contribution', 'cat_sys_internal', 'expense', 10020, true, 'users', 'cyan', now(), now()),
   ('cat_sys_rotating_savings_payout', 'cat_sys_internal', 'income', 10021, true, 'coins', 'cyan', now(), now())
-ON CONFLICT (id) DO NOTHING;
+)
+, upsert_categories AS (
+INSERT INTO categories (key, type, sort_order, is_active, icon, color, created_at, updated_at)
+SELECT key, type, sort_order, is_active, icon, color, created_at, updated_at
+FROM seed_categories
+ON CONFLICT (key) DO NOTHING
+)
+UPDATE categories c
+SET parent_category_id = p.id
+FROM seed_categories s
+LEFT JOIN categories p ON p.key = s.parent_key
+WHERE c.key = s.key
+  AND c.parent_category_id IS DISTINCT FROM p.id;
 
 -- +goose Down
 -- This is a seed migration, so we don't delete on rollback

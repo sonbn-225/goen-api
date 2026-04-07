@@ -496,7 +496,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Target User ID or Username",
+                        "description": "Target User ID",
                         "name": "userId",
                         "in": "path",
                         "required": true
@@ -5573,9 +5573,6 @@ const docTemplate = `{
                 "balance": {
                     "type": "string"
                 },
-                "client_id": {
-                    "type": "string"
-                },
                 "color": {
                     "type": "string"
                 },
@@ -5776,6 +5773,9 @@ const docTemplate = `{
                 "is_active": {
                     "type": "boolean"
                 },
+                "key_name": {
+                    "type": "string"
+                },
                 "parent_category_id": {
                     "type": "string"
                 },
@@ -5914,9 +5914,6 @@ const docTemplate = `{
                 "account_id": {
                     "type": "string"
                 },
-                "client_id": {
-                    "type": "string"
-                },
                 "contact_id": {
                     "type": "string"
                 },
@@ -5957,9 +5954,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "category_id": {
-                    "type": "string"
-                },
-                "client_id": {
                     "type": "string"
                 },
                 "description": {
@@ -6125,9 +6119,6 @@ const docTemplate = `{
         "dto.CreateTradeRequest": {
             "type": "object",
             "properties": {
-                "client_id": {
-                    "type": "string"
-                },
                 "fee_category_id": {
                     "type": "string"
                 },
@@ -6198,9 +6189,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "category_id": {
-                    "type": "string"
-                },
-                "client_id": {
                     "type": "string"
                 },
                 "description": {
@@ -6313,9 +6301,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "accrued_interest": {
-                    "type": "string"
-                },
-                "client_id": {
                     "type": "string"
                 },
                 "contact_avatar_url": {
@@ -7262,9 +7247,6 @@ const docTemplate = `{
                 "broker_account_id": {
                     "type": "string"
                 },
-                "client_id": {
-                    "type": "string"
-                },
                 "fee_transaction_id": {
                     "type": "string"
                 },
@@ -7396,9 +7378,6 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
-                },
-                "client_id": {
-                    "type": "string"
                 },
                 "description": {
                     "type": "string"

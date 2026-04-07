@@ -1,12 +1,12 @@
 package entity
 
 import (
-	"time"
+	"github.com/google/uuid"
 )
 
 type ImportedTransaction struct {
-	ID                   string         `json:"id"`
-	UserID               string         `json:"-"`
+	AuditEntity
+	UserID               uuid.UUID      `json:"-"`
 	Source               string         `json:"source"`
 	TransactionDate      string         `json:"transaction_date"`
 	Amount               string         `json:"amount"`
@@ -14,21 +14,17 @@ type ImportedTransaction struct {
 	TransactionType      *string        `json:"transaction_type,omitempty"`
 	ImportedAccountName  *string        `json:"imported_account_name,omitempty"`
 	ImportedCategoryName *string        `json:"imported_category_name,omitempty"`
-	MappedAccountID      *string        `json:"mapped_account_id,omitempty"`
-	MappedCategoryID     *string        `json:"mapped_category_id,omitempty"`
+	MappedAccountID      *uuid.UUID     `json:"mapped_account_id,omitempty"`
+	MappedCategoryID     *uuid.UUID     `json:"mapped_category_id,omitempty"`
 	RawPayload           map[string]any `json:"raw_payload,omitempty"`
-	CreatedAt            time.Time      `json:"created_at"`
-	UpdatedAt            time.Time      `json:"updated_at"`
 }
 
 type ImportMappingRule struct {
-	ID         string    `json:"id"`
-	UserID     string    `json:"-"`
+	AuditEntity
+	UserID     uuid.UUID `json:"-"`
 	Kind       string    `json:"kind"` // account | category
 	SourceName string    `json:"source_name"`
-	MappedID   string    `json:"mapped_id"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	MappedID   uuid.UUID `json:"mapped_id"`
 }
 
 type ImportedTransactionCreate struct {
@@ -39,34 +35,35 @@ type ImportedTransactionCreate struct {
 	TransactionType      *string
 	ImportedAccountName  *string
 	ImportedCategoryName *string
-	MappedAccountID      *string
-	MappedCategoryID     *string
+	MappedAccountID      *uuid.UUID
+	MappedCategoryID     *uuid.UUID
 	RawPayload           map[string]any
 }
 
 type ImportedTransactionPatch struct {
-	MappedAccountID  *string
-	MappedCategoryID *string
+	MappedAccountID  *uuid.UUID
+	MappedCategoryID *uuid.UUID
 }
 
 type ImportMappingRuleUpsert struct {
 	Kind       string
 	SourceName string
-	MappedID   string
+	MappedID   uuid.UUID
 }
 
 type ExportTransactionRow struct {
-	TransactionID   string  `json:"transaction_id"`
-	TransactionDate string  `json:"transaction_date"`
-	Amount          string  `json:"amount"`
-	Description     *string `json:"description,omitempty"`
-	TransactionType string  `json:"transaction_type"`
-	AccountName     string  `json:"account_name"`
-	AccountID       string  `json:"account_id"`
-	CategoryName    *string `json:"category_name,omitempty"`
-	CategoryID      *string `json:"category_id,omitempty"`
-	FromAccountName *string `json:"from_account_name,omitempty"`
-	FromAccountID   *string `json:"from_account_id,omitempty"`
-	ToAccountName   *string `json:"to_account_name,omitempty"`
-	ToAccountID     *string `json:"to_account_id,omitempty"`
+	TransactionID   uuid.UUID  `json:"transaction_id"`
+	TransactionDate string     `json:"transaction_date"`
+	Amount          string     `json:"amount"`
+	Description     *string    `json:"description,omitempty"`
+	TransactionType string     `json:"transaction_type"`
+	AccountName     string     `json:"account_name"`
+	AccountID       uuid.UUID  `json:"account_id"`
+	CategoryName    *string    `json:"category_name,omitempty"`
+	CategoryID      *uuid.UUID `json:"category_id,omitempty"`
+	FromAccountName *string    `json:"from_account_name,omitempty"`
+	FromAccountID   *uuid.UUID `json:"from_account_id,omitempty"`
+	ToAccountName   *string    `json:"to_account_name,omitempty"`
+	ToAccountID     *uuid.UUID `json:"to_account_id,omitempty"`
 }
+

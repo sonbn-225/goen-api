@@ -3,6 +3,7 @@ package dto
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
@@ -27,23 +28,21 @@ type PatchAccountRequest struct {
 }
 
 type AccountResponse struct {
-	ID                  string     `json:"id"`
-	ClientID            *string    `json:"client_id,omitempty"`
+	ID                  uuid.UUID  `json:"id"`
 	Name                string     `json:"name"`
 	AccountNumber       *string    `json:"account_number,omitempty"`
 	Color               *string    `json:"color,omitempty"`
 	AccountType         string     `json:"account_type"`
 	Currency            string     `json:"currency"`
-	ParentAccountID     *string    `json:"parent_account_id,omitempty"`
+	ParentAccountID     *uuid.UUID `json:"parent_account_id,omitempty"`
 	Status              string     `json:"status"`
 	Balance             string     `json:"balance"`
-	InvestmentAccountID *string    `json:"investment_account_id,omitempty"`
+	InvestmentAccountID *uuid.UUID `json:"investment_account_id,omitempty"`
 }
 
 func NewAccountResponse(it entity.Account) AccountResponse {
 	return AccountResponse{
 		ID:                  it.ID,
-		ClientID:            it.ClientID,
 		Name:                it.Name,
 		AccountNumber:       it.AccountNumber,
 		Color:               it.Color,
@@ -65,9 +64,9 @@ func NewAccountResponses(items []entity.Account) []AccountResponse {
 }
 
 type AccountBalanceResponse struct {
-	AccountID string `json:"account_id"`
-	Currency  string `json:"currency"`
-	Balance   string `json:"balance"`
+	AccountID uuid.UUID `json:"account_id"`
+	Currency  string    `json:"currency"`
+	Balance   string    `json:"balance"`
 }
 
 func NewAccountBalanceResponse(it entity.AccountBalance) AccountBalanceResponse {
@@ -85,11 +84,11 @@ func NewAccountBalanceResponses(items []entity.AccountBalance) []AccountBalanceR
 	}
 	return out
 }
-  
+
 type AccountShareResponse struct {
-	ID              string     `json:"id"`
-	AccountID       string     `json:"account_id"`
-	UserID          string     `json:"user_id"`
+	ID              uuid.UUID  `json:"id"`
+	AccountID       uuid.UUID  `json:"account_id"`
+	UserID          uuid.UUID  `json:"user_id"`
 	Permission      string     `json:"permission"`
 	Status          string     `json:"status"`
 	RevokedAt       *time.Time `json:"revoked_at,omitempty"`
@@ -125,12 +124,12 @@ func NewAccountShareResponses(items []entity.AccountShare) []AccountShareRespons
 }
 
 type AccountAuditEventResponse struct {
-	ID          string         `json:"id"`
-	AccountID   string         `json:"account_id"`
-	ActorUserID string         `json:"actor_user_id"`
+	ID          uuid.UUID      `json:"id"`
+	AccountID   uuid.UUID      `json:"account_id"`
+	ActorUserID uuid.UUID      `json:"actor_user_id"`
 	Action      string         `json:"action"`
 	EntityType  string         `json:"entity_type"`
-	EntityID    string         `json:"entity_id"`
+	EntityID    uuid.UUID      `json:"entity_id"`
 	OccurredAt  time.Time      `json:"occurred_at"`
 	Diff        map[string]any `json:"diff,omitempty"`
 }

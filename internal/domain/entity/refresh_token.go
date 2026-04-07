@@ -1,11 +1,15 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type RefreshToken struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
+	AuditEntity
+	UserID    uuid.UUID `json:"user_id"`
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expires_at"`
-	CreatedAt time.Time `json:"created_at"`
 }
+

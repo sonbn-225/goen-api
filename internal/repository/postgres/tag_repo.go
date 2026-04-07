@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
@@ -18,7 +19,7 @@ func NewTagRepo(db *database.Postgres) *TagRepo {
 	return &TagRepo{db: db}
 }
 
-func (r *TagRepo) CreateTag(ctx context.Context, userID string, t entity.Tag) error {
+func (r *TagRepo) CreateTag(ctx context.Context, userID uuid.UUID, t entity.Tag) error {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return err
@@ -31,7 +32,7 @@ func (r *TagRepo) CreateTag(ctx context.Context, userID string, t entity.Tag) er
 	return err
 }
 
-func (r *TagRepo) GetTag(ctx context.Context, userID string, tagID string) (*entity.Tag, error) {
+func (r *TagRepo) GetTag(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) (*entity.Tag, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -63,7 +64,7 @@ func (r *TagRepo) GetTag(ctx context.Context, userID string, tagID string) (*ent
 	return &t, nil
 }
 
-func (r *TagRepo) ListTags(ctx context.Context, userID string) ([]entity.Tag, error) {
+func (r *TagRepo) ListTags(ctx context.Context, userID uuid.UUID) ([]entity.Tag, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err

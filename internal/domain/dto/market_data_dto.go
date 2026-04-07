@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
@@ -17,7 +18,7 @@ type RefreshManyResponse struct {
 }
 
 type SecurityStatus struct {
-	SecurityID string            `json:"security_id"`
+	SecurityID uuid.UUID         `json:"security_id"`
 	Prices     *entity.SyncState `json:"prices_daily"`
 	Events     *entity.SyncState `json:"security_events"`
 	RateLimit  *entity.RateLimit `json:"rate_limit,omitempty"`
@@ -29,16 +30,16 @@ type GlobalStatus struct {
 }
 
 type RefreshPriceRequest struct {
-	SecurityID string  `json:"security_id"`
-	Force      *string `json:"force,omitempty"`
-	Full       *string `json:"full,omitempty"`
-	From       *string `json:"from,omitempty"`
-	To         *string `json:"to,omitempty"`
+	SecurityID uuid.UUID `json:"security_id"`
+	Force      *string   `json:"force,omitempty"`
+	Full       *string   `json:"full,omitempty"`
+	From       *string   `json:"from,omitempty"`
+	To         *string   `json:"to,omitempty"`
 }
 
 type RefreshEventRequest struct {
-	SecurityID string  `json:"security_id"`
-	Force      *string `json:"force,omitempty"`
+	SecurityID uuid.UUID `json:"security_id"`
+	Force      *string   `json:"force,omitempty"`
 }
 
 type RefreshSymbolsRequest struct {

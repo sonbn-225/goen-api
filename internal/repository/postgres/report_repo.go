@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
@@ -17,7 +18,7 @@ func NewReportRepo(db *database.Postgres) *ReportRepo {
 	return &ReportRepo{db: db}
 }
 
-func (r *ReportRepo) GetCashflow(ctx context.Context, userID string, months int) ([]entity.CashflowStat, error) {
+func (r *ReportRepo) GetCashflow(ctx context.Context, userID uuid.UUID, months int) ([]entity.CashflowStat, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -73,7 +74,7 @@ func (r *ReportRepo) GetCashflow(ctx context.Context, userID string, months int)
 	return out, nil
 }
 
-func (r *ReportRepo) GetTopExpenses(ctx context.Context, userID string, year int, month int, limit int) ([]entity.CategoryExpenseStat, error) {
+func (r *ReportRepo) GetTopExpenses(ctx context.Context, userID uuid.UUID, year int, month int, limit int) ([]entity.CategoryExpenseStat, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err

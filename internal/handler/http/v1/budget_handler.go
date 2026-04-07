@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
@@ -111,10 +112,19 @@ func (h *BudgetHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := chi.URLParam(r, "id")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid budget id format", nil)
+		return
+	}
+
 	res, err := h.svc.Get(r.Context(), userID, id)
 	if err != nil {
 		response.WriteInternalError(w, err)
+		return
+	}
+	if res == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "budget not found", nil)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, res)
@@ -140,7 +150,12 @@ func (h *BudgetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := chi.URLParam(r, "id")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid budget id format", nil)
+		return
+	}
+
 	var req dto.UpdateBudgetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
@@ -150,6 +165,10 @@ func (h *BudgetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	res, err := h.svc.Update(r.Context(), userID, id, req)
 	if err != nil {
 		response.WriteInternalError(w, err)
+		return
+	}
+	if res == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "budget not found", nil)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, res)
@@ -172,7 +191,12 @@ func (h *BudgetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := chi.URLParam(r, "id")
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid budget id format", nil)
+		return
+	}
+
 	if err := h.svc.Delete(r.Context(), userID, id); err != nil {
 		response.WriteInternalError(w, err)
 		return

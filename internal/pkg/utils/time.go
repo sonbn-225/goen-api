@@ -1,64 +1,116 @@
 package utils
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"time"
 )
 
-// ParseTimeOrDate parses a string into a time.Time, supporting ISO 8601, RFC3339, and plain date (YYYY-MM-DD).
+var (
+	ErrEmptyTime   = errors.New("empty time string")
+	ErrInvalidTime = errors.New("invalid time format")
+)
+
+// timeFormats được khai báo ngoài hàm để tránh tốn RAM cấp phát lại mỗi lần parse.
+var timeFormats = []string{
+	time.RFC3339,
+	time.RFC3339Nano,
+	"2006-01-02T15:04:05Z07:00",
+	"2006-01-02T15:04:05",
+	"2006-01-02 15:04:05",
+}
+
+// Now trả về thời gian hiện tại chuẩn UTC.
+// Cắt bỏ phần Monotonic Clock (Microsecond) để đồng nhất dữ liệu giữa RAM và Database.
+func Now() time.Time {
+	return time.Now().UTC().Truncate(time.Microsecond)
+}
+
+// NowString trả về chuỗi thời gian hiện tại theo chuẩn RFC3339.
+func NowString() string {
+	return Now().Format(time.RFC3339)
+}
+
+// NowDateString trả về chuỗi ngày hiện tại (Ví dụ: "2026-04-07").
+func NowDateString() string {
+	return Now().Format(time.DateOnly)
+}
+
+// ParseTimeOrDate sử dụng Heuristic Parsing để tăng tốc độ phân tích chuỗi thời gian.
 func ParseTimeOrDate(s string) (time.Time, error) {
 	s = strings.TrimSpace(s)
-	if s == "" {
-		return time.Time{}, fmt.Errorf("empty time string")
+	l := len(s)
+	if l == 0 {
+		return time.Time{}, ErrEmptyTime
 	}
 
-	formats := []string{
-		time.RFC3339,
-		time.RFC3339Nano,
-		"2006-01-02T15:04:05Z07:00",
-		"2006-01-02T15:04:05",
-		"2006-01-02 15:04:05",
-		"2006-01-02",
+	// Tối ưu 1: Bắt thẳng định dạng "YYYY-MM-DD" để bỏ qua vòng lặp tốn kém.
+	if l == 10 {
+		t, err := time.ParseInLocation(time.DateOnly, s, time.UTC)
+		if err == nil {
+			return t, nil
+		}
 	}
 
-	for _, f := range formats {
+	// Tối ưu 2: Thử các format phức tạp hơn nếu cần.
+	for _, f := range timeFormats {
 		if t, err := time.Parse(f, s); err == nil {
 			return t.UTC(), nil
 		}
 	}
-	return time.Time{}, fmt.Errorf("invalid time format: %s", s)
+	return time.Time{}, ErrInvalidTime
 }
 
-// NormalizeOccurredAt returns a time.Time and a YYYY-MM-DD string.
+// NormalizeOccurredAt gộp ngày và giờ một cách thông minh mà không cần phép nối chuỗi (Zero-Allocation).
 func NormalizeOccurredAt(occurredAtStr, dateStr, timeStr *string) (time.Time, string, error) {
-	if occurredAtStr != nil && strings.TrimSpace(*occurredAtStr) != "" {
-		t, err := ParseTimeOrDate(*occurredAtStr)
-		if err != nil {
-			return time.Time{}, "", fmt.Errorf("occurred_at is invalid: %w", err)
-		}
-		return t, t.Format("2006-01-02"), nil
-	}
-
-	now := time.Now().UTC()
-	if dateStr != nil && strings.TrimSpace(*dateStr) != "" {
-		d := strings.TrimSpace(*dateStr)
-		full := d
-		if timeStr != nil && strings.TrimSpace(*timeStr) != "" {
-			full += "T" + strings.TrimSpace(*timeStr)
-		} else {
-			full += "T" + now.Format("15:04:05")
-		}
-		t, err := ParseTimeOrDate(full)
-		if err != nil {
-			// Fallback to plain date
-			t, err = ParseTimeOrDate(d)
+	// 1. Nếu có sẵn chuỗi occurredAt, ưu tiên xử lý trước
+	if occurredAtStr != nil {
+		if s := strings.TrimSpace(*occurredAtStr); s != "" {
+			t, err := ParseTimeOrDate(s)
 			if err != nil {
-				return time.Time{}, "", fmt.Errorf("occurred_date is invalid: %w", err)
+				return time.Time{}, "", err
 			}
+			return t, t.Format(time.DateOnly), nil
 		}
-		return t, d, nil
 	}
 
-	return now, now.Format("2006-01-02"), nil
+	now := Now()
+
+	// 2. Xử lý ghép ngày (dateStr) và giờ (timeStr)
+	if dateStr != nil {
+		if d := strings.TrimSpace(*dateStr); d != "" {
+
+			// Parse phần ngày (luôn ép về UTC)
+			datePart, err := time.ParseInLocation(time.DateOnly, d, time.UTC)
+			if err != nil {
+				return time.Time{}, "", err
+			}
+
+			if timeStr != nil {
+				if ts := strings.TrimSpace(*timeStr); ts != "" {
+
+					// Parse phần giờ
+					timeOnly, err := time.Parse("15:04:05", ts)
+					if err == nil {
+						// Tối ưu 3: Dùng phép gán toán học time.Date thay vì nối chuỗi string
+						finalTime := time.Date(
+							datePart.Year(), datePart.Month(), datePart.Day(),
+							timeOnly.Hour(), timeOnly.Minute(), timeOnly.Second(), 0, time.UTC,
+						)
+						return finalTime, d, nil
+					}
+				}
+			}
+
+			// Nếu không có phần giờ hợp lệ, lấy giờ hiện tại (now) đắp vào
+			finalTime := time.Date(
+				datePart.Year(), datePart.Month(), datePart.Day(),
+				now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), time.UTC,
+			)
+			return finalTime, d, nil
+		}
+	}
+
+	// 3. Fallback: Nếu không có bất kỳ data nào, trả về thời điểm hiện hành
+	return now, now.Format(time.DateOnly), nil
 }

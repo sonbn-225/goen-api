@@ -3,12 +3,12 @@ package service
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 type ContactService struct {
@@ -19,18 +19,19 @@ func NewContactService(repo interfaces.ContactRepository) *ContactService {
 	return &ContactService{repo: repo}
 }
 
-func (s *ContactService) Create(ctx context.Context, userID string, req dto.CreateContactRequest) (*dto.ContactResponse, error) {
-	now := time.Now().UTC()
+func (s *ContactService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateContactRequest) (*dto.ContactResponse, error) {
 	c := entity.Contact{
-		ID:        uuid.NewString(),
+		AuditEntity: entity.AuditEntity{
+			BaseEntity: entity.BaseEntity{
+				ID: utils.NewID(),
+			},
+		},
 		UserID:    userID,
 		Name:      strings.TrimSpace(req.Name),
 		Email:     req.Email,
 		Phone:     req.Phone,
 		AvatarURL: req.AvatarURL,
 		Notes:     req.Notes,
-		CreatedAt: now,
-		UpdatedAt: now,
 	}
 
 	// Try auto-linking by email or phone
@@ -52,7 +53,7 @@ func (s *ContactService) Create(ctx context.Context, userID string, req dto.Crea
 	return s.Get(ctx, userID, c.ID)
 }
 
-func (s *ContactService) Get(ctx context.Context, userID, contactID string) (*dto.ContactResponse, error) {
+func (s *ContactService) Get(ctx context.Context, userID, contactID uuid.UUID) (*dto.ContactResponse, error) {
 	it, err := s.repo.GetContact(ctx, userID, contactID)
 	if err != nil {
 		return nil, err
@@ -64,7 +65,7 @@ func (s *ContactService) Get(ctx context.Context, userID, contactID string) (*dt
 	return &resp, nil
 }
 
-func (s *ContactService) List(ctx context.Context, userID string) ([]dto.ContactResponse, error) {
+func (s *ContactService) List(ctx context.Context, userID uuid.UUID) ([]dto.ContactResponse, error) {
 	items, err := s.repo.ListContacts(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -72,7 +73,7 @@ func (s *ContactService) List(ctx context.Context, userID string) ([]dto.Contact
 	return dto.NewContactResponses(items), nil
 }
 
-func (s *ContactService) Update(ctx context.Context, userID, contactID string, req dto.UpdateContactRequest) (*dto.ContactResponse, error) {
+func (s *ContactService) Update(ctx context.Context, userID, contactID uuid.UUID, req dto.UpdateContactRequest) (*dto.ContactResponse, error) {
 	cur, err := s.repo.GetContact(ctx, userID, contactID)
 	if err != nil {
 		return nil, err
@@ -93,7 +94,6 @@ func (s *ContactService) Update(ctx context.Context, userID, contactID string, r
 	if req.Notes != nil {
 		cur.Notes = req.Notes
 	}
-	cur.UpdatedAt = time.Now().UTC()
 
 	// Re-check linking if email/phone changed
 	if req.Email != nil || req.Phone != nil {
@@ -122,14 +122,14 @@ func (s *ContactService) Update(ctx context.Context, userID, contactID string, r
 	return s.Get(ctx, userID, contactID)
 }
 
-func (s *ContactService) Delete(ctx context.Context, userID, contactID string) error {
+func (s *ContactService) Delete(ctx context.Context, userID, contactID uuid.UUID) error {
 	return s.repo.DeleteContact(ctx, userID, contactID)
 }
 
-func (s *ContactService) GetOrCreateByName(ctx context.Context, userID, name string) (string, error) {
+func (s *ContactService) GetOrCreateByName(ctx context.Context, userID uuid.UUID, name string) (uuid.UUID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return "", nil
+		return uuid.Nil, nil
 	}
 
 	contacts, err := s.repo.ListContacts(ctx, userID)
@@ -144,7 +144,8 @@ func (s *ContactService) GetOrCreateByName(ctx context.Context, userID, name str
 	// Not found, create new
 	c, err := s.Create(ctx, userID, dto.CreateContactRequest{Name: name})
 	if err != nil {
-		return "", err
+		return uuid.Nil, err
 	}
 	return c.ID, nil
 }
+

@@ -23,7 +23,7 @@ func NewBudgetService(repo interfaces.BudgetRepository, categoryRepo interfaces.
 	return &BudgetService{repo: repo, categoryRepo: categoryRepo}
 }
 
-func (s *BudgetService) Create(ctx context.Context, userID string, req dto.CreateBudgetRequest) (*dto.BudgetWithStatsResponse, error) {
+func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateBudgetRequest) (*dto.BudgetWithStatsResponse, error) {
 	period := strings.TrimSpace(req.Period)
 	if period != "month" && period != "week" && period != "custom" {
 		return nil, errors.New("invalid period")
@@ -34,12 +34,16 @@ func (s *BudgetService) Create(ctx context.Context, userID string, req dto.Creat
 		return nil, errors.New("invalid amount")
 	}
 
-	categoryID := utils.NormalizeOptionalString(req.CategoryID)
-	if categoryID == nil {
+	if req.CategoryID == nil || *req.CategoryID == "" {
 		return nil, errors.New("category_id is required")
 	}
 
-	cat, err := s.categoryRepo.GetCategory(ctx, userID, *categoryID)
+	categoryID, err := uuid.Parse(*req.CategoryID)
+	if err != nil {
+		return nil, errors.New("invalid category ID")
+	}
+
+	cat, err := s.categoryRepo.GetCategory(ctx, userID, categoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -52,9 +56,12 @@ func (s *BudgetService) Create(ctx context.Context, userID string, req dto.Creat
 		return nil, err
 	}
 
-	now := time.Now().UTC()
 	b := entity.Budget{
-		ID:                    uuid.NewString(),
+		AuditEntity: entity.AuditEntity{
+			BaseEntity: entity.BaseEntity{
+				ID: utils.NewID(),
+			},
+		},
 		UserID:                userID,
 		Name:                  utils.NormalizeOptionalString(req.Name),
 		Period:                period,
@@ -63,9 +70,7 @@ func (s *BudgetService) Create(ctx context.Context, userID string, req dto.Creat
 		Amount:                amount,
 		AlertThresholdPercent: req.AlertThresholdPercent,
 		RolloverMode:          req.RolloverMode,
-		CategoryID:            categoryID,
-		CreatedAt:             now,
-		UpdatedAt:             now,
+		CategoryID:            &categoryID,
 	}
 
 	if err := s.repo.CreateBudget(ctx, userID, b); err != nil {
@@ -75,7 +80,7 @@ func (s *BudgetService) Create(ctx context.Context, userID string, req dto.Creat
 	return s.Get(ctx, userID, b.ID)
 }
 
-func (s *BudgetService) Get(ctx context.Context, userID string, budgetID string) (*dto.BudgetWithStatsResponse, error) {
+func (s *BudgetService) Get(ctx context.Context, userID uuid.UUID, budgetID uuid.UUID) (*dto.BudgetWithStatsResponse, error) {
 	b, err := s.repo.GetBudget(ctx, userID, budgetID)
 	if err != nil {
 		return nil, err
@@ -83,7 +88,7 @@ func (s *BudgetService) Get(ctx context.Context, userID string, budgetID string)
 	return s.withStats(ctx, userID, *b)
 }
 
-func (s *BudgetService) List(ctx context.Context, userID string) ([]dto.BudgetWithStatsResponse, error) {
+func (s *BudgetService) List(ctx context.Context, userID uuid.UUID) ([]dto.BudgetWithStatsResponse, error) {
 	items, err := s.repo.ListBudgets(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -99,7 +104,7 @@ func (s *BudgetService) List(ctx context.Context, userID string) ([]dto.BudgetWi
 	return results, nil
 }
 
-func (s *BudgetService) Update(ctx context.Context, userID string, budgetID string, req dto.UpdateBudgetRequest) (*dto.BudgetWithStatsResponse, error) {
+func (s *BudgetService) Update(ctx context.Context, userID uuid.UUID, budgetID uuid.UUID, req dto.UpdateBudgetRequest) (*dto.BudgetWithStatsResponse, error) {
 	cur, err := s.repo.GetBudget(ctx, userID, budgetID)
 	if err != nil {
 		return nil, err
@@ -117,7 +122,6 @@ func (s *BudgetService) Update(ctx context.Context, userID string, budgetID stri
 	if req.RolloverMode != nil {
 		cur.RolloverMode = req.RolloverMode
 	}
-	cur.UpdatedAt = time.Now().UTC()
 
 	if err := s.repo.UpdateBudget(ctx, userID, *cur); err != nil {
 		return nil, err
@@ -125,7 +129,7 @@ func (s *BudgetService) Update(ctx context.Context, userID string, budgetID stri
 	return s.Get(ctx, userID, budgetID)
 }
 
-func (s *BudgetService) Delete(ctx context.Context, userID string, budgetID string) error {
+func (s *BudgetService) Delete(ctx context.Context, userID uuid.UUID, budgetID uuid.UUID) error {
 	return s.repo.DeleteBudget(ctx, userID, budgetID)
 }
 
@@ -169,7 +173,7 @@ func (s *BudgetService) normalizeBudgetPeriod(period string, startIn, endIn *str
 	return startStr, end.Format("2006-01-02"), nil
 }
 
-func (s *BudgetService) withStats(ctx context.Context, userID string, b entity.Budget) (*dto.BudgetWithStatsResponse, error) {
+func (s *BudgetService) withStats(ctx context.Context, userID uuid.UUID, b entity.Budget) (*dto.BudgetWithStatsResponse, error) {
 	spent := "0"
 	if b.CategoryID != nil && b.PeriodStart != nil && b.PeriodEnd != nil {
 		v, err := s.repo.ComputeSpent(ctx, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
@@ -180,21 +184,11 @@ func (s *BudgetService) withStats(ctx context.Context, userID string, b entity.B
 
 	remaining, percent := s.computeStats(b.Amount, spent)
 
-	return &dto.BudgetWithStatsResponse{
-		ID:                    b.ID,
-		UserID:                b.UserID,
-		Name:                  b.Name,
-		Period:                b.Period,
-		PeriodStart:           b.PeriodStart,
-		PeriodEnd:             b.PeriodEnd,
-		Amount:                b.Amount,
-		AlertThresholdPercent: b.AlertThresholdPercent,
-		RolloverMode:          b.RolloverMode,
-		CategoryID:            b.CategoryID,
-		Spent:                 spent,
-		Remaining:             remaining,
-		PercentUsed:           percent,
-	}, nil
+	res := dto.NewBudgetWithStatsResponse(b)
+	res.Spent = spent
+	res.Remaining = remaining
+	res.PercentUsed = percent
+	return &res, nil
 }
 
 func (s *BudgetService) computeStats(amountStr, spentStr string) (string, int) {
@@ -217,3 +211,4 @@ func (s *BudgetService) computeStats(amountStr, spentStr string) (string, int) {
 
 	return rem.FloatString(2), int(fPct)
 }
+

@@ -1,22 +1,25 @@
 package dto
 
 import (
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
 type CategoryResponse struct {
-	ID               string  `json:"id"`
-	ParentCategoryID *string `json:"parent_category_id,omitempty"`
-	Type             *string `json:"type,omitempty"`
-	SortOrder        *int    `index:"sort_order,omitempty" json:"sort_order,omitempty"`
-	IsActive         bool    `json:"is_active"`
-	Icon             *string `json:"icon,omitempty"`
-	Color            *string `json:"color,omitempty"`
+	ID               uuid.UUID  `json:"id"`
+	Key              string     `json:"key"`
+	ParentCategoryID *uuid.UUID `json:"parent_category_id,omitempty"`
+	Type             *string    `json:"type,omitempty"`
+	SortOrder        *int       `index:"sort_order,omitempty" json:"sort_order,omitempty"`
+	IsActive         bool       `json:"is_active"`
+	Icon             *string    `json:"icon,omitempty"`
+	Color            *string    `json:"color,omitempty"`
 }
 
 func NewCategoryResponse(it entity.Category) CategoryResponse {
 	return CategoryResponse{
 		ID:               it.ID,
+		Key:              it.Key,
 		ParentCategoryID: it.ParentCategoryID,
 		Type:             it.Type,
 		SortOrder:        it.SortOrder,

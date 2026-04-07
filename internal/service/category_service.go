@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
@@ -27,7 +28,7 @@ func NewCategoryService(repo interfaces.CategoryRepository, rds *database.Redis)
 	}
 }
 
-func (s *CategoryService) Get(ctx context.Context, userID, categoryID string) (*dto.CategoryResponse, error) {
+func (s *CategoryService) Get(ctx context.Context, userID, categoryID uuid.UUID) (*dto.CategoryResponse, error) {
 	// For Get, we can just fetch all from cache and find the specific one
 	// as the list is small and global.
 	cats, err := s.List(ctx, userID, "")
@@ -44,7 +45,7 @@ func (s *CategoryService) Get(ctx context.Context, userID, categoryID string) (*
 	return nil, nil
 }
 
-func (s *CategoryService) List(ctx context.Context, userID string, txType string) ([]dto.CategoryResponse, error) {
+func (s *CategoryService) List(ctx context.Context, userID uuid.UUID, txType string) ([]dto.CategoryResponse, error) {
 	var allCats []dto.CategoryResponse
 
 	// Try cache first
@@ -95,3 +96,4 @@ func (s *CategoryService) filterByType(cats []dto.CategoryResponse, txType strin
 	}
 	return filtered
 }
+
