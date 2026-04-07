@@ -15,9 +15,9 @@ type CreateRotatingSavingsGroupRequest struct {
 	UserSlots           int       `json:"user_slots"`
 	ContributionAmount  float64   `json:"contribution_amount"`
 	FixedInterestAmount *float64  `json:"fixed_interest_amount"`
-	CycleFrequency      string    `json:"cycle_frequency"` // weekly, monthly
-	StartDate           string    `json:"start_date"`      // YYYY-MM-DD
-	Status              string    `json:"status"`
+	CycleFrequency      entity.RotatingSavingsCycleFrequency `json:"cycle_frequency"` // weekly, monthly
+	StartDate           string                               `json:"start_date"`      // YYYY-MM-DD
+	Status              entity.RotatingSavingsStatus         `json:"status"`
 }
  
 type UpdateRotatingSavingsGroupRequest struct {
@@ -26,7 +26,7 @@ type UpdateRotatingSavingsGroupRequest struct {
 	ContributionAmount  *float64   `json:"contribution_amount"`
 	FixedInterestAmount *float64   `json:"fixed_interest_amount"`
 	PayoutCycleNo       *int       `json:"payout_cycle_no"`
-	Status              *string    `json:"status"`
+	Status              *entity.RotatingSavingsStatus `json:"status"`
 }
  
 type RotatingSavingsGroupResponse struct {
@@ -40,9 +40,9 @@ type RotatingSavingsGroupResponse struct {
 	ContributionAmount  float64   `json:"contribution_amount"`
 	PayoutCycleNo       *int      `json:"payout_cycle_no"`
 	FixedInterestAmount *float64  `json:"fixed_interest_amount"`
-	CycleFrequency      string    `json:"cycle_frequency"`
-	StartDate           string    `json:"start_date"`
-	Status              string    `json:"status"`
+	CycleFrequency      entity.RotatingSavingsCycleFrequency `json:"cycle_frequency"`
+	StartDate           string                               `json:"start_date"`
+	Status              entity.RotatingSavingsStatus         `json:"status"`
 }
  
 func NewRotatingSavingsGroupResponse(g entity.RotatingSavingsGroup) RotatingSavingsGroupResponse {
@@ -82,7 +82,7 @@ type RotatingSavingsGroupSummary struct {
 }
  
 type RotatingSavingsContributionRequest struct {
-	Kind                string     `json:"kind"` // contribution, payout, collected
+	Kind                entity.RotatingSavingsContributionKind `json:"kind"` // contribution, payout, collected
 	AccountID           *uuid.UUID `json:"account_id"`
 	OccurredDate        string     `json:"occurred_date"`
 	OccurredTime        *string    `json:"occurred_time"`
@@ -98,9 +98,9 @@ type RotatingSavingsContributionResponse struct {
 	ID                  uuid.UUID `json:"id"`
 	GroupID             uuid.UUID `json:"group_id"`
 	TransactionID       uuid.UUID `json:"transaction_id"`
-	Kind                string    `json:"kind"`
-	CycleNo             *int      `json:"cycle_no"`
-	DueDate             *string   `json:"due_date"`
+	Kind                entity.RotatingSavingsContributionKind `json:"kind"`
+	CycleNo             *int                                   `json:"cycle_no"`
+	DueDate             *string                                `json:"due_date"`
 	Amount              float64   `json:"amount"`
 	SlotsTaken          int       `json:"slots_taken"`
 	CollectedFeePerSlot float64   `json:"collected_fee_per_slot"`
@@ -134,7 +134,7 @@ type RotatingSavingsAuditLogResponse struct {
 	ID        uuid.UUID      `json:"id"`
 	UserID    uuid.UUID      `json:"user_id"`
 	GroupID   *uuid.UUID     `json:"group_id"`
-	Action    string         `json:"action"`
+	Action    entity.RotatingSavingsAuditAction `json:"action"`
 	Details   map[string]any `json:"details"`
 	CreatedAt time.Time      `json:"created_at"`
 }

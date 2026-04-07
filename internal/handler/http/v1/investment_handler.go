@@ -11,6 +11,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
  
 type InvestmentHandler struct {
@@ -69,12 +70,12 @@ func (h *InvestmentHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *InvestmentHandler) ListInvestmentAccounts(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	accounts, err := h.svc.ListInvestmentAccounts(r.Context(), userID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, accounts)
@@ -93,7 +94,7 @@ func (h *InvestmentHandler) ListInvestmentAccounts(w http.ResponseWriter, r *htt
 func (h *InvestmentHandler) GetInvestmentAccount(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -103,7 +104,7 @@ func (h *InvestmentHandler) GetInvestmentAccount(w http.ResponseWriter, r *http.
 	}
 	account, err := h.svc.GetInvestmentAccount(r.Context(), userID, id)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	if account == nil {
@@ -129,7 +130,7 @@ func (h *InvestmentHandler) GetInvestmentAccount(w http.ResponseWriter, r *http.
 func (h *InvestmentHandler) UpdateInvestmentAccountSettings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -144,7 +145,7 @@ func (h *InvestmentHandler) UpdateInvestmentAccountSettings(w http.ResponseWrite
 	}
 	account, err := h.svc.UpdateInvestmentAccountSettings(r.Context(), userID, id, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	if account == nil {
@@ -167,7 +168,7 @@ func (h *InvestmentHandler) UpdateInvestmentAccountSettings(w http.ResponseWrite
 func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -177,7 +178,7 @@ func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 	}
 	trades, err := h.svc.ListTrades(r.Context(), userID, id)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, trades)
@@ -199,7 +200,7 @@ func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -214,7 +215,7 @@ func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) 
 	}
 	trade, err := h.svc.CreateTrade(r.Context(), userID, id, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusCreated, trade)
@@ -237,7 +238,7 @@ func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) 
 func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -257,7 +258,7 @@ func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) 
 	}
 	trade, err := h.svc.UpdateTrade(r.Context(), userID, id, tradeID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	if trade == nil {
@@ -281,7 +282,7 @@ func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) 
 func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -296,7 +297,7 @@ func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) 
 	}
 	err = h.svc.DeleteTrade(r.Context(), userID, id, tradeID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Trade deleted"})
@@ -315,7 +316,7 @@ func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) 
 func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -325,7 +326,7 @@ func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request)
 	}
 	holdings, err := h.svc.ListHoldings(r.Context(), userID, id)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, holdings)
@@ -344,7 +345,7 @@ func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request)
 func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -354,7 +355,7 @@ func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.
 	}
 	report, err := h.svc.GetRealizedPNLReport(r.Context(), userID, id)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, report)
@@ -363,7 +364,7 @@ func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.
 func (h *InvestmentHandler) ListEligibleActions(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -373,7 +374,7 @@ func (h *InvestmentHandler) ListEligibleActions(w http.ResponseWriter, r *http.R
 	}
 	items, err := h.svc.ListEligibleCorporateActions(r.Context(), userID, id)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, items)
@@ -382,7 +383,7 @@ func (h *InvestmentHandler) ListEligibleActions(w http.ResponseWriter, r *http.R
 func (h *InvestmentHandler) ClaimAction(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -404,7 +405,7 @@ func (h *InvestmentHandler) ClaimAction(w http.ResponseWriter, r *http.Request) 
  
 	trade, err := h.svc.ClaimCorporateAction(r.Context(), userID, id, eventID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, trade)
@@ -413,7 +414,7 @@ func (h *InvestmentHandler) ClaimAction(w http.ResponseWriter, r *http.Request) 
 func (h *InvestmentHandler) BackfillCash(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -423,7 +424,7 @@ func (h *InvestmentHandler) BackfillCash(w http.ResponseWriter, r *http.Request)
 	}
 	result, err := h.svc.BackfillTradePrincipalTransactions(r.Context(), userID, id)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, result)
@@ -440,7 +441,7 @@ func (h *InvestmentHandler) BackfillCash(w http.ResponseWriter, r *http.Request)
 func (h *InvestmentHandler) ListSecurities(w http.ResponseWriter, r *http.Request) {
 	securities, err := h.svc.ListSecurities(r.Context())
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, securities)
@@ -463,7 +464,7 @@ func (h *InvestmentHandler) GetSecurity(w http.ResponseWriter, r *http.Request) 
 	}
 	security, err := h.svc.GetSecurity(r.Context(), id)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	if security == nil {
@@ -502,7 +503,7 @@ func (h *InvestmentHandler) ListSecurityPrices(w http.ResponseWriter, r *http.Re
  
 	prices, err := h.svc.ListSecurityPrices(r.Context(), id, fromPtr, toPtr)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, prices)
@@ -537,7 +538,7 @@ func (h *InvestmentHandler) ListSecurityEvents(w http.ResponseWriter, r *http.Re
  
 	events, err := h.svc.ListSecurityEvents(r.Context(), id, fromPtr, toPtr)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, events)

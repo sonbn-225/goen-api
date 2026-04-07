@@ -83,10 +83,10 @@ func (s *AccountService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 		Name:            name,
 		AccountNumber:   utils.NormalizeOptionalString(req.AccountNumber),
 		Color:           color,
-		AccountType:     accountType,
+		AccountType:     entity.AccountType(accountType),
 		Currency:        currency,
 		ParentAccountID: parentID,
-		Status:          "active",
+		Status:          entity.AccountStatusActive,
 	}
 
 	if err := s.repo.CreateAccountWithOwner(ctx, account, userID); err != nil {
@@ -98,10 +98,16 @@ func (s *AccountService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 }
 
 func (s *AccountService) Patch(ctx context.Context, userID, accountID uuid.UUID, req dto.PatchAccountRequest) (*dto.AccountResponse, error) {
+	var status *entity.AccountStatus
+	if req.Status != nil {
+		s := entity.AccountStatus(*req.Status)
+		status = &s
+	}
+
 	patch := entity.AccountPatch{
 		Name:   req.Name,
 		Color:  req.Color,
-		Status: req.Status,
+		Status: status,
 	}
 
 	it, err := s.repo.PatchAccount(ctx, userID, accountID, patch)
@@ -124,7 +130,7 @@ func (s *AccountService) Delete(ctx context.Context, userID, accountID uuid.UUID
 		return errors.New("account not found")
 	}
 
-	if acc.AccountType == "cash" {
+	if acc.AccountType == entity.AccountTypeCash {
 		return errors.New("cash account cannot be deleted; should be closed instead")
 	}
 
@@ -223,8 +229,9 @@ func (s *AccountService) defaultCurrencyForUser(ctx context.Context, userID uuid
 }
 
 func isValidAccountType(t string) bool {
-	switch t {
-	case "bank", "wallet", "cash", "broker", "card", "savings":
+	switch entity.AccountType(t) {
+	case entity.AccountTypeBank, entity.AccountTypeWallet, entity.AccountTypeCash,
+		entity.AccountTypeBroker, entity.AccountTypeCard, entity.AccountTypeSavings:
 		return true
 	default:
 		return false

@@ -111,14 +111,14 @@ func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, investmentA
 	}
 
 	// 1. Logic FIFO Reversal
-	if tr.Side == "buy" {
+	if tr.Side == entity.TradeSideBuy {
 		lots, err := s.repo.ListShareLots(ctx, userID, investmentAccountID, tr.SecurityID)
 		if err != nil {
 			return err
 		}
 		for _, l := range lots {
 			if l.BuyTradeID != nil && *l.BuyTradeID == tr.ID {
-				if l.Status != "active" || l.Quantity != tr.Quantity {
+				if l.Status != entity.ShareLotStatusActive || l.Quantity != tr.Quantity {
 					return errors.New("cannot delete buy trade because some shares are already sold or modified")
 				}
 			}
@@ -200,11 +200,11 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 		provenance = *req.Provenance
 	}
 
-	side := strings.ToLower(strings.TrimSpace(req.Side))
+	side := strings.ToLower(strings.TrimSpace(string(req.Side)))
 
 	// Sell logic FIFO
 	var sellPlan []lotConsumptionPlan
-	if side == "sell" {
+	if side == string(entity.TradeSideSell) {
 		lots, err := s.repo.ListShareLots(ctx, userID, brokerAccountID, sid)
 		if err != nil {
 			return nil, err
@@ -229,14 +229,14 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 	tradeID := utils.NewID()
 
 	// Principal Transaction
-	if !(side == "buy" && provenance == "stock_dividend") {
+	if !(side == string(entity.TradeSideBuy) && provenance == "stock_dividend") {
 		qRat, _ := new(big.Rat).SetString(req.Quantity)
 		pRat, _ := new(big.Rat).SetString(req.Price)
 		notional := new(big.Rat).Mul(qRat, pRat)
 		if notional.Sign() > 0 {
 			amt := notional.FloatString(2)
 			kind := "expense"
-			if side == "sell" {
+			if side == string(entity.TradeSideSell) {
 				kind = "income"
 			}
 			desc := "Trade " + side + " " + req.SecurityID.String()
@@ -246,7 +246,7 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 
 			extRef := "trade:" + tradeID.String() + ":principal"
 			var catID uuid.UUID
-			if side == "sell" {
+			if side == string(entity.TradeSideSell) {
 				catID, _ = uuid.Parse("00000000-0000-0000-0000-000000000001") // TODO: System category
 			} else {
 				catID, _ = uuid.Parse("00000000-0000-0000-0000-000000000002") // TODO: System category
@@ -256,7 +256,7 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 			}
 
 			_, _ = s.txSvc.Create(ctx, userID, dto.CreateTransactionRequest{
-				Type:         kind,
+				Type:         entity.TransactionType(kind),
 				OccurredDate: &occDate,
 				Amount:       amt,
 				Description:  &desc,
@@ -302,7 +302,7 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 		SecurityID:       sid,
 		FeeTransactionID: feeTxID,
 		TaxTransactionID: taxTxID,
-		Side:             side,
+		Side:             entity.TradeSide(side),
 		Quantity:         req.Quantity,
 		Price:            req.Price,
 		Fees:             fees,
@@ -315,7 +315,7 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 		return nil, err
 	}
 
-	if side == "buy" {
+	if side == string(entity.TradeSideBuy) {
 		lot := entity.ShareLot{
 			AuditEntity: entity.AuditEntity{
 				BaseEntity: entity.BaseEntity{
@@ -328,7 +328,7 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 			AcquisitionDate: occDate,
 			CostBasisPer:    req.Price,
 			Provenance:      provenance,
-			Status:          "active",
+			Status:          entity.ShareLotStatusActive,
 			BuyTradeID:      &tradeID,
 		}
 		_ = s.repo.CreateShareLot(ctx, userID, lot)

@@ -26,7 +26,7 @@ type PatchSavingsRequest struct {
 	TermMonths       *int       `json:"term_months,omitempty"`
 	MaturityDate     *string    `json:"maturity_date,omitempty"`
 	AutoRenew        *bool      `json:"auto_renew,omitempty"`
-	Status           *string    `json:"status,omitempty"`
+	Status           *entity.SavingsStatus `json:"status,omitempty"`
 }
  
 type SavingsResponse struct {
@@ -40,7 +40,7 @@ type SavingsResponse struct {
 	MaturityDate     *string   `json:"maturity_date,omitempty"`
 	AutoRenew        bool      `json:"auto_renew"`
 	AccruedInterest  string    `json:"accrued_interest"`
-	Status           string    `json:"status"`
+	Status           entity.SavingsStatus `json:"status"`
 }
  
 func NewSavingsResponse(s entity.Savings) SavingsResponse {

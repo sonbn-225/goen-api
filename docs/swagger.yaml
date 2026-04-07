@@ -25,7 +25,7 @@ definitions:
       account_number:
         type: string
       account_type:
-        type: string
+        $ref: '#/definitions/entity.AccountType'
       balance:
         type: string
       color:
@@ -41,7 +41,7 @@ definitions:
       parent_account_id:
         type: string
       status:
-        type: string
+        $ref: '#/definitions/entity.AccountStatus'
     type: object
   dto.AccountShareResponse:
     properties:
@@ -52,11 +52,11 @@ definitions:
       id:
         type: string
       permission:
-        type: string
+        $ref: '#/definitions/entity.AccountSharePermission'
       revoked_at:
         type: string
       status:
-        type: string
+        $ref: '#/definitions/entity.AccountShareStatus'
       updated_at:
         type: string
       user_display_name:
@@ -135,7 +135,7 @@ definitions:
       percent_used:
         type: integer
       period:
-        type: string
+        $ref: '#/definitions/entity.BudgetPeriod'
       period_end:
         type: string
       period_start:
@@ -143,7 +143,7 @@ definitions:
       remaining:
         type: string
       rollover_mode:
-        type: string
+        $ref: '#/definitions/entity.BudgetRolloverMode'
       spent:
         type: string
       user_id:
@@ -168,7 +168,7 @@ definitions:
       sort_order:
         type: integer
       type:
-        type: string
+        $ref: '#/definitions/entity.CategoryType'
     type: object
   dto.ContactResponse:
     properties:
@@ -219,13 +219,13 @@ definitions:
       name:
         type: string
       period:
-        type: string
+        $ref: '#/definitions/entity.BudgetPeriod'
       period_end:
         type: string
       period_start:
         type: string
       rollover_mode:
-        type: string
+        $ref: '#/definitions/entity.BudgetRolloverMode'
     required:
     - amount
     - period
@@ -254,8 +254,9 @@ definitions:
       contact_name:
         type: string
       direction:
+        allOf:
+        - $ref: '#/definitions/entity.DebtDirection'
         description: lent, borrowed
-        type: string
       due_date:
         type: string
       interest_rate:
@@ -342,8 +343,9 @@ definitions:
       contribution_amount:
         type: number
       cycle_frequency:
+        allOf:
+        - $ref: '#/definitions/entity.RotatingSavingsCycleFrequency'
         description: weekly, monthly
-        type: string
       fixed_interest_amount:
         type: number
       member_count:
@@ -354,7 +356,7 @@ definitions:
         description: YYYY-MM-DD
         type: string
       status:
-        type: string
+        $ref: '#/definitions/entity.RotatingSavingsStatus'
       user_slots:
         type: integer
     type: object
@@ -419,8 +421,9 @@ definitions:
       security_id:
         type: string
       side:
+        allOf:
+        - $ref: '#/definitions/entity.TradeSide'
         description: buy, sell
-        type: string
       tax_category_id:
         type: string
       tax_description:
@@ -475,7 +478,7 @@ definitions:
       to_amount:
         type: string
       type:
-        type: string
+        $ref: '#/definitions/entity.TransactionType'
     type: object
   dto.DebtPaymentLinkResponse:
     properties:
@@ -523,7 +526,7 @@ definitions:
       currency:
         type: string
       direction:
-        type: string
+        $ref: '#/definitions/entity.DebtDirection'
       due_date:
         type: string
       id:
@@ -541,7 +544,7 @@ definitions:
       start_date:
         type: string
       status:
-        type: string
+        $ref: '#/definitions/entity.DebtStatus'
       user_id:
         type: string
     type: object
@@ -621,7 +624,7 @@ definitions:
       id:
         type: string
       kind:
-        type: string
+        $ref: '#/definitions/entity.ImportMappingRuleKind'
       mapped_id:
         type: string
       source_name:
@@ -735,7 +738,7 @@ definitions:
       savings_account_id:
         type: string
       status:
-        type: string
+        $ref: '#/definitions/entity.SavingsStatus'
       term_months:
         type: integer
     type: object
@@ -816,7 +819,7 @@ definitions:
   dto.RotatingSavingsAuditLogResponse:
     properties:
       action:
-        type: string
+        $ref: '#/definitions/entity.RotatingSavingsAuditAction'
       created_at:
         type: string
       details:
@@ -842,8 +845,9 @@ definitions:
       due_date:
         type: string
       kind:
+        allOf:
+        - $ref: '#/definitions/entity.RotatingSavingsContributionKind'
         description: contribution, payout, collected
-        type: string
       note:
         type: string
       occurred_date:
@@ -868,7 +872,7 @@ definitions:
       id:
         type: string
       kind:
-        type: string
+        $ref: '#/definitions/entity.RotatingSavingsContributionKind'
       note:
         type: string
       slots_taken:
@@ -916,7 +920,7 @@ definitions:
       currency:
         type: string
       cycle_frequency:
-        type: string
+        $ref: '#/definitions/entity.RotatingSavingsCycleFrequency'
       fixed_interest_amount:
         type: number
       id:
@@ -930,7 +934,7 @@ definitions:
       start_date:
         type: string
       status:
-        type: string
+        $ref: '#/definitions/entity.RotatingSavingsStatus'
       user_id:
         type: string
       user_slots:
@@ -1002,7 +1006,7 @@ definitions:
       start_date:
         type: string
       status:
-        type: string
+        $ref: '#/definitions/entity.SavingsStatus'
       term_months:
         type: integer
     type: object
@@ -1015,7 +1019,7 @@ definitions:
       effective_date:
         type: string
       event_type:
-        type: string
+        $ref: '#/definitions/entity.SecurityEventType'
       ex_date:
         type: string
       id:
@@ -1149,7 +1153,7 @@ definitions:
       security_id:
         type: string
       side:
-        type: string
+        $ref: '#/definitions/entity.TradeSide'
       tax_transaction_id:
         type: string
       taxes:
@@ -1193,7 +1197,7 @@ definitions:
       occurred_at:
         type: string
       status:
-        type: string
+        $ref: '#/definitions/entity.TransactionStatus'
       tag_ids:
         items:
           type: string
@@ -1242,7 +1246,7 @@ definitions:
       occurred_date:
         type: string
       status:
-        type: string
+        $ref: '#/definitions/entity.TransactionStatus'
       tag_colors:
         items:
           type: string
@@ -1262,7 +1266,7 @@ definitions:
       to_currency:
         type: string
       type:
-        type: string
+        $ref: '#/definitions/entity.TransactionType'
     type: object
   dto.UpdateBudgetRequest:
     properties:
@@ -1273,7 +1277,7 @@ definitions:
       name:
         type: string
       rollover_mode:
-        type: string
+        $ref: '#/definitions/entity.BudgetRolloverMode'
     type: object
   dto.UpdateContactRequest:
     properties:
@@ -1297,7 +1301,7 @@ definitions:
       name:
         type: string
       status:
-        type: string
+        $ref: '#/definitions/entity.DebtStatus'
     type: object
   dto.UpdateRotatingSavingsGroupRequest:
     properties:
@@ -1312,7 +1316,7 @@ definitions:
       payout_cycle_no:
         type: integer
       status:
-        type: string
+        $ref: '#/definitions/entity.RotatingSavingsStatus'
     type: object
   dto.UpsertMappingRulesRequest:
     properties:
@@ -1348,6 +1352,190 @@ definitions:
       username:
         type: string
     type: object
+  entity.AccountSharePermission:
+    enum:
+    - owner
+    - viewer
+    - editor
+    type: string
+    x-enum-varnames:
+    - AccountSharePermissionOwner
+    - AccountSharePermissionViewer
+    - AccountSharePermissionEditor
+  entity.AccountShareStatus:
+    enum:
+    - active
+    - revoked
+    type: string
+    x-enum-varnames:
+    - AccountShareStatusActive
+    - AccountShareStatusRevoked
+  entity.AccountStatus:
+    enum:
+    - active
+    - closed
+    type: string
+    x-enum-varnames:
+    - AccountStatusActive
+    - AccountStatusClosed
+  entity.AccountType:
+    enum:
+    - bank
+    - wallet
+    - cash
+    - broker
+    - card
+    - savings
+    type: string
+    x-enum-varnames:
+    - AccountTypeBank
+    - AccountTypeWallet
+    - AccountTypeCash
+    - AccountTypeBroker
+    - AccountTypeCard
+    - AccountTypeSavings
+  entity.BudgetPeriod:
+    enum:
+    - month
+    - week
+    - custom
+    type: string
+    x-enum-varnames:
+    - BudgetPeriodMonth
+    - BudgetPeriodWeek
+    - BudgetPeriodCustom
+  entity.BudgetRolloverMode:
+    enum:
+    - none
+    - add_positive
+    - add_all
+    type: string
+    x-enum-varnames:
+    - BudgetRolloverModeNone
+    - BudgetRolloverModeAddPositive
+    - BudgetRolloverModeAddAll
+  entity.CategoryType:
+    enum:
+    - expense
+    - income
+    type: string
+    x-enum-varnames:
+    - CategoryTypeExpense
+    - CategoryTypeIncome
+  entity.DebtDirection:
+    enum:
+    - lent
+    - borrowed
+    type: string
+    x-enum-varnames:
+    - DebtDirectionLent
+    - DebtDirectionBorrowed
+  entity.DebtStatus:
+    enum:
+    - active
+    - paid
+    - cancelled
+    type: string
+    x-enum-varnames:
+    - DebtStatusActive
+    - DebtStatusPaid
+    - DebtStatusCancelled
+  entity.ImportMappingRuleKind:
+    enum:
+    - account
+    - category
+    type: string
+    x-enum-varnames:
+    - ImportMappingRuleKindAccount
+    - ImportMappingRuleKindCategory
+  entity.RotatingSavingsAuditAction:
+    enum:
+    - group_created
+    - group_updated
+    - contribution_created
+    type: string
+    x-enum-varnames:
+    - RotatingSavingsAuditActionGroupCreated
+    - RotatingSavingsAuditActionGroupUpdated
+    - RotatingSavingsAuditActionContributionCreated
+  entity.RotatingSavingsContributionKind:
+    enum:
+    - contribution
+    - payout
+    - collected
+    type: string
+    x-enum-varnames:
+    - RotatingSavingsContributionKindContribution
+    - RotatingSavingsContributionKindPayout
+    - RotatingSavingsContributionKindCollected
+  entity.RotatingSavingsCycleFrequency:
+    enum:
+    - weekly
+    - monthly
+    type: string
+    x-enum-varnames:
+    - RotatingSavingsCycleFrequencyWeekly
+    - RotatingSavingsCycleFrequencyMonthly
+  entity.RotatingSavingsStatus:
+    enum:
+    - active
+    - completed
+    - closed
+    type: string
+    x-enum-varnames:
+    - RotatingSavingsStatusActive
+    - RotatingSavingsStatusCompleted
+    - RotatingSavingsStatusClosed
+  entity.SavingsStatus:
+    enum:
+    - active
+    - matured
+    - closed
+    type: string
+    x-enum-varnames:
+    - SavingsStatusActive
+    - SavingsStatusMatured
+    - SavingsStatusClosed
+  entity.SecurityEventType:
+    enum:
+    - cash_dividend
+    - stock_dividend
+    - split
+    - merger
+    type: string
+    x-enum-varnames:
+    - SecurityEventTypeCashDividend
+    - SecurityEventTypeStockDividend
+    - SecurityEventTypeSplit
+    - SecurityEventTypeMerger
+  entity.TradeSide:
+    enum:
+    - buy
+    - sell
+    type: string
+    x-enum-varnames:
+    - TradeSideBuy
+    - TradeSideSell
+  entity.TransactionStatus:
+    enum:
+    - pending
+    - posted
+    - cancelled
+    type: string
+    x-enum-varnames:
+    - TransactionStatusPending
+    - TransactionStatusPosted
+    - TransactionStatusCancelled
+  entity.TransactionType:
+    enum:
+    - expense
+    - income
+    - transfer
+    type: string
+    x-enum-varnames:
+    - TransactionTypeExpense
+    - TransactionTypeIncome
+    - TransactionTypeTransfer
   response.ErrorBody:
     properties:
       code:

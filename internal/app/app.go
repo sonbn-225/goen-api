@@ -78,7 +78,7 @@ func New(cfg *config.Config) (*App, error) {
 	categorySvc := service.NewCategoryService(categoryRepo, rds)
 	tagSvc := service.NewTagService(tagRepo)
 	accountSvc := service.NewAccountService(accountRepo, userRepo)
-	transactionSvc := service.NewTransactionService(transactionRepo, tagSvc)
+	transactionSvc := service.NewTransactionService(transactionRepo, tagSvc, accountRepo)
 	contactSvc := service.NewContactService(contactRepo)
 	debtSvc := service.NewDebtService(debtRepo, contactSvc)
 	budgetSvc := service.NewBudgetService(budgetRepo, categoryRepo)

@@ -9,6 +9,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
  
 type CategoryHandler struct {
@@ -43,14 +44,14 @@ func (h *CategoryHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
 	txType := r.URL.Query().Get("type")
 	items, err := h.svc.List(r.Context(), userID, txType)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -72,7 +73,7 @@ func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *CategoryHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -84,7 +85,7 @@ func (h *CategoryHandler) Get(w http.ResponseWriter, r *http.Request) {
  
 	item, err := h.svc.Get(r.Context(), userID, id)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  

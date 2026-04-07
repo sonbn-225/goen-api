@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"mime/multipart"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/storage"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
@@ -46,7 +46,7 @@ func (s *AuthService) Signup(ctx context.Context, req dto.SignupRequest) (*dto.A
 	username := strings.ToLower(strings.TrimSpace(req.Username))
 
 	if email == "" && phone == "" {
-		return nil, errors.New("email or phone is required")
+		return nil, apperr.BadRequest("invalid_input", "email or phone is required")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -106,11 +106,11 @@ func (s *AuthService) Signin(ctx context.Context, req dto.SigninRequest) (*dto.A
 	}
 
 	if err != nil {
-		return nil, errors.New("invalid credentials")
+		return nil, apperr.ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password)); err != nil {
-		return nil, errors.New("invalid credentials")
+		return nil, apperr.ErrInvalidCredentials
 	}
 
 	accessToken, expiresIn, err := s.generateAccessToken(u.User)
@@ -136,13 +136,13 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*dto.Au
 	// 1. Verify refresh token exists in DB
 	rt, err := s.refreshRepo.GetByToken(ctx, refreshToken)
 	if err != nil {
-		return nil, errors.New("invalid refresh token")
+		return nil, apperr.Unauthorized("invalid refresh token")
 	}
 
 	// 2. Check expiry
 	if time.Now().After(rt.ExpiresAt) {
 		_ = s.refreshRepo.DeleteByToken(ctx, refreshToken)
-		return nil, errors.New("refresh token expired")
+		return nil, apperr.Unauthorized("refresh token expired")
 	}
 
 	// 3. Get user
@@ -197,7 +197,7 @@ func (s *AuthService) UpdateMySettings(ctx context.Context, userID uuid.UUID, pa
 
 func (s *AuthService) UploadAvatar(ctx context.Context, userID uuid.UUID, file *multipart.FileHeader) (*dto.UserResponse, error) {
 	if s.s3 == nil {
-		return nil, errors.New("storage not configured")
+		return nil, apperr.Internal("storage not configured")
 	}
 
 	key, err := s.s3.UploadAvatar(ctx, userID.String(), file)
@@ -218,7 +218,7 @@ func (s *AuthService) UploadAvatar(ctx context.Context, userID uuid.UUID, file *
 
 func (s *AuthService) GetMyAvatars(ctx context.Context, userID uuid.UUID) ([]dto.MediaResponse, error) {
 	if s.s3 == nil {
-		return nil, errors.New("storage not configured")
+		return nil, apperr.Internal("storage not configured")
 	}
 
 	prefix := fmt.Sprintf("avatars/%s/", userID.String())
@@ -287,7 +287,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(uWithPass.PasswordHash), []byte(currentPassword)); err != nil {
-		return errors.New("invalid current password")
+		return apperr.BadRequest("invalid_password", "invalid current password")
 	}
 
 	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)

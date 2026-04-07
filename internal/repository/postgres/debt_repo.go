@@ -163,7 +163,7 @@ func (r *DebtRepo) DeleteDebt(ctx context.Context, userID uuid.UUID, id uuid.UUI
 	return r.SoftDelete(ctx, "debts", id, &userID)
 }
 
-func (r *DebtRepo) CreatePaymentLink(ctx context.Context, userID uuid.UUID, link entity.DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus string, closedAt *time.Time) error {
+func (r *DebtRepo) CreatePaymentLink(ctx context.Context, userID uuid.UUID, link entity.DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus entity.DebtStatus, closedAt *time.Time) error {
 	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
 		// Verify ownership
 		var ok bool

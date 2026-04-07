@@ -33,36 +33,60 @@ type SecurityPriceDaily struct {
 	Volume     *string   `json:"volume,omitempty"`
 }
 
+type SecurityEventType string
+
+const (
+	SecurityEventTypeCashDividend  SecurityEventType = "cash_dividend"
+	SecurityEventTypeStockDividend SecurityEventType = "stock_dividend"
+	SecurityEventTypeSplit         SecurityEventType = "split"
+	SecurityEventTypeMerger        SecurityEventType = "merger"
+)
+
 type SecurityEvent struct {
 	AuditEntity
-	SecurityID         uuid.UUID `json:"security_id"`
-	EventType          string    `json:"event_type"` // cash_dividend, stock_dividend, split, merger, etc.
-	ExDate             *string   `json:"ex_date,omitempty"`
-	RecordDate         *string   `json:"record_date,omitempty"`
-	PayDate            *string   `json:"pay_date,omitempty"`
-	EffectiveDate      *string   `json:"effective_date,omitempty"`
-	CashAmountPerShare *string   `json:"cash_amount_per_share,omitempty"`
-	RatioNumerator     *string   `json:"ratio_numerator,omitempty"`
-	RatioDenominator   *string   `json:"ratio_denominator,omitempty"`
-	SubscriptionPrice  *string   `json:"subscription_price,omitempty"`
-	Currency           *string   `json:"currency,omitempty"`
-	Note               *string   `json:"note,omitempty"`
+	SecurityID         uuid.UUID         `json:"security_id"`
+	EventType          SecurityEventType `json:"event_type"`
+	ExDate             *string           `json:"ex_date,omitempty"`
+	RecordDate         *string           `json:"record_date,omitempty"`
+	PayDate            *string           `json:"pay_date,omitempty"`
+	EffectiveDate      *string           `json:"effective_date,omitempty"`
+	CashAmountPerShare *string           `json:"cash_amount_per_share,omitempty"`
+	RatioNumerator     *string           `json:"ratio_numerator,omitempty"`
+	RatioDenominator   *string           `json:"ratio_denominator,omitempty"`
+	SubscriptionPrice  *string           `json:"subscription_price,omitempty"`
+	Currency           *string           `json:"currency,omitempty"`
+	Note               *string           `json:"note,omitempty"`
 }
+
+type SecurityEventElectionStatus string
+
+const (
+	SecurityEventElectionStatusEligible  SecurityEventElectionStatus = "eligible"
+	SecurityEventElectionStatusClaimed   SecurityEventElectionStatus = "claimed"
+	SecurityEventElectionStatusDismissed SecurityEventElectionStatus = "dismissed"
+)
 
 type SecurityEventElection struct {
 	AuditEntity
-	UserID                       uuid.UUID  `json:"user_id"`
-	BrokerAccountID              uuid.UUID  `json:"broker_account_id"`
-	SecurityEventID              uuid.UUID  `json:"security_event_id"`
-	SecurityID                   uuid.UUID  `json:"security_id"`
-	EntitlementDate              string     `json:"entitlement_date"`
-	HoldingQuantityAtEntitlement string     `json:"holding_quantity_at_entitlement_date"`
-	EntitledQuantity             string     `json:"entitled_quantity"`
-	ElectedQuantity              string     `json:"elected_quantity"`
-	Status                       string     `json:"status"` // eligible, claimed, dismissed
-	ConfirmedAt                  *time.Time `json:"confirmed_at,omitempty"`
-	Note                         *string    `json:"note,omitempty"`
+	UserID                       uuid.UUID                   `json:"user_id"`
+	BrokerAccountID              uuid.UUID                   `json:"broker_account_id"`
+	SecurityEventID              uuid.UUID                   `json:"security_event_id"`
+	SecurityID                   uuid.UUID                   `json:"security_id"`
+	EntitlementDate              string                      `json:"entitlement_date"`
+	HoldingQuantityAtEntitlement string                      `json:"holding_quantity_at_entitlement_date"`
+	EntitledQuantity             string                      `json:"entitled_quantity"`
+	ElectedQuantity              string                      `json:"elected_quantity"`
+	Status                       SecurityEventElectionStatus `json:"status"`
+	ConfirmedAt                  *time.Time                  `json:"confirmed_at,omitempty"`
+	Note                         *string                     `json:"note,omitempty"`
 }
+
+type TradeSide string
+
+const (
+	TradeSideBuy  TradeSide = "buy"
+	TradeSideSell TradeSide = "sell"
+)
 
 type Trade struct {
 	AuditEntity
@@ -70,7 +94,7 @@ type Trade struct {
 	SecurityID       uuid.UUID  `json:"security_id"`
 	FeeTransactionID *uuid.UUID `json:"fee_transaction_id,omitempty"`
 	TaxTransactionID *uuid.UUID `json:"tax_transaction_id,omitempty"`
-	Side             string     `json:"side"` // buy, sell
+	Side             TradeSide  `json:"side"`
 	Quantity         string     `json:"quantity"`
 	Price            string     `json:"price"`
 	Fees             string     `json:"fees"`
@@ -92,16 +116,23 @@ type Holding struct {
 	AsOf            *time.Time `json:"as_of,omitempty"`
 }
 
+type ShareLotStatus string
+
+const (
+	ShareLotStatusActive ShareLotStatus = "active"
+	ShareLotStatusClosed ShareLotStatus = "closed"
+)
+
 type ShareLot struct {
 	AuditEntity
-	BrokerAccountID uuid.UUID  `json:"broker_account_id"`
-	SecurityID      uuid.UUID  `json:"security_id"`
-	Quantity        string     `json:"quantity"`
-	AcquisitionDate string     `json:"acquisition_date"`
-	CostBasisPer    string     `json:"cost_basis_per_share"`
-	Provenance      string     `json:"provenance"` // regular_buy, stock_dividend, rights_offering
-	Status          string     `json:"status"`     // active, closed
-	BuyTradeID      *uuid.UUID `json:"buy_trade_id,omitempty"`
+	BrokerAccountID uuid.UUID      `json:"broker_account_id"`
+	SecurityID      uuid.UUID      `json:"security_id"`
+	Quantity        string         `json:"quantity"`
+	AcquisitionDate string         `json:"acquisition_date"`
+	CostBasisPer    string         `json:"cost_basis_per_share"`
+	Provenance      string         `json:"provenance"` // regular_buy, stock_dividend, rights_offering
+	Status          ShareLotStatus `json:"status"`
+	BuyTradeID      *uuid.UUID     `json:"buy_trade_id,omitempty"`
 }
 
 type RealizedTradeLog struct {
@@ -118,3 +149,4 @@ type RealizedTradeLog struct {
 	RealizedPnL     string    `json:"realized_pnl"`
 	Provenance      string    `json:"provenance"`
 }
+

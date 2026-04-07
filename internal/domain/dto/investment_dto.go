@@ -47,7 +47,7 @@ type CreateTradeRequest struct {
 	FeeTransactionID *uuid.UUID `json:"fee_transaction_id,omitempty"`
 	TaxTransactionID *uuid.UUID `json:"tax_transaction_id,omitempty"`
 	Provenance       *string    `json:"provenance,omitempty"`
-	Side             string     `json:"side"` // buy, sell
+	Side             entity.TradeSide  `json:"side"` // buy, sell
 	Quantity         string     `json:"quantity"`
 	Price            string     `json:"price"`
 	Fees             *string    `json:"fees,omitempty"`
@@ -71,7 +71,7 @@ type TradeResponse struct {
 	SecurityID       uuid.UUID  `json:"security_id"`
 	FeeTransactionID *uuid.UUID `json:"fee_transaction_id,omitempty"`
 	TaxTransactionID *uuid.UUID `json:"tax_transaction_id,omitempty"`
-	Side             string     `json:"side"`
+	Side             entity.TradeSide  `json:"side"`
 	Quantity         string     `json:"quantity"`
 	Price            string     `json:"price"`
 	Fees             string     `json:"fees"`
@@ -202,7 +202,7 @@ func NewSecurityPriceDailyResponses(items []entity.SecurityPriceDaily) []Securit
 type SecurityEventResponse struct {
 	ID                 uuid.UUID `json:"id"`
 	SecurityID         uuid.UUID `json:"security_id"`
-	EventType          string    `json:"event_type"`
+	EventType          entity.SecurityEventType `json:"event_type"`
 	ExDate             *string   `json:"ex_date,omitempty"`
 	RecordDate         *string   `json:"record_date,omitempty"`
 	PayDate            *string   `json:"pay_date,omitempty"`
@@ -245,7 +245,7 @@ type EligibleAction struct {
 	Event            SecurityEventResponse `json:"event"`
 	HoldingQuantity  string                `json:"holding_quantity"`
 	EntitledQuantity string                `json:"entitled_quantity"`
-	Status           string                `json:"status"` // eligible, claimed, dismissed
+	Status           entity.SecurityEventElectionStatus `json:"status"` // eligible, claimed, dismissed
 	ElectionID       *uuid.UUID            `json:"election_id,omitempty"`
 }
 

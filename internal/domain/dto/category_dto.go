@@ -10,7 +10,7 @@ type CategoryResponse struct {
 	Key              string     `json:"key"`
 	ParentKey        *string    `json:"parent_key,omitempty"`
 	ParentCategoryID *uuid.UUID `json:"parent_category_id,omitempty"`
-	Type             *string    `json:"type,omitempty"`
+	Type             *entity.CategoryType `json:"type,omitempty"`
 	SortOrder        *int       `index:"sort_order,omitempty" json:"sort_order,omitempty"`
 	IsActive         bool       `json:"is_active"`
 	Icon             *string    `json:"icon,omitempty"`

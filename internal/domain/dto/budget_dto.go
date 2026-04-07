@@ -10,12 +10,12 @@ import (
 
 type CreateBudgetRequest struct {
 	Name                  *string `json:"name,omitempty"`
-	Period                string  `json:"period" binding:"required"`
+	Period                entity.BudgetPeriod `json:"period" binding:"required"`
 	PeriodStart           *string `json:"period_start,omitempty"`
 	PeriodEnd             *string `json:"period_end,omitempty"`
 	Amount                string  `json:"amount" binding:"required"`
 	AlertThresholdPercent *int    `json:"alert_threshold_percent,omitempty"`
-	RolloverMode          *string `json:"rollover_mode,omitempty"`
+	RolloverMode          *entity.BudgetRolloverMode `json:"rollover_mode,omitempty"`
 	CategoryID            *string `json:"category_id,omitempty"`
 }
 
@@ -23,19 +23,19 @@ type UpdateBudgetRequest struct {
 	Name                  *string `json:"name,omitempty"`
 	Amount                *string `json:"amount,omitempty"`
 	AlertThresholdPercent *int    `json:"alert_threshold_percent,omitempty"`
-	RolloverMode          *string `json:"rollover_mode,omitempty"`
+	RolloverMode          *entity.BudgetRolloverMode `json:"rollover_mode,omitempty"`
 }
 
 type BudgetWithStatsResponse struct {
 	ID                    uuid.UUID  `json:"id"`
 	UserID                uuid.UUID  `json:"user_id"`
 	Name                  *string    `json:"name,omitempty"`
-	Period                string     `json:"period"`
+	Period                entity.BudgetPeriod `json:"period"`
 	PeriodStart           *string    `json:"period_start,omitempty"`
 	PeriodEnd             *string    `json:"period_end,omitempty"`
 	Amount                string     `json:"amount"`
 	AlertThresholdPercent *int       `json:"alert_threshold_percent,omitempty"`
-	RolloverMode          *string    `json:"rollover_mode,omitempty"`
+	RolloverMode          *entity.BudgetRolloverMode `json:"rollover_mode,omitempty"`
 	CategoryID            *uuid.UUID `json:"category_id,omitempty"`
 	Spent                 string     `json:"spent"`
 	Remaining             string     `json:"remaining"`

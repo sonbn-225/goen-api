@@ -6,6 +6,22 @@ import (
 	"github.com/google/uuid"
 )
 
+type TransactionType string
+
+const (
+	TransactionTypeExpense  TransactionType = "expense"
+	TransactionTypeIncome   TransactionType = "income"
+	TransactionTypeTransfer TransactionType = "transfer"
+)
+
+type TransactionStatus string
+
+const (
+	TransactionStatusPending   TransactionStatus = "pending"
+	TransactionStatusPosted    TransactionStatus = "posted"
+	TransactionStatusCancelled TransactionStatus = "cancelled"
+)
+
 type TransactionLineItem struct {
 	BaseEntity
 	CategoryID    *uuid.UUID  `json:"category_id,omitempty"`
@@ -18,7 +34,7 @@ type TransactionLineItem struct {
 type Transaction struct {
 	AuditEntity
 	ExternalRef  *string   `json:"external_ref,omitempty"`
-	Type         string    `json:"type"` // expense, income, transfer
+	Type         TransactionType    `json:"type"`
 	OccurredAt   time.Time `json:"occurred_at"`
 	OccurredDate string    `json:"occurred_date"`
 	Amount       string    `json:"amount"`
@@ -34,7 +50,7 @@ type Transaction struct {
 	FromAccountID   *uuid.UUID            `json:"from_account_id,omitempty"`
 	ToAccountID     *uuid.UUID            `json:"to_account_id,omitempty"`
 	ExchangeRate    *string               `json:"exchange_rate,omitempty"`
-	Status          string                `json:"status"` // pending, posted, cancelled
+	Status          TransactionStatus     `json:"status"` // pending, posted, cancelled
 	LineItems       []TransactionLineItem `json:"line_items,omitempty"`
 	TagIDs          []uuid.UUID           `json:"tag_ids,omitempty"`
 	CategoryIDs     []uuid.UUID           `json:"category_ids,omitempty"`
@@ -49,7 +65,7 @@ type Transaction struct {
 type TransactionListFilter struct {
 	AccountID         *uuid.UUID
 	CategoryID        *uuid.UUID
-	Type              *string
+	Type              *TransactionType
 	Search            *string
 	ExternalRefFamily *string
 	From              *time.Time
@@ -64,8 +80,9 @@ type TransactionPatch struct {
 	CategoryIDs       []uuid.UUID
 	TagIDs            []uuid.UUID
 	Amount            *string
-	Status            *string
+	Status            *TransactionStatus
 	OccurredAt        *time.Time
 	LineItems         *[]TransactionLineItem     // nil = no change, non-nil = replace all
 	GroupParticipants *[]GroupExpenseParticipant // nil = no change, non-nil = replace all (only unsettled)
 }
+

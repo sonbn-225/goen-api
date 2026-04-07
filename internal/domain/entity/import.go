@@ -19,12 +19,19 @@ type ImportedTransaction struct {
 	RawPayload           map[string]any `json:"raw_payload,omitempty"`
 }
 
+type ImportMappingRuleKind string
+
+const (
+	ImportMappingRuleKindAccount  ImportMappingRuleKind = "account"
+	ImportMappingRuleKindCategory ImportMappingRuleKind = "category"
+)
+
 type ImportMappingRule struct {
 	AuditEntity
-	UserID     uuid.UUID `json:"-"`
-	Kind       string    `json:"kind"` // account | category
-	SourceName string    `json:"source_name"`
-	MappedID   uuid.UUID `json:"mapped_id"`
+	UserID     uuid.UUID             `json:"-"`
+	Kind       ImportMappingRuleKind `json:"kind"`
+	SourceName string                `json:"source_name"`
+	MappedID   uuid.UUID             `json:"mapped_id"`
 }
 
 type ImportedTransactionCreate struct {
@@ -46,7 +53,7 @@ type ImportedTransactionPatch struct {
 }
 
 type ImportMappingRuleUpsert struct {
-	Kind       string
+	Kind       ImportMappingRuleKind
 	SourceName string
 	MappedID   uuid.UUID
 }

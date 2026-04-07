@@ -424,6 +424,24 @@ func (r *AccountRepo) ListAccountAuditEvents(ctx context.Context, actorUserID uu
 	return out, nil
 }
 
+func (r *AccountRepo) RecordAccountAuditEvent(ctx context.Context, event entity.AccountAuditEvent) error {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return err
+	}
+
+	var diffJSON []byte
+	if event.Diff != nil {
+		diffJSON, _ = json.Marshal(event.Diff)
+	}
+
+	_, err = pool.Exec(ctx, `
+		INSERT INTO audit_events (id, account_id, actor_user_id, action, entity_type, entity_id, occurred_at, diff)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, event.ID, event.AccountID, event.ActorUserID, event.Action, event.EntityType, event.EntityID, event.OccurredAt, diffJSON)
+	return err
+}
+
 func (r *AccountRepo) requireAccountOwner(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) error {
 	var one int
 	err := tx.QueryRow(ctx, `

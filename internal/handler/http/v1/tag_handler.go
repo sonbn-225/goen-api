@@ -11,6 +11,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
 
 type TagHandler struct {
@@ -45,13 +46,13 @@ func (h *TagHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
 	items, err := h.svc.List(r.Context(), userID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -73,7 +74,7 @@ func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -85,7 +86,7 @@ func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	t, err := h.svc.Create(r.Context(), userID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -107,7 +108,7 @@ func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *TagHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -119,7 +120,7 @@ func (h *TagHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	t, err := h.svc.Get(r.Context(), userID, id)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 

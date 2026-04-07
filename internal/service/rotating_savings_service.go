@@ -34,7 +34,7 @@ func NewRotatingSavingsService(
 func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID uuid.UUID, req dto.CreateRotatingSavingsGroupRequest) (*dto.RotatingSavingsGroupResponse, error) {
 	status := req.Status
 	if status == "" {
-		status = "active"
+		status = entity.RotatingSavingsStatusActive
 	}
 
 	accountID := req.AccountID
@@ -79,7 +79,7 @@ func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID uuid.UU
 		},
 		UserID:    userID,
 		GroupID:   &g.ID,
-		Action:    "group_created",
+		Action:    entity.RotatingSavingsAuditActionGroupCreated,
 		Details:   map[string]any{"name": g.Name},
 		CreatedAt: time.Now().UTC(),
 	})
@@ -146,7 +146,7 @@ func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupI
 		},
 		UserID:    userID,
 		GroupID:   &g.ID,
-		Action:    "group_updated",
+		Action:    entity.RotatingSavingsAuditActionGroupUpdated,
 		Details:   map[string]any{"status": g.Status},
 		CreatedAt: time.Now().UTC(),
 	})
@@ -177,7 +177,7 @@ func (s *RotatingSavingsService) GetGroupDetail(ctx context.Context, userID, gro
 	totalPaid := 0.0
 	totalReceived := 0.0
 	for _, c := range contributions {
-		if c.Kind == "payout" {
+		if c.Kind == entity.RotatingSavingsContributionKindPayout {
 			collectedSlotsCount += c.SlotsTaken
 			totalReceived += c.Amount
 		} else {
@@ -232,7 +232,7 @@ func (s *RotatingSavingsService) generateSchedule(g entity.RotatingSavingsGroup,
 		c := &history[i]
 		if c.CycleNo != nil {
 			ch := histMap[*c.CycleNo]
-			if c.Kind == "payout" {
+			if c.Kind == entity.RotatingSavingsContributionKindPayout {
 				ch.P = c
 			} else {
 				ch.C = c
@@ -257,7 +257,7 @@ func (s *RotatingSavingsService) generateSchedule(g entity.RotatingSavingsGroup,
 		userCollectedBeforeI := 0
 		lastPayoutBeforeI := 0
 		for _, c := range history {
-			if c.Kind == "payout" && c.CycleNo != nil && *c.CycleNo < i {
+			if c.Kind == entity.RotatingSavingsContributionKindPayout && c.CycleNo != nil && *c.CycleNo < i {
 				userCollectedBeforeI += c.SlotsTaken
 				if *c.CycleNo > lastPayoutBeforeI {
 					lastPayoutBeforeI = *c.CycleNo
@@ -319,7 +319,7 @@ func (s *RotatingSavingsService) ListGroups(ctx context.Context, userID uuid.UUI
 		totalReceived := 0.0
 		completedCycles := make(map[int]bool)
 		for _, c := range contributions {
-			if c.Kind == "payout" {
+			if c.Kind == entity.RotatingSavingsContributionKindPayout {
 				totalReceived += c.Amount
 			} else {
 				totalPaid += c.Amount
@@ -359,17 +359,17 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 	}
 
 	txType := "expense"
-	if req.Kind == "payout" {
+	if req.Kind == entity.RotatingSavingsContributionKindPayout {
 		txType = "income"
 	}
 
 	desc := "Đóng hụi"
-	if req.Kind == "payout" {
+	if req.Kind == entity.RotatingSavingsContributionKindPayout {
 		desc = "Lĩnh hụi"
 	}
 
 	var catID uuid.UUID
-	if req.Kind == "payout" {
+	if req.Kind == entity.RotatingSavingsContributionKindPayout {
 		catID, _ = uuid.Parse("00000000-0000-0000-0000-000000000005")
 	} else {
 		catID, _ = uuid.Parse("00000000-0000-0000-0000-000000000006")
@@ -380,7 +380,7 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 	}
 
 	tx, err := s.txSvc.Create(ctx, userID, dto.CreateTransactionRequest{
-		Type: txType, OccurredDate: &req.OccurredDate, Amount: req.Amount, CategoryID: &catID, Description: &desc, AccountID: &g.AccountID,
+		Type: entity.TransactionType(txType), OccurredDate: &req.OccurredDate, Amount: req.Amount, CategoryID: &catID, Description: &desc, AccountID: &g.AccountID,
 	})
 	if err != nil {
 		return nil, err
@@ -415,7 +415,7 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 		},
 		UserID:    userID,
 		GroupID:   &groupID,
-		Action:    "contribution_created",
+		Action:    entity.RotatingSavingsAuditActionContributionCreated,
 		Details:   map[string]any{"kind": c.Kind, "amount": req.Amount},
 		CreatedAt: time.Now().UTC(),
 	})

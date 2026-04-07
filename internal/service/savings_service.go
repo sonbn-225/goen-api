@@ -35,7 +35,7 @@ func (s *SavingsService) CreateSavings(ctx context.Context, userID uuid.UUID, re
 		MaturityDate:     req.MaturityDate,
 		AutoRenew:        req.AutoRenew,
 		AccruedInterest:  "0",
-		Status:           "active",
+		Status:           entity.SavingsStatusActive,
 	}
  
 	if err := s.repo.CreateSavings(ctx, userID, instr); err != nil {
@@ -88,7 +88,7 @@ func (s *SavingsService) PatchSavings(ctx context.Context, userID, id uuid.UUID,
 	}
 	if req.Status != nil {
 		cur.Status = *req.Status
-		if *req.Status == "closed" || *req.Status == "matured" {
+		if *req.Status == entity.SavingsStatusClosed || *req.Status == entity.SavingsStatusMatured {
 			now := time.Now().UTC()
 			cur.ClosedAt = &now
 		}

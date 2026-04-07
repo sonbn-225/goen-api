@@ -11,6 +11,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
 
 type SavingsHandler struct {
@@ -53,12 +54,12 @@ func (h *SavingsHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *SavingsHandler) ListSavings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	items, err := h.savingsSvc.ListSavings(r.Context(), userID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, items)
@@ -79,7 +80,7 @@ func (h *SavingsHandler) ListSavings(w http.ResponseWriter, r *http.Request) {
 func (h *SavingsHandler) CreateSavings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	var req dto.CreateSavingsRequest
@@ -89,7 +90,7 @@ func (h *SavingsHandler) CreateSavings(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := h.savingsSvc.CreateSavings(r.Context(), userID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusCreated, item)
@@ -108,7 +109,7 @@ func (h *SavingsHandler) CreateSavings(w http.ResponseWriter, r *http.Request) {
 func (h *SavingsHandler) GetSavings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -118,7 +119,7 @@ func (h *SavingsHandler) GetSavings(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := h.savingsSvc.GetSavings(r.Context(), userID, id)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	if item == nil {
@@ -144,7 +145,7 @@ func (h *SavingsHandler) GetSavings(w http.ResponseWriter, r *http.Request) {
 func (h *SavingsHandler) PatchSavings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -159,7 +160,7 @@ func (h *SavingsHandler) PatchSavings(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := h.savingsSvc.PatchSavings(r.Context(), userID, id, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	if item == nil {
@@ -182,7 +183,7 @@ func (h *SavingsHandler) PatchSavings(w http.ResponseWriter, r *http.Request) {
 func (h *SavingsHandler) DeleteSavings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -191,7 +192,7 @@ func (h *SavingsHandler) DeleteSavings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.savingsSvc.DeleteSavings(r.Context(), userID, id); err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, map[string]string{"message": "Savings deleted"})

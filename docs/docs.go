@@ -5568,7 +5568,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "account_type": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.AccountType"
                 },
                 "balance": {
                     "type": "string"
@@ -5592,7 +5592,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.AccountStatus"
                 }
             }
         },
@@ -5609,13 +5609,13 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "permission": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.AccountSharePermission"
                 },
                 "revoked_at": {
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.AccountShareStatus"
                 },
                 "updated_at": {
                     "type": "string"
@@ -5736,7 +5736,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "period": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.BudgetPeriod"
                 },
                 "period_end": {
                     "type": "string"
@@ -5748,7 +5748,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "rollover_mode": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.BudgetRolloverMode"
                 },
                 "spent": {
                     "type": "string"
@@ -5786,7 +5786,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "type": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.CategoryType"
                 }
             }
         },
@@ -5868,7 +5868,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "period": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.BudgetPeriod"
                 },
                 "period_end": {
                     "type": "string"
@@ -5877,7 +5877,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "rollover_mode": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.BudgetRolloverMode"
                 }
             }
         },
@@ -5925,7 +5925,11 @@ const docTemplate = `{
                 },
                 "direction": {
                     "description": "lent, borrowed",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.DebtDirection"
+                        }
+                    ]
                 },
                 "due_date": {
                     "type": "string"
@@ -6050,7 +6054,11 @@ const docTemplate = `{
                 },
                 "cycle_frequency": {
                     "description": "weekly, monthly",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.RotatingSavingsCycleFrequency"
+                        }
+                    ]
                 },
                 "fixed_interest_amount": {
                     "type": "number"
@@ -6066,7 +6074,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.RotatingSavingsStatus"
                 },
                 "user_slots": {
                     "type": "integer"
@@ -6166,7 +6174,11 @@ const docTemplate = `{
                 },
                 "side": {
                     "description": "buy, sell",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.TradeSide"
+                        }
+                    ]
                 },
                 "tax_category_id": {
                     "type": "string"
@@ -6249,7 +6261,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.TransactionType"
                 }
             }
         },
@@ -6322,7 +6334,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "direction": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.DebtDirection"
                 },
                 "due_date": {
                     "type": "string"
@@ -6349,7 +6361,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.DebtStatus"
                 },
                 "user_id": {
                     "type": "string"
@@ -6472,7 +6484,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.ImportMappingRuleKind"
                 },
                 "mapped_id": {
                     "type": "string"
@@ -6645,7 +6657,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.SavingsStatus"
                 },
                 "term_months": {
                     "type": "integer"
@@ -6770,7 +6782,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "action": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.RotatingSavingsAuditAction"
                 },
                 "created_at": {
                     "type": "string"
@@ -6810,7 +6822,11 @@ const docTemplate = `{
                 },
                 "kind": {
                     "description": "contribution, payout, collected",
-                    "type": "string"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.RotatingSavingsContributionKind"
+                        }
+                    ]
                 },
                 "note": {
                     "type": "string"
@@ -6848,7 +6864,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.RotatingSavingsContributionKind"
                 },
                 "note": {
                     "type": "string"
@@ -6921,7 +6937,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "cycle_frequency": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.RotatingSavingsCycleFrequency"
                 },
                 "fixed_interest_amount": {
                     "type": "number"
@@ -6942,7 +6958,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.RotatingSavingsStatus"
                 },
                 "user_id": {
                     "type": "string"
@@ -7051,7 +7067,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.SavingsStatus"
                 },
                 "term_months": {
                     "type": "integer"
@@ -7071,7 +7087,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "event_type": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.SecurityEventType"
                 },
                 "ex_date": {
                     "type": "string"
@@ -7275,7 +7291,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "side": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.TradeSide"
                 },
                 "tax_transaction_id": {
                     "type": "string"
@@ -7342,7 +7358,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.TransactionStatus"
                 },
                 "tag_ids": {
                     "type": "array",
@@ -7416,7 +7432,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.TransactionStatus"
                 },
                 "tag_colors": {
                     "type": "array",
@@ -7446,7 +7462,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.TransactionType"
                 }
             }
         },
@@ -7463,7 +7479,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "rollover_mode": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.BudgetRolloverMode"
                 }
             }
         },
@@ -7500,7 +7516,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.DebtStatus"
                 }
             }
         },
@@ -7523,7 +7539,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "status": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.RotatingSavingsStatus"
                 }
             }
         },
@@ -7578,6 +7594,247 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "entity.AccountSharePermission": {
+            "type": "string",
+            "enum": [
+                "owner",
+                "viewer",
+                "editor"
+            ],
+            "x-enum-varnames": [
+                "AccountSharePermissionOwner",
+                "AccountSharePermissionViewer",
+                "AccountSharePermissionEditor"
+            ]
+        },
+        "entity.AccountShareStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "revoked"
+            ],
+            "x-enum-varnames": [
+                "AccountShareStatusActive",
+                "AccountShareStatusRevoked"
+            ]
+        },
+        "entity.AccountStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "closed"
+            ],
+            "x-enum-varnames": [
+                "AccountStatusActive",
+                "AccountStatusClosed"
+            ]
+        },
+        "entity.AccountType": {
+            "type": "string",
+            "enum": [
+                "bank",
+                "wallet",
+                "cash",
+                "broker",
+                "card",
+                "savings"
+            ],
+            "x-enum-varnames": [
+                "AccountTypeBank",
+                "AccountTypeWallet",
+                "AccountTypeCash",
+                "AccountTypeBroker",
+                "AccountTypeCard",
+                "AccountTypeSavings"
+            ]
+        },
+        "entity.BudgetPeriod": {
+            "type": "string",
+            "enum": [
+                "month",
+                "week",
+                "custom"
+            ],
+            "x-enum-varnames": [
+                "BudgetPeriodMonth",
+                "BudgetPeriodWeek",
+                "BudgetPeriodCustom"
+            ]
+        },
+        "entity.BudgetRolloverMode": {
+            "type": "string",
+            "enum": [
+                "none",
+                "add_positive",
+                "add_all"
+            ],
+            "x-enum-varnames": [
+                "BudgetRolloverModeNone",
+                "BudgetRolloverModeAddPositive",
+                "BudgetRolloverModeAddAll"
+            ]
+        },
+        "entity.CategoryType": {
+            "type": "string",
+            "enum": [
+                "expense",
+                "income"
+            ],
+            "x-enum-varnames": [
+                "CategoryTypeExpense",
+                "CategoryTypeIncome"
+            ]
+        },
+        "entity.DebtDirection": {
+            "type": "string",
+            "enum": [
+                "lent",
+                "borrowed"
+            ],
+            "x-enum-varnames": [
+                "DebtDirectionLent",
+                "DebtDirectionBorrowed"
+            ]
+        },
+        "entity.DebtStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "paid",
+                "cancelled"
+            ],
+            "x-enum-varnames": [
+                "DebtStatusActive",
+                "DebtStatusPaid",
+                "DebtStatusCancelled"
+            ]
+        },
+        "entity.ImportMappingRuleKind": {
+            "type": "string",
+            "enum": [
+                "account",
+                "category"
+            ],
+            "x-enum-varnames": [
+                "ImportMappingRuleKindAccount",
+                "ImportMappingRuleKindCategory"
+            ]
+        },
+        "entity.RotatingSavingsAuditAction": {
+            "type": "string",
+            "enum": [
+                "group_created",
+                "group_updated",
+                "contribution_created"
+            ],
+            "x-enum-varnames": [
+                "RotatingSavingsAuditActionGroupCreated",
+                "RotatingSavingsAuditActionGroupUpdated",
+                "RotatingSavingsAuditActionContributionCreated"
+            ]
+        },
+        "entity.RotatingSavingsContributionKind": {
+            "type": "string",
+            "enum": [
+                "contribution",
+                "payout",
+                "collected"
+            ],
+            "x-enum-varnames": [
+                "RotatingSavingsContributionKindContribution",
+                "RotatingSavingsContributionKindPayout",
+                "RotatingSavingsContributionKindCollected"
+            ]
+        },
+        "entity.RotatingSavingsCycleFrequency": {
+            "type": "string",
+            "enum": [
+                "weekly",
+                "monthly"
+            ],
+            "x-enum-varnames": [
+                "RotatingSavingsCycleFrequencyWeekly",
+                "RotatingSavingsCycleFrequencyMonthly"
+            ]
+        },
+        "entity.RotatingSavingsStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "completed",
+                "closed"
+            ],
+            "x-enum-varnames": [
+                "RotatingSavingsStatusActive",
+                "RotatingSavingsStatusCompleted",
+                "RotatingSavingsStatusClosed"
+            ]
+        },
+        "entity.SavingsStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "matured",
+                "closed"
+            ],
+            "x-enum-varnames": [
+                "SavingsStatusActive",
+                "SavingsStatusMatured",
+                "SavingsStatusClosed"
+            ]
+        },
+        "entity.SecurityEventType": {
+            "type": "string",
+            "enum": [
+                "cash_dividend",
+                "stock_dividend",
+                "split",
+                "merger"
+            ],
+            "x-enum-varnames": [
+                "SecurityEventTypeCashDividend",
+                "SecurityEventTypeStockDividend",
+                "SecurityEventTypeSplit",
+                "SecurityEventTypeMerger"
+            ]
+        },
+        "entity.TradeSide": {
+            "type": "string",
+            "enum": [
+                "buy",
+                "sell"
+            ],
+            "x-enum-varnames": [
+                "TradeSideBuy",
+                "TradeSideSell"
+            ]
+        },
+        "entity.TransactionStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "posted",
+                "cancelled"
+            ],
+            "x-enum-varnames": [
+                "TransactionStatusPending",
+                "TransactionStatusPosted",
+                "TransactionStatusCancelled"
+            ]
+        },
+        "entity.TransactionType": {
+            "type": "string",
+            "enum": [
+                "expense",
+                "income",
+                "transfer"
+            ],
+            "x-enum-varnames": [
+                "TransactionTypeExpense",
+                "TransactionTypeIncome",
+                "TransactionTypeTransfer"
+            ]
         },
         "response.ErrorBody": {
             "type": "object",

@@ -12,6 +12,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
  
 type GroupExpenseHandler struct {
@@ -50,7 +51,7 @@ func (h *GroupExpenseHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *GroupExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -62,7 +63,7 @@ func (h *GroupExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
  
 	res, err := h.svc.Create(r.Context(), userID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -83,7 +84,7 @@ func (h *GroupExpenseHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *GroupExpenseHandler) ListByTransaction(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -95,7 +96,7 @@ func (h *GroupExpenseHandler) ListByTransaction(w http.ResponseWriter, r *http.R
  
 	items, err := h.svc.ListByTransaction(r.Context(), userID, txID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -118,7 +119,7 @@ func (h *GroupExpenseHandler) ListByTransaction(w http.ResponseWriter, r *http.R
 func (h *GroupExpenseHandler) Settle(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -136,7 +137,7 @@ func (h *GroupExpenseHandler) Settle(w http.ResponseWriter, r *http.Request) {
  
 	tx, err := h.svc.Settle(r.Context(), userID, pID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -156,7 +157,7 @@ func (h *GroupExpenseHandler) Settle(w http.ResponseWriter, r *http.Request) {
 func (h *GroupExpenseHandler) ListNames(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -169,7 +170,7 @@ func (h *GroupExpenseHandler) ListNames(w http.ResponseWriter, r *http.Request) 
  
 	names, err := h.svc.ListUniqueParticipantNames(r.Context(), userID, limit)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
