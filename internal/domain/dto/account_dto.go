@@ -28,16 +28,16 @@ type PatchAccountRequest struct {
 }
 
 type AccountResponse struct {
-	ID                  uuid.UUID  `json:"id"`
-	Name                string     `json:"name"`
-	AccountNumber       *string    `json:"account_number,omitempty"`
-	Color               *string    `json:"color,omitempty"`
-	AccountType         string     `json:"account_type"`
-	Currency            string     `json:"currency"`
-	ParentAccountID     *uuid.UUID `json:"parent_account_id,omitempty"`
-	Status              string     `json:"status"`
-	Balance             string     `json:"balance"`
-	InvestmentAccountID *uuid.UUID `json:"investment_account_id,omitempty"`
+	ID                  uuid.UUID            `json:"id"`
+	Name                string               `json:"name"`
+	AccountNumber       *string              `json:"account_number,omitempty"`
+	Color               *string              `json:"color,omitempty"`
+	AccountType         entity.AccountType   `json:"account_type"`
+	Currency            string               `json:"currency"`
+	ParentAccountID     *uuid.UUID           `json:"parent_account_id,omitempty"`
+	Status              entity.AccountStatus `json:"status"`
+	Balance             string               `json:"balance"`
+	InvestmentAccountID *uuid.UUID           `json:"investment_account_id,omitempty"`
 }
 
 func NewAccountResponse(it entity.Account) AccountResponse {
@@ -86,17 +86,17 @@ func NewAccountBalanceResponses(items []entity.AccountBalance) []AccountBalanceR
 }
 
 type AccountShareResponse struct {
-	ID              uuid.UUID  `json:"id"`
-	AccountID       uuid.UUID  `json:"account_id"`
-	UserID          uuid.UUID  `json:"user_id"`
-	Permission      string     `json:"permission"`
-	Status          string     `json:"status"`
-	RevokedAt       *time.Time `json:"revoked_at,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	UserEmail       *string    `json:"user_email,omitempty"`
-	UserPhone       *string    `json:"user_phone,omitempty"`
-	UserDisplayName *string    `json:"user_display_name,omitempty"`
+	ID              uuid.UUID                     `json:"id"`
+	AccountID       uuid.UUID                     `json:"account_id"`
+	UserID          uuid.UUID                     `json:"user_id"`
+	Permission      entity.AccountSharePermission `json:"permission"`
+	Status          entity.AccountShareStatus     `json:"status"`
+	RevokedAt       *time.Time                    `json:"revoked_at,omitempty"`
+	CreatedAt       time.Time                     `json:"created_at"`
+	UpdatedAt       time.Time                     `json:"updated_at"`
+	UserEmail       *string                       `json:"user_email,omitempty"`
+	UserPhone       *string                       `json:"user_phone,omitempty"`
+	UserDisplayName *string                       `json:"user_display_name,omitempty"`
 }
 
 func NewAccountShareResponse(it entity.AccountShare) AccountShareResponse {

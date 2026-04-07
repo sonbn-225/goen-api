@@ -16,7 +16,7 @@ type DebtRepository interface {
 	UpdateDebt(ctx context.Context, userID uuid.UUID, debt entity.Debt) error
 	DeleteDebt(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) error
 
-	CreatePaymentLink(ctx context.Context, userID uuid.UUID, link entity.DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus string, closedAt *time.Time) error
+	CreatePaymentLink(ctx context.Context, userID uuid.UUID, link entity.DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus entity.DebtStatus, closedAt *time.Time) error
 	ListPaymentLinks(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtPaymentLink, error)
 	ListPaymentLinksByTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID) ([]entity.DebtPaymentLink, error)
 

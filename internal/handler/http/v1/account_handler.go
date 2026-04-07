@@ -12,6 +12,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
  
 type AccountHandler struct {
@@ -54,13 +55,13 @@ func (h *AccountHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
 	items, err := h.svc.List(r.Context(), userID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -81,7 +82,7 @@ func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -93,7 +94,7 @@ func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
  
 	account, err := h.svc.Create(r.Context(), userID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -114,7 +115,7 @@ func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -126,7 +127,7 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
  
 	acc, err := h.svc.Get(r.Context(), userID, accountID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -154,7 +155,7 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *AccountHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -172,7 +173,7 @@ func (h *AccountHandler) Patch(w http.ResponseWriter, r *http.Request) {
  
 	acc, err := h.svc.Patch(r.Context(), userID, accountID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -197,7 +198,7 @@ func (h *AccountHandler) Patch(w http.ResponseWriter, r *http.Request) {
 func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -208,7 +209,7 @@ func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
  
 	if err := h.svc.Delete(r.Context(), userID, accountID); err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -228,7 +229,7 @@ func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -240,7 +241,7 @@ func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
  
 	items, err := h.svc.ListShares(r.Context(), userID, accountID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -262,7 +263,7 @@ func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
 func (h *AccountHandler) ListAuditEvents(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -284,7 +285,7 @@ func (h *AccountHandler) ListAuditEvents(w http.ResponseWriter, r *http.Request)
  
 	items, err := h.svc.ListAuditEvents(r.Context(), userID, accountID, limit)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -307,7 +308,7 @@ func (h *AccountHandler) ListAuditEvents(w http.ResponseWriter, r *http.Request)
 func (h *AccountHandler) UpsertShare(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -325,7 +326,7 @@ func (h *AccountHandler) UpsertShare(w http.ResponseWriter, r *http.Request) {
  
 	item, err := h.svc.UpsertShare(r.Context(), userID, accountID, req.Login, req.Permission)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  
@@ -345,7 +346,7 @@ func (h *AccountHandler) UpsertShare(w http.ResponseWriter, r *http.Request) {
 func (h *AccountHandler) RevokeShare(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
@@ -362,7 +363,7 @@ func (h *AccountHandler) RevokeShare(w http.ResponseWriter, r *http.Request) {
 	}
  
 	if err := h.svc.RevokeShare(r.Context(), userID, accountID, targetUserID); err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
  

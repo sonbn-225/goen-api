@@ -50,7 +50,7 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.svc.Signup(r.Context(), req)
 	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "internal_error", err.Error(), nil)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -77,7 +77,7 @@ func (h *AuthHandler) Signin(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.svc.Signin(r.Context(), req)
 	if err != nil {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", err.Error(), nil)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -104,7 +104,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.svc.Refresh(r.Context(), req.RefreshToken)
 	if err != nil {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", err.Error(), nil)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -129,7 +129,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Logout(r.Context(), req.RefreshToken); err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 

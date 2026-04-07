@@ -9,7 +9,7 @@ import (
 
 type CreateDebtRequest struct {
 	AccountID    string  `json:"account_id" binding:"required"`
-	Direction    string  `json:"direction" binding:"required"` // lent, borrowed
+	Direction    entity.DebtDirection  `json:"direction" binding:"required"` // lent, borrowed
 	Name         *string `json:"name,omitempty"`
 	ContactID    *string `json:"contact_id,omitempty"`
 	ContactName  *string `json:"contact_name,omitempty"`
@@ -23,7 +23,7 @@ type CreateDebtRequest struct {
 type UpdateDebtRequest struct {
 	Name         *string `json:"name,omitempty"`
 	DueDate      *string `json:"due_date,omitempty"`
-	Status       *string `json:"status,omitempty"`
+	Status       *entity.DebtStatus    `json:"status,omitempty"`
 	InterestRate *string `json:"interest_rate,omitempty"`
 }
 
@@ -38,7 +38,7 @@ type DebtResponse struct {
 	ID                   uuid.UUID  `json:"id"`
 	UserID               uuid.UUID  `json:"user_id"`
 	AccountID            *uuid.UUID `json:"account_id,omitempty"`
-	Direction            string     `json:"direction"`
+	Direction            entity.DebtDirection  `json:"direction"`
 	Name                 *string    `json:"name,omitempty"`
 	ContactID            *uuid.UUID `json:"contact_id,omitempty"`
 	ContactName          *string    `json:"contact_name,omitempty"`
@@ -51,7 +51,7 @@ type DebtResponse struct {
 	InterestRule         *string    `json:"interest_rule,omitempty"`
 	OutstandingPrincipal string     `json:"outstanding_principal"`
 	AccruedInterest      string     `json:"accrued_interest"`
-	Status               string     `json:"status"`
+	Status               entity.DebtStatus     `json:"status"`
 	CreatedAt            time.Time  `json:"created_at"`
 }
 

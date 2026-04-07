@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
 
 type SuccessEnvelope struct {
@@ -22,9 +24,11 @@ type ErrorBody struct {
 }
 
 func WriteJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
+	if body != nil {
+		_ = json.NewEncoder(w).Encode(body)
+	}
 }
 
 func WriteSuccess(w http.ResponseWriter, status int, data any) {
@@ -37,6 +41,16 @@ func WriteSuccessWithMeta(w http.ResponseWriter, status int, data any, meta any)
 	WriteJSON(w, status, SuccessEnvelope{
 		Data: data,
 		Meta: meta,
+	})
+}
+
+func WriteAppError(w http.ResponseWriter, err *apperr.AppError) {
+	WriteJSON(w, err.StatusCode, ErrorEnvelope{
+		Error: ErrorBody{
+			Code:    err.Code,
+			Message: err.Message,
+			Details: err.Details,
+		},
 	})
 }
 
@@ -55,4 +69,17 @@ func WriteInternalError(w http.ResponseWriter, err error) {
 		slog.Error("internal server error", "error", err)
 	}
 	WriteError(w, http.StatusInternalServerError, "internal_error", "An internal server error occurred", nil)
+}
+
+func HandleError(w http.ResponseWriter, err error) {
+	if err == nil {
+		return
+	}
+
+	if appErr, ok := err.(*apperr.AppError); ok {
+		WriteAppError(w, appErr)
+		return
+	}
+
+	WriteInternalError(w, err)
 }

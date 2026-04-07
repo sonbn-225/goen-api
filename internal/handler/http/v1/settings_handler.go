@@ -10,6 +10,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
 
 type SettingsHandler struct {
@@ -45,7 +46,7 @@ func (h *SettingsHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *SettingsHandler) PatchMySettings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -57,7 +58,7 @@ func (h *SettingsHandler) PatchMySettings(w http.ResponseWriter, r *http.Request
 
 	res, err := h.svc.UpdateMySettings(r.Context(), userID, patch)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 

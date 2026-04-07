@@ -11,6 +11,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
  
 type ContactHandler struct {
@@ -49,12 +50,12 @@ func (h *ContactHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *ContactHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	items, err := h.svc.List(r.Context(), userID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, items)
@@ -75,7 +76,7 @@ func (h *ContactHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *ContactHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	var req dto.CreateContactRequest
@@ -85,7 +86,7 @@ func (h *ContactHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := h.svc.Create(r.Context(), userID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	response.WriteSuccess(w, http.StatusCreated, res)
@@ -105,7 +106,7 @@ func (h *ContactHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *ContactHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -115,7 +116,7 @@ func (h *ContactHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := h.svc.Get(r.Context(), userID, id)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	if res == nil {
@@ -142,7 +143,7 @@ func (h *ContactHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -157,7 +158,7 @@ func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := h.svc.Update(r.Context(), userID, id, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	if res == nil {
@@ -180,7 +181,7 @@ func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *ContactHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -189,7 +190,7 @@ func (h *ContactHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.Delete(r.Context(), userID, id); err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

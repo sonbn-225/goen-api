@@ -20,6 +20,7 @@ type AccountRepository interface {
 	UpsertAccountShare(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID, targetUserID uuid.UUID, permission string) (*entity.AccountShare, error)
 	RevokeAccountShare(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID, targetUserID uuid.UUID) error
 	ListAccountAuditEvents(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID, limit int) ([]entity.AccountAuditEvent, error)
+	RecordAccountAuditEvent(ctx context.Context, event entity.AccountAuditEvent) error
 }
 
 type AccountService interface {

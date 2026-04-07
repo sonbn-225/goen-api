@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
@@ -71,7 +71,7 @@ func (h *TransactionHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -99,7 +99,7 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 	req := dto.ListTransactionsRequest{
 		AccountID:  accID,
 		CategoryID: catID,
-		Type:       normalize(q.Get("type")),
+		Type:       (*entity.TransactionType)(normalize(q.Get("type"))),
 		Search:     normalize(q.Get("search")),
 		From:       normalize(q.Get("from")),
 		To:         normalize(q.Get("to")),
@@ -109,7 +109,7 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	items, cursor, total, err := h.svc.List(r.Context(), userID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -143,32 +143,19 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
 	var req dto.CreateTransactionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		response.HandleError(w, apperr.BadRequest("validation_error", "invalid json"))
 		return
 	}
 
 	tx, err := h.svc.Create(r.Context(), userID, req)
 	if err != nil {
-		msg := strings.TrimSpace(err.Error())
-		if strings.HasPrefix(msg, "forbidden:") {
-			response.WriteError(w, http.StatusForbidden, "forbidden", msg, nil)
-			return
-		}
-		if strings.HasPrefix(msg, "invalid ") ||
-			strings.Contains(msg, "is required") ||
-			strings.Contains(msg, "must be provided") ||
-			strings.Contains(msg, "single line item only") ||
-			strings.Contains(msg, "only supported for expense") {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", msg, nil)
-			return
-		}
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -189,7 +176,7 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -201,12 +188,12 @@ func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	tx, err := h.svc.Get(r.Context(), userID, transactionID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
 	if tx == nil {
-		response.WriteError(w, http.StatusNotFound, "not_found", "transaction not found", nil)
+		response.HandleError(w, apperr.ErrNotFound)
 		return
 	}
 
@@ -229,7 +216,7 @@ func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -241,18 +228,18 @@ func (h *TransactionHandler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	var req dto.TransactionPatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json", nil)
+		response.HandleError(w, apperr.BadRequest("validation_error", "invalid json"))
 		return
 	}
 
 	tx, err := h.svc.Patch(r.Context(), userID, transactionID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
 	if tx == nil {
-		response.WriteError(w, http.StatusNotFound, "not_found", "transaction not found", nil)
+		response.HandleError(w, apperr.ErrNotFound)
 		return
 	}
 
@@ -272,7 +259,7 @@ func (h *TransactionHandler) Patch(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -283,7 +270,7 @@ func (h *TransactionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(r.Context(), userID, transactionID); err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -305,7 +292,7 @@ func (h *TransactionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) BatchPatch(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -317,7 +304,7 @@ func (h *TransactionHandler) BatchPatch(w http.ResponseWriter, r *http.Request) 
 
 	res, err := h.svc.BatchPatch(r.Context(), userID, req)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -337,7 +324,7 @@ func (h *TransactionHandler) BatchPatch(w http.ResponseWriter, r *http.Request) 
 func (h *TransactionHandler) StageImport(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -349,7 +336,7 @@ func (h *TransactionHandler) StageImport(w http.ResponseWriter, r *http.Request)
 
 	staged, skipped, errors, err := h.svc.StageImport(r.Context(), userID, req.Items)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -371,13 +358,13 @@ func (h *TransactionHandler) StageImport(w http.ResponseWriter, r *http.Request)
 func (h *TransactionHandler) ListImported(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
 	items, err := h.svc.ListImported(r.Context(), userID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -398,7 +385,7 @@ func (h *TransactionHandler) ListImported(w http.ResponseWriter, r *http.Request
 func (h *TransactionHandler) PatchImported(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -421,7 +408,7 @@ func (h *TransactionHandler) PatchImported(w http.ResponseWriter, r *http.Reques
 
 	res, err := h.svc.PatchImported(r.Context(), userID, importID, patch)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -439,7 +426,7 @@ func (h *TransactionHandler) PatchImported(w http.ResponseWriter, r *http.Reques
 func (h *TransactionHandler) DeleteImported(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -450,7 +437,7 @@ func (h *TransactionHandler) DeleteImported(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := h.svc.DeleteImported(r.Context(), userID, importID); err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -467,12 +454,12 @@ func (h *TransactionHandler) DeleteImported(w http.ResponseWriter, r *http.Reque
 func (h *TransactionHandler) ClearImported(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
 	if err := h.svc.ClearImported(r.Context(), userID); err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -491,7 +478,7 @@ func (h *TransactionHandler) ClearImported(w http.ResponseWriter, r *http.Reques
 func (h *TransactionHandler) CreateFromImported(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -503,7 +490,7 @@ func (h *TransactionHandler) CreateFromImported(w http.ResponseWriter, r *http.R
 
 	tx, err := h.svc.CreateFromImported(r.Context(), userID, importID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -523,7 +510,7 @@ func (h *TransactionHandler) CreateFromImported(w http.ResponseWriter, r *http.R
 func (h *TransactionHandler) CreateManyFromImported(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -535,7 +522,7 @@ func (h *TransactionHandler) CreateManyFromImported(w http.ResponseWriter, r *ht
 
 	res, err := h.svc.CreateManyFromImported(r.Context(), userID, req.ImportIDs)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -553,13 +540,13 @@ func (h *TransactionHandler) CreateManyFromImported(w http.ResponseWriter, r *ht
 func (h *TransactionHandler) ListMappingRules(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
 	rules, err := h.svc.ListMappingRules(r.Context(), userID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -579,7 +566,7 @@ func (h *TransactionHandler) ListMappingRules(w http.ResponseWriter, r *http.Req
 func (h *TransactionHandler) UpsertMappingRules(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -591,7 +578,7 @@ func (h *TransactionHandler) UpsertMappingRules(w http.ResponseWriter, r *http.R
 
 	res, err := h.svc.UpsertMappingRules(r.Context(), userID, req.Rules)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -609,7 +596,7 @@ func (h *TransactionHandler) UpsertMappingRules(w http.ResponseWriter, r *http.R
 func (h *TransactionHandler) DeleteMappingRule(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -620,7 +607,7 @@ func (h *TransactionHandler) DeleteMappingRule(w http.ResponseWriter, r *http.Re
 	}
 
 	if err := h.svc.DeleteMappingRule(r.Context(), userID, ruleID); err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -638,15 +625,16 @@ func (h *TransactionHandler) DeleteMappingRule(w http.ResponseWriter, r *http.Re
 func (h *TransactionHandler) ApplyRulesAndCreate(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
 	res, err := h.svc.ApplyRulesAndCreate(r.Context(), userID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
 	response.WriteSuccess(w, http.StatusOK, res)
 }
+

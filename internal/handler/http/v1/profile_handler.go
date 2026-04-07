@@ -12,6 +12,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/handler/middleware"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/response"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
 
 type ProfileHandler struct {
@@ -50,7 +51,7 @@ func (h *ProfileHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *ProfileHandler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -60,7 +61,7 @@ func (h *ProfileHandler) Me(w http.ResponseWriter, r *http.Request) {
 			response.WriteError(w, http.StatusUnauthorized, "unauthorized", "invalid or expired session", nil)
 			return
 		}
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -90,7 +91,7 @@ func isMissingUserError(err error) bool {
 func (h *ProfileHandler) PatchMyProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -107,7 +108,7 @@ func (h *ProfileHandler) PatchMyProfile(w http.ResponseWriter, r *http.Request) 
 
 	res, err := h.svc.UpdateMyProfile(r.Context(), userID, body.DisplayName, body.Email, body.Phone, body.Username)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -129,7 +130,7 @@ func (h *ProfileHandler) PatchMyProfile(w http.ResponseWriter, r *http.Request) 
 func (h *ProfileHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -148,7 +149,7 @@ func (h *ProfileHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.svc.UploadAvatar(r.Context(), userID, header)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 
@@ -170,7 +171,7 @@ func (h *ProfileHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 func (h *ProfileHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
@@ -203,13 +204,13 @@ func (h *ProfileHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 func (h *ProfileHandler) GetMyAvatars(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.WriteError(w, http.StatusUnauthorized, "unauthorized", "user not found in context", nil)
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
 
 	res, err := h.svc.GetMyAvatars(r.Context(), userID)
 	if err != nil {
-		response.WriteInternalError(w, err)
+		response.HandleError(w, err)
 		return
 	}
 

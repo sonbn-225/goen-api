@@ -24,8 +24,8 @@ func NewBudgetService(repo interfaces.BudgetRepository, categoryRepo interfaces.
 }
 
 func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateBudgetRequest) (*dto.BudgetWithStatsResponse, error) {
-	period := strings.TrimSpace(req.Period)
-	if period != "month" && period != "week" && period != "custom" {
+	period := entity.BudgetPeriod(strings.TrimSpace(string(req.Period)))
+	if period != entity.BudgetPeriodMonth && period != entity.BudgetPeriodWeek && period != entity.BudgetPeriodCustom {
 		return nil, errors.New("invalid period")
 	}
 
@@ -51,7 +51,7 @@ func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, req dto.Cr
 		return nil, errors.New("category is invalid or inactive")
 	}
 
-	start, end, err := s.normalizeBudgetPeriod(period, req.PeriodStart, req.PeriodEnd)
+	start, end, err := s.normalizeBudgetPeriod(string(period), req.PeriodStart, req.PeriodEnd)
 	if err != nil {
 		return nil, err
 	}
@@ -160,11 +160,11 @@ func (s *BudgetService) normalizeBudgetPeriod(period string, startIn, endIn *str
 	}
 
 	var end time.Time
-	switch period {
-	case "month":
+	switch entity.BudgetPeriod(period) {
+	case entity.BudgetPeriodMonth:
 		next := start.AddDate(0, 1, 0)
 		end = next.AddDate(0, 0, -1)
-	case "week":
+	case entity.BudgetPeriodWeek:
 		end = start.AddDate(0, 0, 6)
 	default:
 		return "", "", errors.New("invalid period")

@@ -22,7 +22,7 @@ type GroupParticipantInput struct {
 
 type CreateTransactionRequest struct {
 	ExternalRef         *string                 `json:"external_ref,omitempty"`
-	Type                string                  `json:"type"`
+	Type                entity.TransactionType  `json:"type"`
 	OccurredAt          *string                 `json:"occurred_at,omitempty"`
 	OccurredDate        *string                 `json:"occurred_date,omitempty"`
 	OccurredTime        *string                 `json:"occurred_time,omitempty"`
@@ -47,7 +47,7 @@ type TransactionPatchRequest struct {
 	CategoryIDs       []uuid.UUID              `json:"category_ids,omitempty"`
 	TagIDs            []uuid.UUID              `json:"tag_ids,omitempty"`
 	Amount            *string                  `json:"amount,omitempty"`
-	Status            *string                  `json:"status,omitempty"`
+	Status            *entity.TransactionStatus `json:"status,omitempty"`
 	OccurredAt        *string                  `json:"occurred_at,omitempty"`
 	LineItems         *[]CreateLineItemRequest `json:"line_items,omitempty"`
 	GroupParticipants *[]GroupParticipantInput `json:"group_participants,omitempty"`
@@ -96,7 +96,7 @@ type TransactionLineItemResponse struct {
 type TransactionResponse struct {
 	ID              uuid.UUID                     `json:"id"`
 	ExternalRef     *string                       `json:"external_ref,omitempty"`
-	Type            string                        `json:"type"`
+	Type            entity.TransactionType        `json:"type"`
 	OccurredAt      time.Time                     `json:"occurred_at"`
 	OccurredDate    string                        `json:"occurred_date"`
 	Amount          string                        `json:"amount"`
@@ -110,7 +110,7 @@ type TransactionResponse struct {
 	FromAccountID   *uuid.UUID                    `json:"from_account_id,omitempty"`
 	ToAccountID     *uuid.UUID                    `json:"to_account_id,omitempty"`
 	ExchangeRate    *string                       `json:"exchange_rate,omitempty"`
-	Status          string                        `json:"status"`
+	Status          entity.TransactionStatus      `json:"status"`
 	LineItems       []TransactionLineItemResponse `json:"line_items,omitempty"`
 	TagIDs          []uuid.UUID                   `json:"tag_ids,omitempty"`
 	CategoryIDs     []uuid.UUID                   `json:"category_ids,omitempty"`
@@ -208,7 +208,7 @@ func NewImportedTransactionResponses(items []entity.ImportedTransaction) []Impor
 
 type ImportMappingRuleResponse struct {
 	ID         uuid.UUID `json:"id"`
-	Kind       string    `json:"kind"`
+	Kind       entity.ImportMappingRuleKind `json:"kind"`
 	SourceName string    `json:"source_name"`
 	MappedID   uuid.UUID `json:"mapped_id"`
 }
@@ -256,7 +256,7 @@ type UpsertMappingRulesRequest struct {
 type ListTransactionsRequest struct {
 	AccountID  *uuid.UUID `json:"account_id"`
 	CategoryID *uuid.UUID `json:"category_id"`
-	Type       *string    `json:"type"`
+	Type       *entity.TransactionType `json:"type"`
 	Search     *string    `json:"search"`
 	From       *string    `json:"from"`
 	To         *string    `json:"to"`

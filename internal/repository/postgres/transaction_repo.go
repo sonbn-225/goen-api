@@ -34,8 +34,11 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID uuid.UUID, 
 	if err != nil {
 		return nil, err
 	}
+	return r.getTransaction(ctx, pool, userID, id)
+}
 
-	row := pool.QueryRow(ctx, `
+func (r *TransactionRepo) getTransaction(ctx context.Context, q database.Queryer, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
+	row := q.QueryRow(ctx, `
 		SELECT
 			t.id, t.external_ref, t.type, t.occurred_at,
 			to_char(t.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS occurred_date,
@@ -60,7 +63,7 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID uuid.UUID, 
 
 	var t entity.Transaction
 	var catNames, catColors, tagNames, tagColors []string
-	err = row.Scan(
+	err := row.Scan(
 		&t.ID, &t.ExternalRef, &t.Type, &t.OccurredAt, &t.OccurredDate,
 		&t.Amount, &t.FromAmount, &t.ToAmount, &t.Description, &t.AccountID, &t.FromAccountID, &t.ToAccountID,
 		&t.ExchangeRate, &t.AccountCurrency, &t.FromCurrency, &t.ToCurrency, &t.Status,
@@ -74,11 +77,11 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID uuid.UUID, 
 	}
 
 	// Enrichment
-	_ = pool.QueryRow(ctx, `
+	_ = q.QueryRow(ctx, `
 		SELECT 
-			COALESCE(array_agg(DISTINCT c.name), '{}'::text[]),
+			COALESCE(array_agg(DISTINCT c.key), '{}'::text[]),
 			COALESCE(array_agg(DISTINCT c.color), '{}'::text[]),
-			COALESCE(array_agg(DISTINCT tg.name), '{}'::text[]),
+			COALESCE(array_agg(DISTINCT tg.name_vi), '{}'::text[]),
 			COALESCE(array_agg(DISTINCT tg.color), '{}'::text[])
 		FROM transaction_line_items li
 		LEFT JOIN categories c ON c.id = li.category_id
@@ -93,7 +96,7 @@ func (r *TransactionRepo) GetTransaction(ctx context.Context, userID uuid.UUID, 
 	t.TagColors = tagColors
 
 	// Line Items
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT li.id, li.category_id, li.amount::text, li.note,
 		       COALESCE((SELECT array_agg(tlit.tag_id ORDER BY tlit.tag_id) FROM transaction_line_item_tags tlit WHERE tlit.line_item_id = li.id), '{}'::uuid[])
 		FROM transaction_line_items li
@@ -233,9 +236,9 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID uuid.UUID
 		// Quick enrichment join per item (or could use a larger join above, but array_agg per item is safer for complex many-to-many)
 		_ = pool.QueryRow(ctx, `
 			SELECT 
-				COALESCE(array_agg(DISTINCT c.name), '{}'::text[]),
+				COALESCE(array_agg(DISTINCT c.key), '{}'::text[]),
 				COALESCE(array_agg(DISTINCT c.color), '{}'::text[]),
-				COALESCE(array_agg(DISTINCT tg.name), '{}'::text[]),
+				COALESCE(array_agg(DISTINCT tg.name_vi), '{}'::text[]),
 				COALESCE(array_agg(DISTINCT tg.color), '{}'::text[])
 			FROM transaction_line_items li
 			LEFT JOIN categories c ON c.id = li.category_id
@@ -259,87 +262,122 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID uuid.UUID
 }
 
 func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID, patch entity.TransactionPatch) (*entity.Transaction, error) {
-	now := time.Now().UTC()
+	var it *entity.Transaction
 	err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {
 		var err error
-		if _, err = r.GetTransaction(ctx, userID, transactionID); err != nil {
-			return err
-		}
+		it, err = r.patchTransactionTx(ctx, txConn, userID, transactionID, patch)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return it, nil
+}
 
-		// Basic SQL update
-		set := []string{"updated_at = $1"}
-		args := []any{now}
+func (r *TransactionRepo) patchTransactionTx(ctx context.Context, txConn pgx.Tx, userID uuid.UUID, transactionID uuid.UUID, patch entity.TransactionPatch) (*entity.Transaction, error) {
+	now := time.Now().UTC()
+	
+	// Verify ownership/permission
+	if _, err := r.getTransaction(ctx, txConn, userID, transactionID); err != nil {
+		return nil, err
+	}
 
-		if patch.Amount != nil {
-			args = append(args, *patch.Amount)
-			set = append(set, fmt.Sprintf("amount = $%d", len(args)))
-		}
-		if patch.OccurredAt != nil {
-			args = append(args, *patch.OccurredAt)
-			set = append(set, fmt.Sprintf("occurred_at = $%d", len(args)))
-		}
-		if patch.Status != nil {
-			args = append(args, *patch.Status)
-			set = append(set, fmt.Sprintf("status = $%d", len(args)))
-		}
+	// 1. Basic SQL update for the transactions table
+	set := []string{"updated_at = $1"}
+	args := []any{now}
 
-		if len(set) > 2 {
-			args = append(args, transactionID)
-			query := fmt.Sprintf("UPDATE transactions SET %s WHERE id = $%d", strings.Join(set, ", "), len(args))
-			if _, err := txConn.Exec(ctx, query, args...); err != nil {
-				return err
+	if patch.Amount != nil {
+		args = append(args, *patch.Amount)
+		set = append(set, fmt.Sprintf("amount = $%d", len(args)))
+	}
+	if patch.OccurredAt != nil {
+		args = append(args, *patch.OccurredAt)
+		set = append(set, fmt.Sprintf("occurred_at = $%d", len(args)))
+	}
+	if patch.Status != nil {
+		args = append(args, *patch.Status)
+		set = append(set, fmt.Sprintf("status = $%d", len(args)))
+	}
+
+	if len(set) > 1 {
+		args = append(args, transactionID)
+		query := fmt.Sprintf("UPDATE transactions SET %s WHERE id = $%d", strings.Join(set, ", "), len(args))
+		if _, err := txConn.Exec(ctx, query, args...); err != nil {
+			return nil, err
+		}
+	}
+
+	// 2. Handle Description and CategoryIDs (updating the first line item)
+	if patch.Description != nil || patch.CategoryIDs != nil {
+		// Identify the first line item
+		var firstID uuid.UUID
+		err := txConn.QueryRow(ctx, "SELECT id FROM transaction_line_items WHERE transaction_id = $1 ORDER BY id LIMIT 1", transactionID).Scan(&firstID)
+		if err == nil {
+			liSet := []string{}
+			liArgs := []any{}
+			
+			if patch.Description != nil {
+				liArgs = append(liArgs, *patch.Description)
+				liSet = append(liSet, fmt.Sprintf("note = $%d", len(liArgs)))
+			}
+			if len(patch.CategoryIDs) > 0 {
+				liArgs = append(liArgs, patch.CategoryIDs[0])
+				liSet = append(liSet, fmt.Sprintf("category_id = $%d", len(liArgs)))
+			}
+			
+			if len(liSet) > 0 {
+				liArgs = append(liArgs, firstID)
+				liQuery := fmt.Sprintf("UPDATE transaction_line_items SET %s WHERE id = $%d", strings.Join(liSet, ", "), len(liArgs))
+				if _, err := txConn.Exec(ctx, liQuery, liArgs...); err != nil {
+					return nil, err
+				}
 			}
 		}
+	}
 
-		// Handle LineItems: replace all
-		if patch.LineItems != nil {
-			_, err = txConn.Exec(ctx, "DELETE FROM transaction_line_items WHERE transaction_id = $1", transactionID)
+	// 3. Handle LineItems: replace all
+	if patch.LineItems != nil {
+		_, err := txConn.Exec(ctx, "DELETE FROM transaction_line_items WHERE transaction_id = $1", transactionID)
+		if err != nil {
+			return nil, err
+		}
+		for _, li := range *patch.LineItems {
+			liID := li.ID
+			if liID == uuid.Nil {
+				liID = uuid.New()
+			}
+			_, err = txConn.Exec(ctx, "INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note) VALUES ($1,$2,$3,$4,$5)",
+				liID, transactionID, li.CategoryID, li.Amount, li.Note)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			for _, li := range *patch.LineItems {
-				liID := li.ID
-				if liID == uuid.Nil {
-					liID = uuid.New()
-				}
-				_, err = txConn.Exec(ctx, "INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note) VALUES ($1,$2,$3,$4,$5)",
-					liID, transactionID, li.CategoryID, li.Amount, li.Note)
-				if err != nil {
-					return err
-				}
-				if len(li.TagIDs) > 0 {
-					for _, tid := range li.TagIDs {
-						_, err = txConn.Exec(ctx, "INSERT INTO transaction_line_item_tags (line_item_id, tag_id, created_at, updated_at) VALUES ($1, $2, $3, $4)", liID, tid, now, now)
-						if err != nil {
-							return err
-						}
+			if len(li.TagIDs) > 0 {
+				for _, tid := range li.TagIDs {
+					_, err = txConn.Exec(ctx, "INSERT INTO transaction_line_item_tags (line_item_id, tag_id, created_at, updated_at) VALUES ($1, $2, $3, $4)", liID, tid, now, now)
+					if err != nil {
+						return nil, err
 					}
 				}
 			}
 		}
-
-		// Handle Tags
-		if patch.TagIDs != nil {
-			_, err = txConn.Exec(ctx, "DELETE FROM transaction_tags WHERE transaction_id = $1", transactionID)
-			if err != nil {
-				return err
-			}
-			for _, tid := range patch.TagIDs {
-				_, err = txConn.Exec(ctx, "INSERT INTO transaction_tags (transaction_id, tag_id, created_at, updated_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", transactionID, tid, now, now)
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
 	}
 
-	return r.GetTransaction(ctx, userID, transactionID)
+	// 4. Handle Tags
+	if patch.TagIDs != nil {
+		_, err := txConn.Exec(ctx, "DELETE FROM transaction_tags WHERE transaction_id = $1", transactionID)
+		if err != nil {
+			return nil, err
+		}
+		for _, tid := range patch.TagIDs {
+			_, err = txConn.Exec(ctx, "INSERT INTO transaction_tags (transaction_id, tag_id, created_at, updated_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", transactionID, tid, now, now)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Return enriched transaction
+	return r.getTransaction(ctx, txConn, userID, transactionID)
 }
 
 func (r *TransactionRepo) BatchPatchTransactions(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID, patches map[uuid.UUID]entity.TransactionPatch, mode string) ([]uuid.UUID, []uuid.UUID, error) {
@@ -354,7 +392,7 @@ func (r *TransactionRepo) BatchPatchTransactions(ctx context.Context, userID uui
 				if !ok {
 					continue
 				}
-				_, err := r.PatchTransaction(ctx, userID, id, p)
+				_, err := r.patchTransactionTx(ctx, txConn, userID, id, p)
 				if err != nil {
 					return err
 				}
@@ -673,7 +711,7 @@ func (r *TransactionRepo) UpsertImportMappingRules(ctx context.Context, userID u
 
 	err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {
 		for _, rule := range rules {
-			kind := strings.ToLower(strings.TrimSpace(rule.Kind))
+			kind := strings.ToLower(strings.TrimSpace(string(rule.Kind)))
 			sourceName := strings.TrimSpace(rule.SourceName)
 			mappedID := rule.MappedID
 			if sourceName == "" || mappedID == uuid.Nil {

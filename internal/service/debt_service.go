@@ -67,7 +67,7 @@ func (s *DebtService) Create(ctx context.Context, userID uuid.UUID, req dto.Crea
 		InterestRule:         utils.NormalizeOptionalString(req.InterestRule),
 		OutstandingPrincipal: principal,
 		AccruedInterest:      "0",
-		Status:               "active",
+		Status:               entity.DebtStatusActive,
 	}
 
 	if err := s.repo.CreateDebt(ctx, d); err != nil {
@@ -124,7 +124,7 @@ func (s *DebtService) Update(ctx context.Context, userID uuid.UUID, debtID uuid.
 		cur.InterestRate = req.InterestRate
 	}
 
-	if cur.Status == "paid" && cur.ClosedAt == nil {
+	if cur.Status == entity.DebtStatusPaid && cur.ClosedAt == nil {
 		now := time.Now().UTC()
 		cur.ClosedAt = &now
 	}
@@ -200,7 +200,7 @@ func (s *DebtService) AddPayment(ctx context.Context, userID uuid.UUID, debtID u
 	newStatus := debt.Status
 	var closedAt *time.Time
 	if newOutstandingRat != nil && newAccruedRat != nil && newOutstandingRat.Sign() <= 0 && newAccruedRat.Sign() <= 0 {
-		newStatus = "paid"
+		newStatus = entity.DebtStatusPaid
 		now := time.Now().UTC()
 		closedAt = &now
 	}

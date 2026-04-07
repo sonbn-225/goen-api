@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -13,17 +14,19 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 type TransactionService struct {
-	repo    interfaces.TransactionRepository
-	tagSvc  interfaces.TagService
-	debtSvc interfaces.DebtService
+	repo        interfaces.TransactionRepository
+	tagSvc      interfaces.TagService
+	debtSvc     interfaces.DebtService
+	accountRepo interfaces.AccountRepository
 }
 
-func NewTransactionService(repo interfaces.TransactionRepository, tagSvc interfaces.TagService) *TransactionService {
-	return &TransactionService{repo: repo, tagSvc: tagSvc}
+func NewTransactionService(repo interfaces.TransactionRepository, tagSvc interfaces.TagService, accountRepo interfaces.AccountRepository) *TransactionService {
+	return &TransactionService{repo: repo, tagSvc: tagSvc, accountRepo: accountRepo}
 }
 
 func (s *TransactionService) SetDebtService(ds interfaces.DebtService) {
@@ -78,20 +81,20 @@ func (s *TransactionService) Get(ctx context.Context, userID, transactionID uuid
 }
 
 func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateTransactionRequest) (*dto.TransactionResponse, error) {
-	kind := strings.TrimSpace(req.Type)
-	if kind != "expense" && kind != "income" && kind != "transfer" {
-		return nil, errors.New("invalid transaction type")
+	kind := strings.TrimSpace(string(req.Type))
+	if kind != string(entity.TransactionTypeExpense) && kind != string(entity.TransactionTypeIncome) && kind != string(entity.TransactionTypeTransfer) {
+		return nil, apperr.BadRequest("invalid_type", "invalid transaction type")
 	}
 
 	amount := strings.TrimSpace(req.Amount)
 	if !utils.IsValidDecimal(amount) {
-		return nil, errors.New("invalid decimal amount")
+		return nil, apperr.BadRequest("invalid_amount", "invalid decimal amount")
 	}
 
 	fromAmount := utils.NormalizeOptionalString(req.FromAmount)
 	toAmount := utils.NormalizeOptionalString(req.ToAmount)
 	if (fromAmount != nil) != (toAmount != nil) {
-		return nil, errors.New("from_amount and to_amount must be provided together for FX transfers")
+		return nil, apperr.BadRequest("invalid_fx", "from_amount and to_amount must be provided together for FX transfers")
 	}
 
 	occurredAt, occurredDate, err := utils.NormalizeOccurredAt(req.OccurredAt, req.OccurredDate, req.OccurredTime)
@@ -101,10 +104,10 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 
 	lineItems := make([]entity.TransactionLineItem, 0, len(req.LineItems))
 	if kind == "income" && len(req.LineItems) > 1 {
-		return nil, errors.New("income transactions support a single line item only")
+		return nil, apperr.BadRequest("invalid_line_items", "income transactions support a single line item only")
 	}
 	if kind == "income" && len(req.GroupParticipants) > 0 {
-		return nil, errors.New("group participants are only supported for expense transactions")
+		return nil, apperr.BadRequest("invalid_participants", "group participants are only supported for expense transactions")
 	}
 
 	// If CategoryID is top-level and no line items, create a default one.
@@ -123,7 +126,7 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 		sum := big.NewRat(0, 1)
 		for _, li := range req.LineItems {
 			if !utils.IsValidDecimal(li.Amount) {
-				return nil, errors.New("invalid line item amount")
+				return nil, apperr.BadRequest("invalid_amount", "invalid line item amount")
 			}
 			r, _ := new(big.Rat).SetString(li.Amount)
 			sum.Add(sum, r)
@@ -162,7 +165,7 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 			},
 		},
 		ExternalRef:   utils.NormalizeOptionalString(req.ExternalRef),
-		Type:          kind,
+		Type:          entity.TransactionType(kind),
 		OccurredAt:    occurredAt,
 		OccurredDate:  occurredDate,
 		Amount:        amount,
@@ -173,7 +176,7 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 		FromAccountID: req.FromAccountID,
 		ToAccountID:   req.ToAccountID,
 		ExchangeRate:  utils.NormalizeOptionalString(req.ExchangeRate),
-		Status:        "posted",
+		Status:        entity.TransactionStatusPosted,
 	}
 
 	tagIDs, _ := s.ensureTags(ctx, userID, req.TagIDs, req.Lang)
@@ -204,7 +207,7 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 	if err := s.repo.CreateTransaction(ctx, userID, tx, lineItems, tagIDs, participants); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "fk_tli_category" {
-			return nil, errors.New("invalid category_id")
+			return nil, apperr.BadRequest("invalid_category", "invalid category_id")
 		}
 		return nil, err
 	}
@@ -217,6 +220,42 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 		return nil, nil
 	}
 	resp := dto.NewTransactionResponse(*it)
+
+	// Audit Logging
+	if it.AccountID != nil {
+		_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
+			BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
+			AccountID:   *it.AccountID,
+			ActorUserID: userID,
+			Action:      "transaction_created",
+			EntityType:  "transaction",
+			EntityID:    it.ID,
+			OccurredAt:  time.Now().UTC(),
+		})
+	}
+	if it.FromAccountID != nil {
+		_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
+			BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
+			AccountID:   *it.FromAccountID,
+			ActorUserID: userID,
+			Action:      "transaction_created",
+			EntityType:  "transaction",
+			EntityID:    it.ID,
+			OccurredAt:  time.Now().UTC(),
+		})
+	}
+	if it.ToAccountID != nil {
+		_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
+			BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
+			AccountID:   *it.ToAccountID,
+			ActorUserID: userID,
+			Action:      "transaction_created",
+			EntityType:  "transaction",
+			EntityID:    it.ID,
+			OccurredAt:  time.Now().UTC(),
+		})
+	}
+
 	return &resp, nil
 }
 
@@ -228,7 +267,7 @@ func (s *TransactionService) Patch(ctx context.Context, userID, transactionID uu
 		CategoryIDs: req.CategoryIDs,
 		TagIDs:      tagIDs,
 		Amount:      utils.NormalizeOptionalString(req.Amount),
-		Status:      utils.NormalizeOptionalString(req.Status),
+		Status:      req.Status,
 	}
 	if req.OccurredAt != nil {
 		t, err := utils.ParseTimeOrDate(*req.OccurredAt)
@@ -245,6 +284,26 @@ func (s *TransactionService) Patch(ctx context.Context, userID, transactionID uu
 		return nil, nil
 	}
 	resp := dto.NewTransactionResponse(*it)
+
+	// Audit Logging
+	if it.AccountID != nil {
+		var diff map[string]any
+		if patchBytes, err := json.Marshal(patch); err == nil {
+			_ = json.Unmarshal(patchBytes, &diff)
+		}
+
+		_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
+			BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
+			AccountID:   *it.AccountID,
+			ActorUserID: userID,
+			Action:      "transaction_updated",
+			EntityType:  "transaction",
+			EntityID:    it.ID,
+			OccurredAt:  time.Now().UTC(),
+			Diff:        diff,
+		})
+	}
+
 	return &resp, nil
 }
 
@@ -264,7 +323,7 @@ func (s *TransactionService) BatchPatch(ctx context.Context, userID uuid.UUID, r
 			CategoryIDs: req.Patch.CategoryIDs,
 			TagIDs:      tagIDs,
 			Amount:      utils.NormalizeOptionalString(req.Patch.Amount),
-			Status:      utils.NormalizeOptionalString(req.Patch.Status),
+			Status:      req.Patch.Status,
 		}
 		patches[id] = p
 	}
@@ -284,7 +343,23 @@ func (s *TransactionService) BatchPatch(ctx context.Context, userID uuid.UUID, r
 }
 
 func (s *TransactionService) Delete(ctx context.Context, userID, transactionID uuid.UUID) error {
-	return s.repo.DeleteTransaction(ctx, userID, transactionID)
+	tx, _ := s.repo.GetTransaction(ctx, userID, transactionID)
+	err := s.repo.DeleteTransaction(ctx, userID, transactionID)
+	if err == nil && tx != nil {
+		// Audit Logging
+		if tx.AccountID != nil {
+			_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
+				BaseEntity: entity.BaseEntity{ID: utils.NewID()},
+				AccountID:  *tx.AccountID,
+				ActorUserID: userID,
+				Action:      "transaction_deleted",
+				EntityType:  "transaction",
+				EntityID:    transactionID,
+				OccurredAt:  time.Now().UTC(),
+			})
+		}
+	}
+	return err
 }
 
 // Imports
@@ -395,7 +470,7 @@ func (s *TransactionService) UpsertMappingRules(ctx context.Context, userID uuid
 	upserts := make([]entity.ImportMappingRuleUpsert, len(inputs))
 	for i, in := range inputs {
 		upserts[i] = entity.ImportMappingRuleUpsert{
-			Kind:       in.Kind,
+			Kind:       entity.ImportMappingRuleKind(in.Kind),
 			SourceName: in.SourceName,
 			MappedID:   in.MappedID,
 		}
@@ -434,7 +509,7 @@ func (s *TransactionService) CreateFromImported(ctx context.Context, userID, imp
 		Type:         "expense", // Default
 	}
 	if it.TransactionType != nil {
-		req.Type = strings.ToLower(*it.TransactionType)
+		req.Type = entity.TransactionType(strings.ToLower(*it.TransactionType))
 	}
 	if it.MappedAccountID != nil {
 		if req.Type == "transfer" {
