@@ -18,21 +18,30 @@ import (
 	"github.com/sonbn-225/goen-api/internal/repository/postgres"
 )
 
-// DebtService manages IOUs, loans, and shared expense debts.
-// It integrates with TransactionService to ensure that lending, borrowing,
-// and repayments are accurately reflected in account balances and history.
+// DebtService quản lý các khoản nợ (IOU), các khoản cho vay và nợ chi phí dùng chung.
+// Nó tích hợp với TransactionService để đảm bảo các khoản cho vay, đi vay
+// và trả nợ được phản ánh chính xác trong số dư tài khoản và lịch sử giao dịch.
+//
+// Các trách nhiệm chính:
+// - Ghi nhận nợ mới và theo dõi việc giải ngân.
+// - Tính toán nợ gốc chưa thanh toán và lãi tích lũy.
+// - Liên kết các khoản thanh toán (giao dịch) với các công cụ nợ cụ thể.
+// - Hoàn trả trạng thái nợ khi các giao dịch trả nợ bị xóa.
+//
+// Nợ gốc và lãi được xử lý dưới dạng số thập phân độ chính xác cao (thông qua big.Rat nội bộ
+// khi tính toán, nhưng lưu trữ dạng chuỗi) để tránh lỗi số dấu phẩy động.
 type DebtService struct {
 	repo       interfaces.DebtRepository
 	contactSvc interfaces.ContactService
 	db         *database.Postgres
 }
 
-// NewDebtService creates a new debt management service.
+// NewDebtService khởi tạo một dịch vụ quản lý nợ mới.
 func NewDebtService(repo interfaces.DebtRepository, contactSvc interfaces.ContactService, db *database.Postgres) *DebtService {
 	return &DebtService{repo: repo, contactSvc: contactSvc, db: db}
 }
 
-// Create records a new debt. It wraps CreateTx in a database transaction.
+// Create ghi nhận một khoản nợ mới. Nó bao bọc CreateTx trong một giao dịch cơ sở dữ liệu.
 func (s *DebtService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateDebtRequest) (*dto.DebtResponse, error) {
 	var resp *dto.DebtResponse
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
@@ -43,9 +52,9 @@ func (s *DebtService) Create(ctx context.Context, userID uuid.UUID, req dto.Crea
 	return resp, err
 }
 
-// CreateTx performs the atomic creation of a debt record.
-// If CreateTransaction is true, it also generates an Income/Expense transaction
-// in the central ledger to reflect the initial disbursement of the loan.
+// CreateTx thực hiện việc tạo bản ghi nợ một cách nguyên tử.
+// Nếu CreateTransaction là true, nó cũng sẽ tạo một giao dịch Thu thập/Chi phí
+// trong sổ cái trung tâm để phản ánh việc giải ngân khoản vay ban đầu.
 func (s *DebtService) CreateTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, req dto.CreateDebtRequest) (*dto.DebtResponse, error) {
 	var contactID *uuid.UUID
 	if req.ContactID != nil && *req.ContactID != "" {
@@ -100,8 +109,8 @@ func (s *DebtService) CreateTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID,
 				},
 			},
 			Type:         txType,
-			OccurredAt:   time.Now().UTC(),
-			OccurredDate: time.Now().UTC().Format("2006-01-02"),
+			OccurredAt:   utils.Now(),
+			OccurredDate: utils.NowDateString(),
 			Amount:       principal,
 			Description:  &desc,
 			AccountID:    &accountID,
@@ -182,6 +191,7 @@ func (s *DebtService) List(ctx context.Context, userID uuid.UUID) ([]dto.DebtRes
 	return dto.NewDebtResponses(items), nil
 }
 
+// Update chỉnh sửa thông tin khoản nợ.
 func (s *DebtService) Update(ctx context.Context, userID uuid.UUID, debtID uuid.UUID, req dto.UpdateDebtRequest) (*dto.DebtResponse, error) {
 	cur, err := s.repo.GetDebt(ctx, userID, debtID)
 	if err != nil {
@@ -202,11 +212,14 @@ func (s *DebtService) Update(ctx context.Context, userID uuid.UUID, debtID uuid.
 	}
 
 	if cur.Status == entity.DebtStatusPaid && cur.ClosedAt == nil {
-		now := time.Now().UTC()
+		now := utils.Now()
 		cur.ClosedAt = &now
 	}
 
-	if err := s.repo.UpdateDebt(ctx, userID, *cur); err != nil {
+	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		return s.repo.UpdateDebtTx(ctx, tx, userID, *cur)
+	})
+	if err != nil {
 		return nil, err
 	}
 
@@ -221,10 +234,12 @@ func (s *DebtService) Update(ctx context.Context, userID uuid.UUID, debtID uuid.
 	return &resp, nil
 }
 
+// Delete xóa một khoản nợ.
 func (s *DebtService) Delete(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) error {
 	return s.repo.DeleteDebt(ctx, userID, debtID)
 }
 
+// AddPayment liên kết một giao dịch hiện có như một khoản thanh toán cho khoản nợ.
 func (s *DebtService) AddPayment(ctx context.Context, userID uuid.UUID, debtID uuid.UUID, req dto.DebtPaymentRequest) (*dto.DebtResponse, error) {
 	var resp *dto.DebtResponse
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
@@ -235,6 +250,13 @@ func (s *DebtService) AddPayment(ctx context.Context, userID uuid.UUID, debtID u
 	return resp, err
 }
 
+// AddPaymentTx liên kết một giao dịch hiện có như một khoản thanh toán cho khoản nợ.
+// Nó tính toán tác động lên nợ gốc chưa thanh toán và lãi tích lũy.
+//
+// Logic phân bổ thanh toán:
+// 1. Trả hết lãi tích lũy trước.
+// 2. Số tiền còn lại được áp dụng vào nợ gốc chưa thanh toán.
+// 3. Nếu mọi thứ đã được trả hết, trạng thái được cập nhật thành 'paid'.
 func (s *DebtService) AddPaymentTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID, req dto.DebtPaymentRequest) (*dto.DebtResponse, error) {
 	debt, err := s.repo.GetDebt(ctx, userID, debtID)
 	if err != nil {
@@ -288,7 +310,7 @@ func (s *DebtService) AddPaymentTx(ctx context.Context, tx pgx.Tx, userID uuid.U
 	var closedAt *time.Time
 	if newOutstandingRat != nil && newAccruedRat != nil && newOutstandingRat.Sign() <= 0 && newAccruedRat.Sign() <= 0 {
 		newStatus = entity.DebtStatusPaid
-		now := time.Now().UTC()
+		now := utils.Now()
 		closedAt = &now
 	}
 
@@ -305,7 +327,7 @@ func (s *DebtService) AddPaymentTx(ctx context.Context, tx pgx.Tx, userID uuid.U
 		TransactionID: transactionID,
 		PrincipalPaid: &principalPaid,
 		InterestPaid:  &interestPaid,
-		CreatedAt:     time.Now().UTC(),
+		CreatedAt:     utils.Now(),
 	}
 
 	if err := s.repo.CreatePaymentLinkTx(ctx, tx, userID, link, debt.Principal, newOutstandingRat.FloatString(2), newAccruedRat.FloatString(2), newStatus, closedAt); err != nil {
@@ -320,6 +342,7 @@ func (s *DebtService) AddPaymentTx(ctx context.Context, tx pgx.Tx, userID uuid.U
 	return &resp, nil
 }
 
+// Repay thực hiện việc trả nợ bằng cách tạo một giao dịch mới.
 func (s *DebtService) Repay(ctx context.Context, userID uuid.UUID, debtID uuid.UUID, req dto.DebtRepayRequest) (*dto.DebtResponse, error) {
 	// Start transaction
 	var resp *dto.DebtResponse
@@ -358,8 +381,8 @@ func (s *DebtService) Repay(ctx context.Context, userID uuid.UUID, debtID uuid.U
 				},
 			},
 			Type:         txType,
-			OccurredAt:   time.Now().UTC(),
-			OccurredDate: time.Now().UTC().Format("2006-01-02"),
+			OccurredAt:   utils.Now(),
+			OccurredDate: utils.NowDateString(),
 			Amount:       req.Amount,
 			Description:  &desc,
 			AccountID:    &accountID,
@@ -399,4 +422,55 @@ func (s *DebtService) ListPayments(ctx context.Context, userID uuid.UUID, debtID
 		resps = append(resps, dto.NewDebtPaymentLinkResponse(l))
 	}
 	return resps, nil
+}
+
+// CleanupTransactionLinksTx gỡ bỏ tất cả các khoản nợ và liên kết thanh toán liên quan đến một giao dịch.
+// Điều này được sử dụng khi một giao dịch bị xóa để duy trì tính toàn vẹn của sổ cái.
+func (s *DebtService) CleanupTransactionLinksTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error {
+	// 1. Xóa các liên kết thanh toán (điều này hoàn trả các tác động trả nợ nếu chúng ta tính toán lại,
+	// nhưng hiện tại chúng ta chỉ xóa các liên kết và bên gọi xử lý trạng thái nợ nếu cần)
+	// Thực tế, nếu chúng ta xóa một giao dịch trả nợ, chúng ta nên hoàn trả nợ gốc còn thiếu của khoản nợ.
+	
+	links, err := s.repo.ListPaymentLinksByTransaction(ctx, userID, transactionID)
+	if err != nil {
+		return err
+	}
+
+	for _, link := range links {
+		debt, err := s.repo.GetDebt(ctx, userID, link.DebtID)
+		if err != nil {
+			return err
+		}
+		if debt == nil {
+			continue
+		}
+
+		// Hoàn trả trạng thái nợ
+		pPaid, _ := new(big.Rat).SetString(*link.PrincipalPaid)
+		iPaid, _ := new(big.Rat).SetString(*link.InterestPaid)
+		
+		curOutstanding, _ := new(big.Rat).SetString(debt.OutstandingPrincipal)
+		curAccrued, _ := new(big.Rat).SetString(debt.AccruedInterest)
+		
+		newOutstanding := new(big.Rat).Add(curOutstanding, pPaid)
+		newAccrued := new(big.Rat).Add(curAccrued, iPaid)
+		
+		debt.OutstandingPrincipal = newOutstanding.FloatString(2)
+		debt.AccruedInterest = newAccrued.FloatString(2)
+		debt.Status = entity.DebtStatusActive
+		debt.ClosedAt = nil
+		debt.UpdatedAt = utils.Now()
+
+		if err := s.repo.UpdateDebtTx(ctx, tx, userID, *debt); err != nil {
+			return err
+		}
+	}
+
+	// 2. Xóa chính các liên kết thanh toán
+	if err := s.repo.DeletePaymentLinksByTransactionTx(ctx, tx, userID, transactionID); err != nil {
+		return err
+	}
+
+	// 3. Xóa các khoản nợ bắt nguồn từ giao dịch này
+	return s.repo.DeleteDebtsByOriginatingTransactionTx(ctx, tx, userID, transactionID)
 }

@@ -27,7 +27,11 @@ func mapSavingsSettingsResponse(it *entity.SavingsSettings) *SavingsSettingsResp
 		return nil
 	}
 	return &SavingsSettingsResponse{
-		TargetAmount: it.TargetAmount,
-		TargetDate:   it.TargetDate,
+		Principal:    it.Principal,
+		InterestRate: it.InterestRate,
+		TermMonths:   it.TermMonths,
+		StartDate:    it.StartDate,
+		MaturityDate: it.MaturityDate,
+		AutoRenew:    it.AutoRenew,
 	}
 }

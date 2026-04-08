@@ -16,8 +16,10 @@ const (
 type AccountStatus string
 
 const (
-	AccountStatusActive AccountStatus = "active"
-	AccountStatusClosed AccountStatus = "closed"
+	AccountStatusActive   AccountStatus = "active"
+	AccountStatusMatured  AccountStatus = "matured"
+	AccountStatusArchived AccountStatus = "archived"
+	AccountStatusDeleted  AccountStatus = "deleted"
 )
 
 // AccountSharePermission defines the level of access granted to a shared account.
@@ -150,14 +152,6 @@ const (
 	RotatingSavingsAuditActionContributionCreated RotatingSavingsAuditAction = "contribution_created"
 )
 
-// SavingsStatus defines the current state of a dedicated savings product or goal.
-type SavingsStatus string
-
-const (
-	SavingsStatusActive  SavingsStatus = "active"
-	SavingsStatusMatured SavingsStatus = "matured" // Savings term has reached maturity
-	SavingsStatusClosed  SavingsStatus = "closed"  // Savings goal has been withdrawn or cancelled
-)
 
 // TransactionType defines the fundamental category of a financial transaction.
 type TransactionType string

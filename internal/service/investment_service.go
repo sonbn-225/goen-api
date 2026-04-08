@@ -117,7 +117,7 @@ func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, accountID, 
 				oldQ, _ := new(big.Rat).SetString(targetLot.Quantity)
 				soldQ, _ := new(big.Rat).SetString(l.Quantity)
 				newQ := new(big.Rat).Add(oldQ, soldQ)
-				if err := s.repo.UpdateShareLotQuantity(ctx, userID, targetLot.ID, newQ.FloatString(8)); err != nil {
+				if err := s.repo.UpdateShareLotQuantityTx(ctx, tx, userID, targetLot.ID, newQ.FloatString(8)); err != nil {
 					return err
 				}
 			}
@@ -163,7 +163,7 @@ func (s *InvestmentService) UpdateTrade(ctx context.Context, userID, accountID, 
 // 4. Updates or creates ShareLots (for acquisition tracking).
 // 5. Updates the overall Holding summary for the security.
 func (s *InvestmentService) CreateTrade(ctx context.Context, userID, accountID uuid.UUID, req dto.CreateTradeRequest) (*dto.TradeResponse, error) {
-	acc, err := s.accRepo.GetAccountForUser(ctx, userID, accountID)
+	acc, err := s.accRepo.GetAccountForUserTx(ctx, nil, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, accountID u
 
 	sid := req.SecurityID
 
-	occAt, occDate, err := s.normalizeOccurredAt(req.OccurredAt, req.OccurredDate, req.OccurredTime)
+	occAt, occDate, err := utils.NormalizeOccurredAt(req.OccurredAt, req.OccurredDate, req.OccurredTime)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +328,7 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, accountID u
 			Note:             req.Note,
 		}
 
-		if err := s.repo.CreateTrade(ctx, userID, trade); err != nil {
+		if err := s.repo.CreateTradeTx(ctx, tx, userID, trade); err != nil {
 			return err
 		}
 
@@ -349,15 +349,15 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, accountID u
 				Status:          entity.ShareLotStatusActive,
 				BuyTradeID:      &tradeID,
 			}
-			if err := s.repo.CreateShareLot(ctx, userID, lot); err != nil {
+			if err := s.repo.CreateShareLotTx(ctx, tx, userID, lot); err != nil {
 				return err
 			}
 		} else {
 			for _, c := range sellPlan {
-				if err := s.repo.UpdateShareLotQuantity(ctx, userID, c.LotID, c.NewQuantity); err != nil {
+				if err := s.repo.UpdateShareLotQuantityTx(ctx, tx, userID, c.LotID, c.NewQuantity); err != nil {
 					return err
 				}
-				if err := s.repo.CreateRealizedTradeLog(ctx, userID, entity.RealizedTradeLog{
+				if err := s.repo.CreateRealizedTradeLogTx(ctx, tx, userID, entity.RealizedTradeLog{
 					AuditEntity: entity.AuditEntity{
 						BaseEntity: entity.BaseEntity{
 							ID: utils.NewID(),
@@ -438,26 +438,7 @@ func (s *InvestmentService) BackfillTradePrincipalTransactions(ctx context.Conte
 // Helpers (Internal)
 
 func (s *InvestmentService) normalizeOccurredAt(occurredAt, occurredDate, occurredTime *string) (time.Time, string, error) {
-	if occurredAt != nil {
-		t, err := time.Parse(time.RFC3339, *occurredAt)
-		if err == nil {
-			return t.UTC(), t.UTC().Format("2006-01-02"), nil
-		}
-	}
-	if occurredDate == nil {
-		now := time.Now().UTC()
-		return now, now.Format("2006-01-02"), nil
-	}
-	d, err := time.Parse("2006-01-02", *occurredDate)
-	if err != nil {
-		return time.Time{}, "", err
-	}
-	t := d
-	if occurredTime != nil {
-		tm, _ := time.Parse("15:04", *occurredTime)
-		t = time.Date(d.Year(), d.Month(), d.Day(), tm.Hour(), tm.Minute(), 0, 0, time.UTC)
-	}
-	return t, t.Format("2006-01-02"), nil
+	return utils.NormalizeOccurredAt(occurredAt, occurredDate, occurredTime)
 }
 
 type lotConsumptionPlan struct {

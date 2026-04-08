@@ -140,7 +140,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*dto.Au
 	}
 
 	// 2. Check expiry
-	if time.Now().After(rt.ExpiresAt) {
+	if utils.Now().After(rt.ExpiresAt) {
 		_ = s.refreshRepo.DeleteByToken(ctx, refreshToken)
 		return nil, apperr.Unauthorized("refresh token expired")
 	}
@@ -304,10 +304,10 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 
 func (s *AuthService) generateAccessToken(user entity.User) (string, int, error) {
 	// Access tokens are short-lived
-	exp := time.Now().Add(time.Duration(s.cfg.JWTAccessTTL) * time.Minute)
+	exp := utils.Now().Add(time.Duration(s.cfg.JWTAccessTTL) * time.Minute)
 	claims := jwt.MapClaims{
 		"sub": user.ID.String(),
-		"iat": time.Now().Unix(),
+		"iat": utils.Now().Unix(),
 		"exp": exp.Unix(),
 	}
 

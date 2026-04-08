@@ -105,11 +105,6 @@ func (r *InvestmentRepo) ListSecurityEventElections(ctx context.Context, userID 
 	return results, nil
 }
 
-func (r *InvestmentRepo) CreateTrade(ctx context.Context, userID uuid.UUID, t entity.Trade) error {
-	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return r.CreateTradeTx(ctx, tx, userID, t)
-	})
-}
 
 func (r *InvestmentRepo) CreateTradeTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, t entity.Trade) error {
 	cmd, err := tx.Exec(ctx, `
@@ -367,11 +362,6 @@ func (r *InvestmentRepo) ListShareLots(ctx context.Context, userID uuid.UUID, ac
 	return results, nil
 }
 
-func (r *InvestmentRepo) CreateShareLot(ctx context.Context, userID uuid.UUID, lot entity.ShareLot) error {
-	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return r.CreateShareLotTx(ctx, tx, userID, lot)
-	})
-}
 
 func (r *InvestmentRepo) CreateShareLotTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, lot entity.ShareLot) error {
 	_, err := tx.Exec(ctx, `
@@ -383,11 +373,6 @@ func (r *InvestmentRepo) CreateShareLotTx(ctx context.Context, tx pgx.Tx, userID
 	return err
 }
 
-func (r *InvestmentRepo) UpdateShareLotQuantity(ctx context.Context, userID uuid.UUID, lotID uuid.UUID, quantity string) error {
-	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return r.UpdateShareLotQuantityTx(ctx, tx, userID, lotID, quantity)
-	})
-}
 
 func (r *InvestmentRepo) UpdateShareLotQuantityTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, lotID uuid.UUID, quantity string) error {
 	status := "active"
@@ -413,11 +398,6 @@ func (r *InvestmentRepo) DeleteShareLotsByTradeID(ctx context.Context, userID uu
 	return err
 }
 
-func (r *InvestmentRepo) CreateRealizedTradeLog(ctx context.Context, userID uuid.UUID, log entity.RealizedTradeLog) error {
-	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return r.CreateRealizedTradeLogTx(ctx, tx, userID, log)
-	})
-}
 
 func (r *InvestmentRepo) CreateRealizedTradeLogTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, log entity.RealizedTradeLog) error {
 	_, err := tx.Exec(ctx, `

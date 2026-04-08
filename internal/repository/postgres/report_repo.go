@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
+	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 type ReportRepo struct {
@@ -25,7 +26,7 @@ func (r *ReportRepo) GetCashflow(ctx context.Context, userID uuid.UUID, months i
 	}
 
 	// Calculate start date (first day of N months ago)
-	startDate := time.Now().UTC().AddDate(0, -months+1, 0)
+	startDate := utils.Now().AddDate(0, -months+1, 0)
 	startDate = time.Date(startDate.Year(), startDate.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	rows, err := pool.Query(ctx, `

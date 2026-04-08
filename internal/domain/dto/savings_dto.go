@@ -30,15 +30,16 @@ type PatchSavingsRequest struct {
 	TermMonths       *int       `json:"term_months,omitempty"`      // New duration
 	MaturityDate     *string    `json:"maturity_date,omitempty"`    // New maturity date
 	AutoRenew        *bool      `json:"auto_renew,omitempty"`       // New auto-renew setting
-	Status           *entity.SavingsStatus `json:"status,omitempty"` // New status (active/matured/closed)
+	Status           *entity.AccountStatus `json:"status,omitempty"` // New status (active/matured/closed)
 }
  
 // SavingsResponse represents a savings goal and its current progress.
 // Used in: SavingsHandler, SavingsService, SavingsInterface
 type SavingsResponse struct {
 	ID               uuid.UUID `json:"id"`                             // Unique savings identifier
+	Name             string    `json:"name"`                           // Name of the savings goal
 	SavingsAccountID uuid.UUID `json:"savings_account_id"`             // ID of the dedicated account
-	ParentAccountID  uuid.UUID `json:"parent_account_id"`              // ID of the source account
+	ParentAccountID  *uuid.UUID `json:"parent_account_id,omitempty"`    // ID of the source account
 	Principal        string    `json:"principal"`                      // Initial deposit amount
 	InterestRate     *string   `json:"interest_rate,omitempty"`         // Annual interest rate
 	TermMonths       *int      `json:"term_months,omitempty"`           // Duration in months
@@ -46,5 +47,5 @@ type SavingsResponse struct {
 	MaturityDate     *string   `json:"maturity_date,omitempty"`         // Maturity date
 	AutoRenew        bool      `json:"auto_renew"`                      // Auto-renew setting
 	AccruedInterest  string    `json:"accrued_interest"`               // Total interest earned so far
-	Status           entity.SavingsStatus `json:"status"`               // Current state of the savings goal
+	Status           entity.AccountStatus `json:"status"`               // Current state of the savings goal
 }

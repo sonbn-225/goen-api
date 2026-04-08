@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	CategoryCacheKey = "goen:categories:all5"
+	CategoryCacheKey = "goen:categories:all"
 	CategoryCacheTTL = 24 * time.Hour
 )
 

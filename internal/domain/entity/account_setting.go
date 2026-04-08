@@ -15,6 +15,10 @@ type InvestmentSettings struct {
 
 // SavingsSettings defines parameters for tracking savings progress.
 type SavingsSettings struct {
-	TargetAmount string `json:"target_amount,omitempty"` // Financial goal amount (decimal string)
-	TargetDate   string `json:"target_date,omitempty"`   // Target date for achieving the goal (YYYY-MM-DD)
+	Principal    string  `json:"principal,omitempty"`     // Initial deposit amount (decimal string)
+	InterestRate *string `json:"interest_rate,omitempty"` // Annual interest rate (decimal string)
+	TermMonths   *int    `json:"term_months,omitempty"`   // Duration in months
+	StartDate    *string `json:"start_date,omitempty"`    // Start date (YYYY-MM-DD)
+	MaturityDate *string `json:"maturity_date,omitempty"` // Expected maturity date (YYYY-MM-DD)
+	AutoRenew    bool    `json:"auto_renew,omitempty"`    // Whether to auto-renew on maturity
 }
