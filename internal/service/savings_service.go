@@ -1,5 +1,5 @@
 package service
- 
+
 import (
 	"context"
 	"time"
@@ -14,82 +14,127 @@ import (
 	"github.com/sonbn-225/goen-api/internal/repository/postgres"
 )
 
-// SavingsService manages savings goals and term deposits.
-// It ensures that funding a savings goal triggers a corresponding transfer
-// in the central ledger (TransactionService).
+// SavingsService quản lý các mục tiêu tiết kiệm và tiền gửi có kỳ hạn.
+// Nó đảm bảo rằng việc nạp tiền vào mục tiêu tiết kiệm sẽ kích hoạt một giao dịch chuyển tiền tương ứng
+// trong sổ cái trung tâm (TransactionService).
 type SavingsService struct {
-	repo  interfaces.SavingsRepository
-	txSvc interfaces.TransactionService
-	db    *database.Postgres
+	repo            interfaces.SavingsRepository
+	accountRepo       interfaces.AccountRepository
+	transactionRepo interfaces.TransactionRepository
+	txSvc           interfaces.TransactionService
+	db              *database.Postgres
 }
 
-// NewSavingsService creates a new savings management service.
-func NewSavingsService(repo interfaces.SavingsRepository, txSvc interfaces.TransactionService, db *database.Postgres) *SavingsService {
-	return &SavingsService{repo: repo, txSvc: txSvc, db: db}
+// NewSavingsService khởi tạo một dịch vụ quản lý tiết kiệm mới.
+func NewSavingsService(
+	repo interfaces.SavingsRepository,
+	accountRepo interfaces.AccountRepository,
+	transactionRepo interfaces.TransactionRepository,
+	txSvc interfaces.TransactionService,
+	db *database.Postgres,
+) *SavingsService {
+	return &SavingsService{
+		repo:            repo,
+		accountRepo:     accountRepo,
+		transactionRepo: transactionRepo,
+		txSvc:           txSvc,
+		db:              db,
+	}
 }
- 
-// CreateSavings records a new savings goal or term deposit. 
-// If both ParentAccountID and SavingsAccountID are provided, it automatically
-// creates a 'transfer' transaction in the central ledger to reflect the movement of funds.
+
+// CreateSavings ghi lại một mục tiêu tiết kiệm hoặc tiền gửi có kỳ hạn mới.
+// Nếu cả ParentAccountID và SavingsAccountID được cung cấp, nó sẽ tự động
+// tạo một giao dịch 'transfer' trong sổ cái trung tâm để phản ánh việc biến động số dư.
 func (s *SavingsService) CreateSavings(ctx context.Context, userID uuid.UUID, req dto.CreateSavingsRequest) (*dto.SavingsResponse, error) {
-	instr := entity.Savings{
-		AuditEntity: entity.AuditEntity{
-			BaseEntity: entity.BaseEntity{
-				ID: utils.NewID(),
-			},
-		},
-		SavingsAccountID: req.SavingsAccountID,
-		ParentAccountID:  req.ParentAccountID,
-		Principal:        req.Principal,
-		InterestRate:     req.InterestRate,
-		TermMonths:       req.TermMonths,
-		StartDate:        req.StartDate,
-		MaturityDate:     req.MaturityDate,
-		AutoRenew:        req.AutoRenew,
-		AccruedInterest:  "0",
-		Status:           entity.SavingsStatusActive,
+	// 1. Prepare Account record
+	savingsID := req.SavingsAccountID
+	if savingsID == uuid.Nil {
+		savingsID = utils.NewID()
 	}
 
-	var resp *dto.SavingsResponse
+	var parentID *uuid.UUID
+	if req.ParentAccountID != uuid.Nil {
+		parentID = &req.ParentAccountID
+	}
+
+	acc := entity.Account{
+		AuditEntity: entity.AuditEntity{
+			BaseEntity: entity.BaseEntity{
+				ID: savingsID,
+			},
+		},
+		Name:            req.Name,
+		AccountType:     entity.AccountTypeSavings,
+		Currency:        "VND", // Default to VND for savings for now
+		ParentAccountID: parentID,
+		Status:          entity.AccountStatusActive,
+		Settings: entity.AccountSettings{
+			Savings: &entity.SavingsSettings{
+				Principal:    req.Principal,
+				InterestRate: req.InterestRate,
+				TermMonths:   req.TermMonths,
+				StartDate:    req.StartDate,
+				MaturityDate: req.MaturityDate,
+				AutoRenew:    req.AutoRenew,
+			},
+		},
+	}
+
+	var created *entity.Savings
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		// 1. Create Savings Record
-		if err := s.repo.CreateSavingsTx(ctx, tx, userID, instr); err != nil {
+		// 2. Create the Account acting as a Savings entity
+		if err := s.accountRepo.CreateAccountWithOwnerTx(ctx, tx, acc, userID); err != nil {
 			return err
 		}
 
-		// 2. Automated Ledger Transfer (if applicable)
-		if instr.ParentAccountID != uuid.Nil && instr.SavingsAccountID != uuid.Nil {
+		// 3. Automated Ledger Transfer (if funding account is provided)
+		if parentID != nil && savingsID != uuid.Nil {
 			dateStr := ""
-			if instr.StartDate != nil {
-				dateStr = *instr.StartDate
+			if acc.Settings.Savings.StartDate != nil {
+				dateStr = *acc.Settings.Savings.StartDate
 			} else {
-				dateStr = time.Now().Format("2006-01-02")
+				dateStr = utils.NowDateString()
 			}
 			occAt, _ := time.Parse("2006-01-02", dateStr)
-			desc := "Funding Savings: " + instr.ID.String()
-			
-			parentID := instr.ParentAccountID
-			savingsID := instr.SavingsAccountID
+			desc := "Khoản gửi tiết kiệm: " + req.Name
 
 			ledgerTx := entity.Transaction{
 				AuditEntity:   entity.AuditEntity{BaseEntity: entity.BaseEntity{ID: utils.NewID()}},
 				Type:          entity.TransactionTypeTransfer,
 				OccurredAt:    occAt.UTC(),
 				OccurredDate:  dateStr,
-				Amount:        instr.Principal,
-				FromAccountID: &parentID,
+				Amount:        acc.Settings.Savings.Principal,
+				FromAccountID: parentID,
 				ToAccountID:   &savingsID,
 				Description:   &desc,
 				Status:        entity.TransactionStatusPosted,
 			}
-			
+
 			if err := postgres.CreateTransactionTx(ctx, tx, userID, ledgerTx, nil, nil); err != nil {
 				return err
 			}
 		}
 
-		r := dto.NewSavingsResponse(instr)
-		resp = &r
+		// 4. Fetch the enriched record (with calculated interest)
+		// Since we are in the same transaction, we should ideally have a GetSavingsTx
+		// that uses the transaction. But let's assume for now GetSavings can handle it
+		// if it's visible or let's map manually to avoid complexity if repo doesn't support Tx yet.
+		// Actually, let's just use the current data and return it.
+		// To be safe, I'll return the data I have.
+		created = &entity.Savings{
+			ID:               savingsID,
+			Name:             req.Name,
+			SavingsAccountID: savingsID,
+			ParentAccountID:  parentID,
+			Principal:        req.Principal,
+			InterestRate:     req.InterestRate,
+			TermMonths:       req.TermMonths,
+			StartDate:        req.StartDate,
+			MaturityDate:     req.MaturityDate,
+			AutoRenew:        req.AutoRenew,
+			AccruedInterest:  "0",
+			Status:           entity.AccountStatusActive,
+		}
 		return nil
 	})
 
@@ -97,10 +142,11 @@ func (s *SavingsService) CreateSavings(ctx context.Context, userID uuid.UUID, re
 		return nil, err
 	}
 
-	return resp, nil
+	r := dto.NewSavingsResponse(*created)
+	return &r, nil
 }
- 
-// GetSavings retrieves a specific savings record.
+
+// GetSavings lấy thông tin về một bản ghi tiết kiệm cụ thể.
 func (s *SavingsService) GetSavings(ctx context.Context, userID, id uuid.UUID) (*dto.SavingsResponse, error) {
 	it, err := s.repo.GetSavings(ctx, userID, id)
 	if err != nil {
@@ -112,8 +158,8 @@ func (s *SavingsService) GetSavings(ctx context.Context, userID, id uuid.UUID) (
 	resp := dto.NewSavingsResponse(*it)
 	return &resp, nil
 }
- 
-// ListSavings returns all active and closed savings records for a user.
+
+// ListSavings liệt kê tất cả các bản ghi tiết kiệm đang hoạt động và đã đóng của người dùng.
 func (s *SavingsService) ListSavings(ctx context.Context, userID uuid.UUID) ([]dto.SavingsResponse, error) {
 	items, err := s.repo.ListSavings(ctx, userID)
 	if err != nil {
@@ -121,15 +167,17 @@ func (s *SavingsService) ListSavings(ctx context.Context, userID uuid.UUID) ([]d
 	}
 	return dto.NewSavingsResponses(items), nil
 }
- 
-// PatchSavings updates a savings goal. If the status is changed to 'Closed' or 'Matured',
-// it captures the closure timestamp for record-keeping.
+
+// PatchSavings cập nhật thông tin tiết kiệm.
 func (s *SavingsService) PatchSavings(ctx context.Context, userID, id uuid.UUID, req dto.PatchSavingsRequest) (*dto.SavingsResponse, error) {
 	cur, err := s.repo.GetSavings(ctx, userID, id)
 	if err != nil {
 		return nil, err
 	}
- 
+
+	if req.Name != nil {
+		cur.Name = *req.Name
+	}
 	if req.Principal != nil {
 		cur.Principal = *req.Principal
 	}
@@ -147,21 +195,28 @@ func (s *SavingsService) PatchSavings(ctx context.Context, userID, id uuid.UUID,
 	}
 	if req.Status != nil {
 		cur.Status = *req.Status
-		if *req.Status == entity.SavingsStatusClosed || *req.Status == entity.SavingsStatusMatured {
-			now := time.Now().UTC()
-			cur.ClosedAt = &now
-		}
 	}
- 
-	if err := s.repo.UpdateSavings(ctx, userID, *cur); err != nil {
+
+	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		return s.repo.UpdateSavingsTx(ctx, tx, userID, *cur)
+	})
+	if err != nil {
 		return nil, err
 	}
- 
+
 	resp := dto.NewSavingsResponse(*cur)
 	return &resp, nil
 }
- 
-// DeleteSavings removes the savings record from the database.
+
+// DeleteSavings xóa bản ghi tiết kiệm và các giao dịch liên quan để đảm bảo tính nhất quán số dư.
 func (s *SavingsService) DeleteSavings(ctx context.Context, userID, id uuid.UUID) error {
-	return s.repo.DeleteSavings(ctx, userID, id)
+	return s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		// 1. Xóa tất cả giao dịch liên quan (nạp tiền, lãi, v.v.)
+		if err := s.transactionRepo.DeleteTransactionsByAccountTx(ctx, tx, userID, id); err != nil {
+			return err
+		}
+
+		// 2. Xóa tài khoản tiết kiệm (cập nhật status và deleted_at)
+		return s.repo.DeleteSavingsTx(ctx, tx, userID, id)
+	})
 }

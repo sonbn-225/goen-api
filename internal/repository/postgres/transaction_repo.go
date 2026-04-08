@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
+	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 type TransactionRepo struct {
@@ -23,25 +24,20 @@ func NewTransactionRepo(db *database.Postgres) *TransactionRepo {
 	return &TransactionRepo{db: db}
 }
 
-func (r *TransactionRepo) CreateTransaction(ctx context.Context, userID uuid.UUID, tx entity.Transaction, lineItems []entity.TransactionLineItem, tagIDs []uuid.UUID) error {
-	return r.db.WithTx(ctx, func(txConn pgx.Tx) error {
-		return CreateTransactionTx(ctx, txConn, userID, tx, lineItems, tagIDs)
-	})
-}
 
 func (r *TransactionRepo) CreateTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, txEntity entity.Transaction, lineItems []entity.TransactionLineItem, tagIDs []uuid.UUID) error {
 	return CreateTransactionTx(ctx, tx, userID, txEntity, lineItems, tagIDs)
 }
 
-func (r *TransactionRepo) GetTransaction(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return nil, err
+func (r *TransactionRepo) GetTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
+	var q database.Queryer = tx
+	if tx == nil {
+		pool, err := r.db.Pool(ctx)
+		if err != nil {
+			return nil, err
+		}
+		q = pool
 	}
-	return r.getTransaction(ctx, pool, userID, id)
-}
-
-func (r *TransactionRepo) getTransaction(ctx context.Context, q database.Queryer, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
 	row := q.QueryRow(ctx, `
 		SELECT
 			t.id, t.external_ref, t.type, t.occurred_at,
@@ -279,10 +275,10 @@ func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID uuid.UUID
 }
 
 func (r *TransactionRepo) patchTransactionTx(ctx context.Context, txConn pgx.Tx, userID uuid.UUID, transactionID uuid.UUID, patch entity.TransactionPatch) (*entity.Transaction, error) {
-	now := time.Now().UTC()
+	now := utils.Now()
 
 	// Verify ownership/permission
-	if _, err := r.getTransaction(ctx, txConn, userID, transactionID); err != nil {
+	if _, err := r.GetTransactionTx(ctx, txConn, userID, transactionID); err != nil {
 		return nil, err
 	}
 
@@ -381,7 +377,7 @@ func (r *TransactionRepo) patchTransactionTx(ctx context.Context, txConn pgx.Tx,
 	}
 
 	// Return enriched transaction
-	return r.getTransaction(ctx, txConn, userID, transactionID)
+	return r.GetTransactionTx(ctx, txConn, userID, transactionID)
 }
 
 func (r *TransactionRepo) BatchPatchTransactions(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID, patches map[uuid.UUID]entity.TransactionPatch, mode string) ([]uuid.UUID, []uuid.UUID, error) {
@@ -428,22 +424,67 @@ func (r *TransactionRepo) BatchPatchTransactions(ctx context.Context, userID uui
 	return updated, failed, nil
 }
 
-func (r *TransactionRepo) DeleteTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID) error {
-	return r.db.WithTx(ctx, func(txConn pgx.Tx) error {
-		return r.DeleteTransactionTx(ctx, txConn, userID, transactionID)
-	})
-}
 
 func (r *TransactionRepo) DeleteTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error {
-	now := time.Now().UTC()
+	now := utils.Now()
 	// Verify owner using the transaction
-	_, err := r.GetTransaction(ctx, userID, transactionID)
+	_, err := r.GetTransactionTx(ctx, tx, userID, transactionID)
 	if err != nil {
 		return err
 	}
 
 	_, err = tx.Exec(ctx, "UPDATE transactions SET deleted_at = $1, updated_at = $1 WHERE id = $2", now, transactionID)
 	return err
+}
+
+func (r *TransactionRepo) DeleteTransactionsByAccountTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) error {
+	now := utils.Now()
+	_, err := tx.Exec(ctx, `
+		UPDATE transactions
+		SET deleted_at = $1, updated_at = $1
+		WHERE (from_account_id = $2 OR to_account_id = $2)
+		  AND deleted_at IS NULL
+	`, now, accountID)
+	return err
+}
+
+func (r *TransactionRepo) ListTransactionsByIDs(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) ([]entity.Transaction, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT 
+			t.id, t.external_ref, t.type::text, t.occurred_at, t.occurred_date, t.amount::text,
+			t.from_amount::text, t.to_amount::text, t.description, t.account_id,
+			t.from_account_id, t.to_account_id, t.exchange_rate::text, t.status::text,
+			t.created_at, t.updated_at
+		FROM transactions t
+		WHERE t.user_id = $1 AND t.id = ANY($2) AND t.deleted_at IS NULL
+	`, userID, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []entity.Transaction
+	for rows.Next() {
+		var t entity.Transaction
+		if err := rows.Scan(
+			&t.ID, &t.ExternalRef, &t.Type, &t.OccurredAt, &t.OccurredDate, &t.Amount,
+			&t.FromAmount, &t.ToAmount, &t.Description, &t.AccountID,
+			&t.FromAccountID, &t.ToAccountID, &t.ExchangeRate, &t.Status,
+			&t.CreatedAt, &t.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, nil
 }
 
 // Helper: requireAccountPermission

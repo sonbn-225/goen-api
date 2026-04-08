@@ -72,7 +72,7 @@ func (s *PublicService) GetPaymentInfo(ctx context.Context, userRef string) (*en
 		return nil, errors.New("invalid default account id format")
 	}
  
-	acc, err := s.accountRepo.GetAccountForUser(ctx, u.ID, accID)
+	acc, err := s.accountRepo.GetAccountForUserTx(ctx, nil, u.ID, accID)
 	if err != nil {
 		return nil, err
 	}
@@ -114,15 +114,27 @@ func (s *PublicService) resolvePublicUser(ctx context.Context, userRef string) (
  
 	// Try lookup by username first
 	byUsername, err := s.userRepo.FindUserByUsername(ctx, strings.ToLower(ref))
+	var u *entity.User
 	if err == nil {
-		return &byUsername.User, nil
+		u = &byUsername.User
+	} else {
+		// Then try lookup by ID
+		uid, err := uuid.Parse(ref)
+		if err != nil {
+			return nil, errors.New("user not found")
+		}
+		u, err = s.userRepo.FindUserByID(ctx, uid)
+		if err != nil {
+			return nil, err
+		}
 	}
- 
-	// Then try lookup by ID
-	uid, err := uuid.Parse(ref)
-	if err != nil {
-		return nil, errors.New("user not found by username and invalid UUID format for ID lookup")
+
+	// Check if public sharing is enabled
+	settings, _ := u.Settings.(map[string]any)
+	enabled, _ := settings["public_sharing_enabled"].(bool)
+	if !enabled {
+		return nil, errors.New("user has disabled public sharing")
 	}
- 
-	return s.userRepo.FindUserByID(ctx, uid)
+
+	return u, nil
 }

@@ -7,6 +7,7 @@ import (
 func NewSavingsResponse(s entity.Savings) SavingsResponse {
 	return SavingsResponse{
 		ID:               s.ID,
+		Name:             s.Name,
 		SavingsAccountID: s.SavingsAccountID,
 		ParentAccountID:  s.ParentAccountID,
 		Principal:        s.Principal,

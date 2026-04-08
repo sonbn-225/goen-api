@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
+	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 type DebtRepo struct {
@@ -20,11 +21,6 @@ func NewDebtRepo(db *database.Postgres) *DebtRepo {
 	return &DebtRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-func (r *DebtRepo) CreateDebt(ctx context.Context, debt entity.Debt) error {
-	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return r.CreateDebtTx(ctx, tx, debt)
-	})
-}
 
 func (r *DebtRepo) CreateDebtTx(ctx context.Context, tx pgx.Tx, debt entity.Debt) error {
 	tag, err := tx.Exec(ctx, `
@@ -146,17 +142,17 @@ func (r *DebtRepo) ListDebts(ctx context.Context, userID uuid.UUID) ([]entity.De
 	return items, nil
 }
 
-func (r *DebtRepo) UpdateDebt(ctx context.Context, userID uuid.UUID, d entity.Debt) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
 
-	_, err = pool.Exec(ctx, `
+func (r *DebtRepo) UpdateDebtTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, d entity.Debt) error {
+	_, err := tx.Exec(ctx, `
 		UPDATE debts
-		SET name = $1, due_date = $2::date, status = $3, interest_rate = $4::numeric, updated_at = $5, closed_at = $6
-		WHERE id = $7 AND user_id = $8 AND deleted_at IS NULL
-	`, d.Name, d.DueDate, d.Status, d.InterestRate, d.UpdatedAt, d.ClosedAt, d.ID, userID)
+		SET name = $1, due_date = $2::date, status = $3, interest_rate = $4::numeric, 
+		    principal = $5::numeric, outstanding_principal = $6::numeric, accrued_interest = $7::numeric,
+		    updated_at = $8, closed_at = $9
+		WHERE id = $10 AND user_id = $11 AND deleted_at IS NULL
+	`, d.Name, d.DueDate, d.Status, d.InterestRate, 
+		d.Principal, d.OutstandingPrincipal, d.AccruedInterest, 
+		d.UpdatedAt, d.ClosedAt, d.ID, userID)
 	return err
 }
 
@@ -164,11 +160,15 @@ func (r *DebtRepo) DeleteDebt(ctx context.Context, userID uuid.UUID, id uuid.UUI
 	return r.SoftDelete(ctx, "debts", id, &userID)
 }
 
-func (r *DebtRepo) CreatePaymentLink(ctx context.Context, userID uuid.UUID, link entity.DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus entity.DebtStatus, closedAt *time.Time) error {
-	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return r.CreatePaymentLinkTx(ctx, tx, userID, link, newPrincipal, newOutstandingPrincipal, newAccruedInterest, newStatus, closedAt)
-	})
+func (r *DebtRepo) DeleteDebtsByOriginatingTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE debts 
+		SET deleted_at = $1 
+		WHERE user_id = $2 AND originating_transaction_id = $3 AND deleted_at IS NULL
+	`, utils.Now(), userID, transactionID)
+	return err
 }
+
 
 func (r *DebtRepo) CreatePaymentLinkTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, link entity.DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus entity.DebtStatus, closedAt *time.Time) error {
 	// 1. Verify ownership
@@ -298,4 +298,16 @@ func (r *DebtRepo) ListInstallments(ctx context.Context, userID uuid.UUID, debtI
 		results = append(results, i)
 	}
 	return results, nil
+}
+
+func (r *DebtRepo) DeletePaymentLinksByTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error {
+	_, err := tx.Exec(ctx, `
+		DELETE FROM debt_payment_links 
+		WHERE id IN (
+			SELECT l.id FROM debt_payment_links l
+			JOIN debts d ON d.id = l.debt_id
+			WHERE d.user_id = $1 AND l.transaction_id = $2
+		)
+	`, userID, transactionID)
+	return err
 }

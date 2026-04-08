@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/google/uuid"
@@ -18,27 +19,6 @@ func NewSavingsRepo(db *database.Postgres) *SavingsRepo {
 	return &SavingsRepo{db: db}
 }
 
-func (r *SavingsRepo) CreateSavings(ctx context.Context, userID uuid.UUID, s entity.Savings) error {
-	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return r.CreateSavingsTx(ctx, tx, userID, s)
-	})
-}
-
-func (r *SavingsRepo) CreateSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, s entity.Savings) error {
-	_, err := tx.Exec(ctx, `
-		INSERT INTO savings_instruments (
-			id, savings_account_id, parent_account_id, principal, interest_rate, term_months,
-			start_date, maturity_date, auto_renew, accrued_interest, status, closed_at,
-			created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-	`,
-		s.ID, s.SavingsAccountID, s.ParentAccountID, s.Principal, s.InterestRate, s.TermMonths,
-		s.StartDate, s.MaturityDate, s.AutoRenew, s.AccruedInterest, s.Status, s.ClosedAt,
-		s.CreatedAt, s.UpdatedAt,
-	)
-	return err
-}
-
 func (r *SavingsRepo) GetSavings(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entity.Savings, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -46,19 +26,20 @@ func (r *SavingsRepo) GetSavings(ctx context.Context, userID uuid.UUID, id uuid.
 	}
 
 	var s entity.Savings
+	var settingsJSON []byte
 	err = pool.QueryRow(ctx, `
 		SELECT
-			si.id, si.savings_account_id, si.parent_account_id, si.principal::text,
-			si.interest_rate::text, si.term_months, to_char(si.start_date, 'YYYY-MM-DD'),
-			to_char(si.maturity_date, 'YYYY-MM-DD'), si.auto_renew, si.accrued_interest::text,
-			si.status::text, si.closed_at, si.created_at, si.updated_at
-		FROM savings_instruments si
-		JOIN user_accounts ua ON ua.account_id = si.savings_account_id
-		WHERE si.id = $1 AND ua.user_id = $2 AND ua.status = 'active'
+			a.id, a.name, a.parent_account_id, a.status, a.settings, a.created_at, a.updated_at,
+			COALESCE((
+				SELECT SUM(t.amount)
+				FROM transactions t
+				WHERE t.to_account_id = a.id AND t.type = 'income' AND t.status = 'posted' AND t.deleted_at IS NULL
+			), 0)::text as accrued_interest
+		FROM accounts a
+		JOIN user_accounts ua ON ua.account_id = a.id
+		WHERE a.id = $1 AND ua.user_id = $2 AND a.account_type = 'savings' AND a.deleted_at IS NULL AND ua.status = 'active'
 	`, id, userID).Scan(
-		&s.ID, &s.SavingsAccountID, &s.ParentAccountID, &s.Principal, &s.InterestRate, &s.TermMonths,
-		&s.StartDate, &s.MaturityDate, &s.AutoRenew, &s.AccruedInterest, &s.Status, &s.ClosedAt,
-		&s.CreatedAt, &s.UpdatedAt,
+		&s.ID, &s.Name, &s.ParentAccountID, &s.Status, &settingsJSON, &s.CreatedAt, &s.UpdatedAt, &s.AccruedInterest,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -66,6 +47,9 @@ func (r *SavingsRepo) GetSavings(ctx context.Context, userID uuid.UUID, id uuid.
 		}
 		return nil, err
 	}
+
+	r.mapSettingsToSavings(&s, settingsJSON)
+	s.SavingsAccountID = s.ID // In the new model, the Savings ID is the Account ID
 	return &s, nil
 }
 
@@ -77,14 +61,16 @@ func (r *SavingsRepo) ListSavings(ctx context.Context, userID uuid.UUID) ([]enti
 
 	rows, err := pool.Query(ctx, `
 		SELECT
-			si.id, si.savings_account_id, si.parent_account_id, si.principal::text,
-			si.interest_rate::text, si.term_months, to_char(si.start_date, 'YYYY-MM-DD'),
-			to_char(si.maturity_date, 'YYYY-MM-DD'), si.auto_renew, si.accrued_interest::text,
-			si.status::text, si.closed_at, si.created_at, si.updated_at
-		FROM savings_instruments si
-		JOIN user_accounts ua ON ua.account_id = si.savings_account_id
-		WHERE ua.user_id = $1 AND ua.status = 'active'
-		ORDER BY si.created_at DESC
+			a.id, a.name, a.parent_account_id, a.status, a.settings, a.created_at, a.updated_at,
+			COALESCE((
+				SELECT SUM(t.amount)
+				FROM transactions t
+				WHERE t.to_account_id = a.id AND t.type = 'income' AND t.status = 'posted' AND t.deleted_at IS NULL
+			), 0)::text as accrued_interest
+		FROM accounts a
+		JOIN user_accounts ua ON ua.account_id = a.id
+		WHERE ua.user_id = $1 AND a.account_type = 'savings' AND a.deleted_at IS NULL AND ua.status = 'active'
+		ORDER BY a.created_at DESC
 	`, userID)
 	if err != nil {
 		return nil, err
@@ -94,49 +80,65 @@ func (r *SavingsRepo) ListSavings(ctx context.Context, userID uuid.UUID) ([]enti
 	var out []entity.Savings
 	for rows.Next() {
 		var s entity.Savings
+		var settingsJSON []byte
 		if err := rows.Scan(
-			&s.ID, &s.SavingsAccountID, &s.ParentAccountID, &s.Principal, &s.InterestRate, &s.TermMonths,
-			&s.StartDate, &s.MaturityDate, &s.AutoRenew, &s.AccruedInterest, &s.Status, &s.ClosedAt,
-			&s.CreatedAt, &s.UpdatedAt,
+			&s.ID, &s.Name, &s.ParentAccountID, &s.Status, &settingsJSON, &s.CreatedAt, &s.UpdatedAt, &s.AccruedInterest,
 		); err != nil {
 			return nil, err
 		}
+		r.mapSettingsToSavings(&s, settingsJSON)
+		s.SavingsAccountID = s.ID
 		out = append(out, s)
 	}
 	return out, nil
 }
 
-func (r *SavingsRepo) UpdateSavings(ctx context.Context, userID uuid.UUID, s entity.Savings) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
+func (r *SavingsRepo) UpdateSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, s entity.Savings) error {
+	settings := entity.AccountSettings{
+		Savings: &entity.SavingsSettings{
+			Principal:    s.Principal,
+			InterestRate: s.InterestRate,
+			TermMonths:   s.TermMonths,
+			StartDate:    s.StartDate,
+			MaturityDate: s.MaturityDate,
+			AutoRenew:    s.AutoRenew,
+		},
 	}
+	settingsJSON, _ := json.Marshal(settings)
 
-	_, err = pool.Exec(ctx, `
-		UPDATE savings_instruments si
-		SET
-			principal = $3, interest_rate = $4, term_months = $5, start_date = $6,
-			maturity_date = $7, auto_renew = $8, accrued_interest = $9, status = $10,
-			closed_at = $11, updated_at = $12
+	_, err := tx.Exec(ctx, `
+		UPDATE accounts a
+		SET name = $3, status = $4, parent_account_id = $5, settings = $6, updated_at = NOW()
 		FROM user_accounts ua
-		WHERE ua.account_id = si.savings_account_id AND ua.user_id = $2 AND si.id = $1
-	`,
-		s.ID, userID, s.Principal, s.InterestRate, s.TermMonths, s.StartDate,
-		s.MaturityDate, s.AutoRenew, s.AccruedInterest, s.Status, s.ClosedAt, s.UpdatedAt,
-	)
+		WHERE ua.account_id = a.id AND ua.user_id = $2 AND a.id = $1 AND a.account_type = 'savings'
+	`, s.ID, userID, s.Name, s.Status, s.ParentAccountID, settingsJSON)
 	return err
 }
 
-func (r *SavingsRepo) DeleteSavings(ctx context.Context, userID, id uuid.UUID) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = pool.Exec(ctx, `
-		DELETE FROM savings_instruments si
-		USING user_accounts ua
-		WHERE ua.account_id = si.savings_account_id AND ua.user_id = $2 AND si.id = $1
-	`, id, userID)
+func (r *SavingsRepo) DeleteSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, id uuid.UUID) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE accounts a
+		SET deleted_at = NOW(), status = $3, updated_at = NOW()
+		FROM user_accounts ua
+		WHERE ua.account_id = a.id AND ua.user_id = $2 AND a.id = $1 AND a.account_type = 'savings'
+	`, id, userID, entity.AccountStatusDeleted)
 	return err
+}
+
+func (r *SavingsRepo) mapSettingsToSavings(s *entity.Savings, settingsJSON []byte) {
+	if len(settingsJSON) == 0 {
+		return
+	}
+	var settings entity.AccountSettings
+	if err := json.Unmarshal(settingsJSON, &settings); err != nil {
+		return
+	}
+	if settings.Savings != nil {
+		s.Principal = settings.Savings.Principal
+		s.InterestRate = settings.Savings.InterestRate
+		s.TermMonths = settings.Savings.TermMonths
+		s.StartDate = settings.Savings.StartDate
+		s.MaturityDate = settings.Savings.MaturityDate
+		s.AutoRenew = settings.Savings.AutoRenew
+	}
 }

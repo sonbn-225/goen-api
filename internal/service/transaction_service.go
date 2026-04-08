@@ -6,7 +6,6 @@ import (
 	"errors"
 	"math/big"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -19,10 +18,10 @@ import (
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
-// TransactionService handles the core ledger logic of the application.
-// It serves as the "Sổ cái trung tâm" (Central Ledger), recording every movement of money
-// across accounts, categories, and tags. Other services (Debt, Investment, Savings) 
-// depend on this service to reflect their financial state in the user's balances.
+// TransactionService xử lý logic cốt lõi của sổ cái ứng dụng.
+// Nó đóng vai trò là "Sổ cái trung tâm", ghi lại mọi biến động tiền tệ
+// qua các tài khoản, hạng mục và nhãn. Các dịch vụ khác (Nợ, Đầu tư, Tiết kiệm)
+// phụ thuộc vào dịch vụ này để phản ánh trạng thái tài chính của họ trong số dư của người dùng.
 type TransactionService struct {
 	repo        interfaces.TransactionRepository
 	tagSvc      interfaces.TagService
@@ -31,17 +30,17 @@ type TransactionService struct {
 	db          *database.Postgres
 }
 
-// NewTransactionService creates a new instance of the central ledger service.
+// NewTransactionService khởi tạo một thực thể mới của dịch vụ sổ cái trung tâm.
 func NewTransactionService(repo interfaces.TransactionRepository, tagSvc interfaces.TagService, accountRepo interfaces.AccountRepository, db *database.Postgres) *TransactionService {
 	return &TransactionService{repo: repo, tagSvc: tagSvc, accountRepo: accountRepo, db: db}
 }
 
-// SetDebtService is used for dependency injection to resolve circular dependency with DebtService.
+// SetDebtService được sử dụng để tiêm phụ thuộc nhằm giải quyết vòng lặp phụ thuộc với DebtService.
 func (s *TransactionService) SetDebtService(ds interfaces.DebtService) {
 	s.debtSvc = ds
 }
 
-// List returns a paginated list of transactions filtered by various criteria.
+// List trả về danh sách phân trang các giao dịch được lọc theo nhiều tiêu chí khác nhau.
 func (s *TransactionService) List(ctx context.Context, userID uuid.UUID, req dto.ListTransactionsRequest) ([]dto.TransactionResponse, *string, int, error) {
 	filter := entity.TransactionListFilter{
 		Page:  req.Page,
@@ -77,9 +76,9 @@ func (s *TransactionService) List(ctx context.Context, userID uuid.UUID, req dto
 	return dto.NewTransactionResponses(items), cursor, total, nil
 }
 
-// Get retrieves a single transaction by its ID, ensuring it belongs to the specified user.
+// Get lấy thông tin một giao dịch duy nhất theo ID, đảm bảo nó thuộc về người dùng được chỉ định.
 func (s *TransactionService) Get(ctx context.Context, userID, transactionID uuid.UUID) (*dto.TransactionResponse, error) {
-	it, err := s.repo.GetTransaction(ctx, userID, transactionID)
+	it, err := s.repo.GetTransactionTx(ctx, nil, userID, transactionID)
 	if err != nil {
 		return nil, err
 	}
@@ -90,11 +89,11 @@ func (s *TransactionService) Get(ctx context.Context, userID, transactionID uuid
 	return &resp, nil
 }
 
-// Create records a new financial movement. It handles:
-// 1. Regular Expenses/Income (with optional line-item split)
-// 2. Transfers between accounts (from_account -> to_account)
-// 3. Shared Expenses (auto-creating debts for participants)
-// All operations are wrapped in a single database transaction for atomic safety.
+// Create ghi nhận một biến động tài chính mới. Nó xử lý:
+// 1. Chi phí/Thu nhập thông thường (với tùy chọn chia nhỏ các hạng mục chi tiết)
+// 2. Chuyển khoản giữa các tài khoản (từ tài khoản gốc -> tài khoản đích)
+// 3. Chi phí dùng chung (tự động tạo nợ cho những người tham gia)
+// Tất cả các thao tác được thực hiện trong một giao dịch cơ sở dữ liệu duy nhất để đảm bảo tính nguyên tử.
 func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateTransactionRequest) (*dto.TransactionResponse, error) {
 	kind := strings.TrimSpace(string(req.Type))
 	if kind != string(entity.TransactionTypeExpense) && kind != string(entity.TransactionTypeIncome) && kind != string(entity.TransactionTypeTransfer) {
@@ -236,7 +235,7 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 		}
 
 		// Fetch back for response
-		it, err := s.repo.GetTransaction(ctx, userID, id)
+		it, err := s.repo.GetTransactionTx(ctx, txConn, userID, id)
 		if err != nil {
 			return err
 		}
@@ -248,14 +247,14 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 
 		// Audit Logging
 		if it.AccountID != nil {
-			_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
+			_ = s.accountRepo.RecordAccountAuditEventTx(ctx, txConn, entity.AccountAuditEvent{
 				BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
 				AccountID:   *it.AccountID,
 				ActorUserID: userID,
 				Action:      "transaction_created",
 				EntityType:  "transaction",
 				EntityID:    it.ID,
-				OccurredAt:  time.Now().UTC(),
+				OccurredAt:  utils.Now(),
 			})
 		}
 
@@ -269,8 +268,8 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 	return resp, nil
 }
 
-// Patch applies partial updates to an existing transaction. 
-// It supports updating description, amount, status, categories, and tags.
+// Patch áp dụng các bản cập nhật một phần cho một giao dịch hiện có.
+// Nó hỗ trợ cập nhật mô tả, số tiền, trạng thái, hạng mục và nhãn.
 func (s *TransactionService) Patch(ctx context.Context, userID, transactionID uuid.UUID, req dto.TransactionPatchRequest) (*dto.TransactionResponse, error) {
 	tagIDs, _ := s.ensureTags(ctx, userID, req.TagIDs, req.Lang)
 
@@ -316,14 +315,14 @@ func (s *TransactionService) Patch(ctx context.Context, userID, transactionID uu
 			_ = json.Unmarshal(patchBytes, &diff)
 		}
 
-		_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
+		_ = s.accountRepo.RecordAccountAuditEventTx(ctx, nil, entity.AccountAuditEvent{
 			BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
 			AccountID:   *it.AccountID,
 			ActorUserID: userID,
 			Action:      "transaction_updated",
 			EntityType:  "transaction",
 			EntityID:    it.ID,
-			OccurredAt:  time.Now().UTC(),
+			OccurredAt:  utils.Now(),
 			Diff:        diff,
 		})
 	}
@@ -378,24 +377,38 @@ func (s *TransactionService) BatchPatch(ctx context.Context, userID uuid.UUID, r
 	}, nil
 }
 
+// Delete xóa một giao dịch và xử lý các ràng buộc liên quan.
 func (s *TransactionService) Delete(ctx context.Context, userID, transactionID uuid.UUID) error {
-	tx, _ := s.repo.GetTransaction(ctx, userID, transactionID)
-	err := s.repo.DeleteTransaction(ctx, userID, transactionID)
-	if err == nil && tx != nil {
-		// Audit Logging
-		if tx.AccountID != nil {
-			_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
+	return s.db.WithTx(ctx, func(txConn pgx.Tx) error {
+		// 1. Lấy thông tin giao dịch để biết tài khoản phục vụ mục đích kiểm toán
+		tx, _ := s.repo.GetTransactionTx(ctx, txConn, userID, transactionID)
+
+		// 2. Dọn dẹp các khoản nợ/thanh toán liên kết
+		if s.debtSvc != nil {
+			if err := s.debtSvc.CleanupTransactionLinksTx(ctx, txConn, userID, transactionID); err != nil {
+				return err
+			}
+		}
+
+		// 3. Xóa chính giao dịch đó
+		if err := s.repo.DeleteTransactionTx(ctx, txConn, userID, transactionID); err != nil {
+			return err
+		}
+
+		// 4. Ghi nhật ký kiểm toán
+		if tx != nil && tx.AccountID != nil {
+			_ = s.accountRepo.RecordAccountAuditEventTx(ctx, txConn, entity.AccountAuditEvent{
 				BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
 				AccountID:   *tx.AccountID,
 				ActorUserID: userID,
 				Action:      "transaction_deleted",
 				EntityType:  "transaction",
 				EntityID:    transactionID,
-				OccurredAt:  time.Now().UTC(),
+				OccurredAt:  utils.Now(),
 			})
 		}
-	}
-	return err
+		return nil
+	})
 }
 
 func (s *TransactionService) ListForExport(ctx context.Context, userID uuid.UUID, filter entity.TransactionListFilter) ([]entity.ExportTransactionRow, error) {
@@ -431,6 +444,21 @@ func (s *TransactionService) ListForExport(ctx context.Context, userID uuid.UUID
 	}
 
 	return rows, nil
+}
+
+// Import xử lý việc ghi nhận hàng loạt giao dịch từ dữ liệu thô.
+func (s *TransactionService) Import(ctx context.Context, userID uuid.UUID, reqs []dto.CreateTransactionRequest) ([]dto.TransactionResponse, error) {
+	resps := make([]dto.TransactionResponse, 0, len(reqs))
+	for _, req := range reqs {
+		resp, err := s.Create(ctx, userID, req)
+		if err != nil {
+			return nil, err
+		}
+		if resp != nil {
+			resps = append(resps, *resp)
+		}
+	}
+	return resps, nil
 }
 
 // Helpers

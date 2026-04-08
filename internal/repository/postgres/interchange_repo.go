@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
+	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 type InterchangeRepo struct {
@@ -21,7 +21,7 @@ func NewInterchangeRepo(db *database.Postgres) *InterchangeRepo {
 }
 
 func (r *InterchangeRepo) UpsertStagedImports(ctx context.Context, userID uuid.UUID, items []entity.StagedImportCreate) ([]entity.StagedImport, error) {
-	now := time.Now().UTC()
+	now := utils.Now()
 	created := make([]entity.StagedImport, 0, len(items))
 
 	err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {
@@ -132,7 +132,7 @@ func (r *InterchangeRepo) GetStagedImport(ctx context.Context, userID, id uuid.U
 }
 
 func (r *InterchangeRepo) PatchStagedImport(ctx context.Context, userID, id uuid.UUID, patch entity.StagedImportPatch) (*entity.StagedImport, error) {
-	now := time.Now().UTC()
+	now := utils.Now()
 	var si entity.StagedImport
 
 	err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {
@@ -150,7 +150,7 @@ func (r *InterchangeRepo) PatchStagedImport(ctx context.Context, userID, id uuid
 		}
 
 		newMetaB, _ := json.Marshal(meta)
-		
+
 		statusClause := ""
 		args := []any{newMetaB, now, id, userID}
 		if patch.Status != nil {
@@ -212,7 +212,7 @@ func (r *InterchangeRepo) DeleteAllStagedImports(ctx context.Context, userID uui
 }
 
 func (r *InterchangeRepo) UpsertImportRules(ctx context.Context, userID uuid.UUID, rules []entity.StagedImportRuleUpsert) ([]entity.StagedImportRule, error) {
-	now := time.Now().UTC()
+	now := utils.Now()
 	out := make([]entity.StagedImportRule, 0, len(rules))
 
 	err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {

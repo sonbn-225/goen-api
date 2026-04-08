@@ -18,7 +18,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE account_status AS ENUM ('active','closed');
+  CREATE TYPE account_status AS ENUM ('active', 'matured', 'archived', 'deleted');
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
@@ -59,11 +59,6 @@ EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
 
-DO $$ BEGIN
-  CREATE TYPE savings_instrument_status AS ENUM ('active','matured','closed');
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
-END $$;
 
 DO $$ BEGIN
   CREATE TYPE rotating_savings_cycle_frequency AS ENUM ('weekly','monthly','custom');
@@ -482,29 +477,6 @@ CREATE TABLE IF NOT EXISTS budgets (
 CREATE INDEX IF NOT EXISTS idx_budgets_user_period ON budgets(user_id, period, period_start, period_end);
 CREATE INDEX IF NOT EXISTS idx_budgets_user_category ON budgets(user_id, category_id);
 
-CREATE TABLE IF NOT EXISTS savings_instruments (
-  id uuid PRIMARY KEY,
-  savings_account_id uuid NOT NULL UNIQUE,
-  parent_account_id uuid NOT NULL,
-  principal numeric(18,2) NOT NULL,
-  interest_rate numeric(18,8),
-  term_months int,
-  start_date date,
-  maturity_date date,
-  auto_renew boolean NOT NULL DEFAULT false,
-  accrued_interest numeric(18,2) NOT NULL DEFAULT 0,
-  status savings_instrument_status NOT NULL DEFAULT 'active',
-  closed_at timestamptz,
-  created_at timestamptz NOT NULL,
-  updated_at timestamptz NOT NULL,
-  deleted_at timestamptz,
-
-  CONSTRAINT fk_savings_instruments_savings_account FOREIGN KEY (savings_account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-  CONSTRAINT fk_savings_instruments_parent_account FOREIGN KEY (parent_account_id) REFERENCES accounts(id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_savings_instruments_parent_account_id ON savings_instruments(parent_account_id);
-CREATE INDEX IF NOT EXISTS idx_savings_instruments_status ON savings_instruments(status);
 
 CREATE TABLE IF NOT EXISTS rotating_savings_groups (
   id uuid PRIMARY KEY,
@@ -852,7 +824,7 @@ CREATE INDEX IF NOT EXISTS idx_share_lots_status
 
 CREATE TABLE IF NOT EXISTS realized_trade_logs (
   id uuid PRIMARY KEY,
-  broker_account_id uuid NOT NULL,
+  account_id uuid NOT NULL,
   security_id uuid NOT NULL,
   sell_trade_id uuid NOT NULL,
   source_share_lot_id uuid NOT NULL,
@@ -867,15 +839,15 @@ CREATE TABLE IF NOT EXISTS realized_trade_logs (
   updated_at timestamptz NOT NULL,
   deleted_at timestamptz,
 
-  CONSTRAINT fk_realized_trade_logs_broker_account_id FOREIGN KEY (broker_account_id) REFERENCES investment_accounts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_realized_trade_logs_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_realized_trade_logs_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE,
   CONSTRAINT fk_realized_trade_logs_sell_trade_id FOREIGN KEY (sell_trade_id) REFERENCES trades(id) ON DELETE CASCADE,
   CONSTRAINT fk_realized_trade_logs_source_share_lot_id FOREIGN KEY (source_share_lot_id) REFERENCES share_lots(id) ON DELETE RESTRICT,
   CONSTRAINT ck_realized_trade_logs_nonneg CHECK (quantity > 0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_realized_trade_logs_broker_security_sell
-  ON realized_trade_logs(broker_account_id, security_id, sell_trade_id);
+CREATE INDEX IF NOT EXISTS idx_realized_trade_logs_account_security_sell
+  ON realized_trade_logs(account_id, security_id, sell_trade_id);
 
 CREATE TABLE IF NOT EXISTS audit_events (
   id uuid NOT NULL,

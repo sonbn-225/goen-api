@@ -5,17 +5,17 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 type InterchangeService struct {
-	repo    interfaces.InterchangeRepository
-	txSvc   interfaces.TransactionService
+	repo  interfaces.InterchangeRepository
+	txSvc interfaces.TransactionService
 }
 
 func NewInterchangeService(
@@ -23,8 +23,8 @@ func NewInterchangeService(
 	txSvc interfaces.TransactionService,
 ) *InterchangeService {
 	return &InterchangeService{
-		repo:    repo,
-		txSvc:   txSvc,
+		repo:  repo,
+		txSvc: txSvc,
 	}
 }
 
@@ -218,7 +218,7 @@ func (s *InterchangeService) ApplyRulesAndCreate(ctx context.Context, userID uui
 		if item.Status != "pending" {
 			continue
 		}
-		
+
 		// Apply rules to metadata
 		updated := false
 		for _, rule := range rules {
@@ -255,7 +255,7 @@ func (s *InterchangeService) ApplyRulesAndCreate(ctx context.Context, userID uui
 func (s *InterchangeService) ExportToCSV(ctx context.Context, userID uuid.UUID, resourceType string, filter any) ([]byte, string, error) {
 	var records [][]string
 	var filename string
-	timestamp := time.Now().Format("20060102_150405")
+	timestamp := utils.Now().Format("20060102_150405")
 
 	switch resourceType {
 	case "transaction":
@@ -323,7 +323,7 @@ func (s *InterchangeService) mapStagedToTransactionRequest(staged *entity.Staged
 	amount, _ := staged.Data["amount"].(string)
 	occurredDate, _ := staged.Data["transaction_date"].(string)
 	description, _ := staged.Data["description"].(string)
-	
+
 	// Default to expense if not specified
 	txType := entity.TransactionTypeExpense
 	if t, ok := staged.Data["type"].(string); ok {

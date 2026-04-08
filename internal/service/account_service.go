@@ -6,23 +6,37 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 type AccountService struct {
-	repo     interfaces.AccountRepository
-	userRepo interfaces.UserRepository
+	repo            interfaces.AccountRepository
+	userRepo        interfaces.UserRepository
+	transactionRepo interfaces.TransactionRepository
+	db              *database.Postgres
 }
 
-func NewAccountService(repo interfaces.AccountRepository, userRepo interfaces.UserRepository) *AccountService {
-	return &AccountService{repo: repo, userRepo: userRepo}
+func NewAccountService(
+	repo interfaces.AccountRepository,
+	userRepo interfaces.UserRepository,
+	transactionRepo interfaces.TransactionRepository,
+	db *database.Postgres,
+) *AccountService {
+	return &AccountService{
+		repo:            repo,
+		userRepo:        userRepo,
+		transactionRepo: transactionRepo,
+		db:              db,
+	}
 }
 
 func (s *AccountService) List(ctx context.Context, userID uuid.UUID) ([]dto.AccountResponse, error) {
-	items, err := s.repo.ListAccountsForUser(ctx, userID)
+	items, err := s.repo.ListAccountsForUserTx(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +44,7 @@ func (s *AccountService) List(ctx context.Context, userID uuid.UUID) ([]dto.Acco
 }
 
 func (s *AccountService) Get(ctx context.Context, userID, accountID uuid.UUID) (*dto.AccountResponse, error) {
-	it, err := s.repo.GetAccountForUser(ctx, userID, accountID)
+	it, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +102,7 @@ func (s *AccountService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 		Settings:        mapAccountSettingsEntity(req.Settings),
 	}
 
-	if err := s.repo.CreateAccountWithOwner(ctx, account, userID); err != nil {
+	if err := s.repo.CreateAccountWithOwnerTx(ctx, nil, account, userID); err != nil {
 		return nil, err
 	}
 
@@ -103,19 +117,33 @@ func (s *AccountService) Patch(ctx context.Context, userID, accountID uuid.UUID,
 		status = &s
 	}
 
-	var settings *entity.AccountSettings
-	if req.Settings != nil {
-		s := mapAccountSettingsEntity(req.Settings)
-		settings = &s
-	}
+	var it *entity.Account
+	var err error
 
-	patch := entity.AccountPatch{
-		Name:     req.Name,
-		Status:   status,
-		Settings: settings,
-	}
+	// We use db.WithTx here because PatchAccountTx requires a transaction
+	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		cur, err := s.repo.GetAccountForUserTx(ctx, tx, userID, accountID)
+		if err != nil {
+			return err
+		}
+		if cur == nil {
+			return errors.New("account not found")
+		}
 
-	it, err := s.repo.PatchAccount(ctx, userID, accountID, patch)
+		patch := entity.AccountPatch{
+			Name:     req.Name,
+			Status:   status,
+			Settings: utils.MapPtr(mapAccountSettingsEntity(req.Settings)),
+		}
+		
+		if req.Settings == nil {
+			patch.Settings = nil
+		}
+
+		it, err = s.repo.PatchAccountTx(ctx, tx, userID, accountID, patch)
+		return err
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +155,7 @@ func (s *AccountService) Patch(ctx context.Context, userID, accountID uuid.UUID,
 }
 
 func (s *AccountService) Delete(ctx context.Context, userID, accountID uuid.UUID) error {
-	acc, err := s.repo.GetAccountForUser(ctx, userID, accountID)
+	acc, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID)
 	if err != nil {
 		return err
 	}
@@ -139,22 +167,24 @@ func (s *AccountService) Delete(ctx context.Context, userID, accountID uuid.UUID
 		return errors.New("cash account cannot be deleted; should be closed instead")
 	}
 
-	hasTransfers, err := s.repo.HasRelatedTransferTransactionsForAccount(ctx, accountID)
-	if err != nil {
-		return err
-	}
-	if hasTransfers {
-		return errors.New("account has related transfer transactions and cannot be deleted")
-	}
+	// Khi xóa hẳn tài khoản, chúng ta cũng thực hiện xóa mềm toàn bộ các giao dịch liên quan
+	// để tránh tình trạng "thất thoát" số dư (số dư biến mất khỏi tài khoản nguồn nhưng không có đích).
+	return s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		// 1. Xóa tất cả giao dịch liên quan
+		if err := s.transactionRepo.DeleteTransactionsByAccountTx(ctx, tx, userID, accountID); err != nil {
+			return err
+		}
 
-	return s.repo.DeleteAccount(ctx, userID, accountID)
+		// 2. Xóa tài khoản (cập nhật status thành 'deleted' và set deleted_at)
+		return s.repo.DeleteAccountTx(ctx, tx, userID, accountID)
+	})
 }
 
 func (s *AccountService) ListShares(ctx context.Context, userID, accountID uuid.UUID) ([]dto.AccountShareResponse, error) {
-	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+	if _, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID); err != nil {
 		return nil, err
 	}
-	items, err := s.repo.ListAccountShares(ctx, userID, accountID)
+	items, err := s.repo.ListAccountSharesTx(ctx, nil, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -162,28 +192,34 @@ func (s *AccountService) ListShares(ctx context.Context, userID, accountID uuid.
 }
 
 func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID uuid.UUID, login, permission string) (*dto.AccountShareResponse, error) {
-	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
-		return nil, err
-	}
-
-	var target *entity.UserWithPassword
+	var it *entity.AccountShare
 	var err error
-	if strings.Contains(login, "@") {
-		target, err = s.userRepo.FindUserByEmail(ctx, strings.ToLower(login))
-	} else if len(login) > 0 && login[0] != '+' && !strings.ContainsAny(login, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
-		target, err = s.userRepo.FindUserByPhone(ctx, login)
-	} else {
-		target, err = s.userRepo.FindUserByUsername(ctx, login)
-	}
 
-	if err != nil {
-		return nil, err
-	}
-	if target.ID == userID {
-		return nil, errors.New("cannot share with yourself")
-	}
+	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		if _, err := s.repo.GetAccountForUserTx(ctx, tx, userID, accountID); err != nil {
+			return err
+		}
 
-	it, err := s.repo.UpsertAccountShare(ctx, userID, accountID, target.ID, permission)
+		var target *entity.UserWithPassword
+		if strings.Contains(login, "@") {
+			target, err = s.userRepo.FindUserByEmail(ctx, strings.ToLower(login))
+		} else if len(login) > 0 && login[0] != '+' && !strings.ContainsAny(login, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+			target, err = s.userRepo.FindUserByPhone(ctx, login)
+		} else {
+			target, err = s.userRepo.FindUserByUsername(ctx, login)
+		}
+
+		if err != nil {
+			return err
+		}
+		if target.ID == userID {
+			return errors.New("cannot share with yourself")
+		}
+
+		it, err = s.repo.UpsertAccountShareTx(ctx, tx, userID, accountID, target.ID, permission)
+		return err
+	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -195,14 +231,16 @@ func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID uuid
 }
 
 func (s *AccountService) RevokeShare(ctx context.Context, userID, accountID, targetUserID uuid.UUID) error {
-	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
-		return err
-	}
-	return s.repo.RevokeAccountShare(ctx, userID, accountID, targetUserID)
+	return s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		if _, err := s.repo.GetAccountForUserTx(ctx, tx, userID, accountID); err != nil {
+			return err
+		}
+		return s.repo.RevokeAccountShareTx(ctx, tx, userID, accountID, targetUserID)
+	})
 }
 
 func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID uuid.UUID, limit int) ([]dto.AccountAuditEventResponse, error) {
-	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+	if _, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID); err != nil {
 		return nil, err
 	}
 
@@ -213,7 +251,7 @@ func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID 
 		limit = 200
 	}
 
-	items, err := s.repo.ListAccountAuditEvents(ctx, userID, accountID, limit)
+	items, err := s.repo.ListAccountAuditEventsTx(ctx, nil, userID, accountID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -268,9 +306,16 @@ func mapSavingsSettingsEntity(it *dto.SavingsSettingsRequest) *entity.SavingsSet
 	if it == nil {
 		return nil
 	}
+	autoRenew := false
+	if it.AutoRenew != nil {
+		autoRenew = *it.AutoRenew
+	}
 	return &entity.SavingsSettings{
-		TargetAmount: it.TargetAmount,
-		TargetDate:   it.TargetDate,
+		Principal:    it.Principal,
+		InterestRate: it.InterestRate,
+		TermMonths:   it.TermMonths,
+		StartDate:    it.StartDate,
+		MaturityDate: it.MaturityDate,
+		AutoRenew:    autoRenew,
 	}
 }
-

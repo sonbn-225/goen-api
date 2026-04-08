@@ -3,11 +3,11 @@ package postgres
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
+	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 // CreateTransactionTx is a shared helper to insert a transaction and its associated data
@@ -92,8 +92,6 @@ func CreateTransactionTx(ctx context.Context, txConn pgx.Tx, userID uuid.UUID, t
 		}
 	}
 
-
-
 	return nil
 }
 
@@ -116,7 +114,7 @@ func requireAccountPermission(ctx context.Context, tx pgx.Tx, userID, accountID 
 // DeleteTransactionTx is a shared helper to soft-delete a transaction and its associated data
 // within an existing database transaction (pgx.Tx).
 func DeleteTransactionTx(ctx context.Context, tx pgx.Tx, userID, transactionID uuid.UUID) error {
-	now := time.Now().UTC()
+	now := utils.Now()
 	// 1. Verify owner (simple check for existence and user_accounts link)
 	var id uuid.UUID
 	err := tx.QueryRow(ctx, `

@@ -18,13 +18,8 @@ func NewRotatingSavingsRepo(db *database.Postgres) *RotatingSavingsRepo {
 	return &RotatingSavingsRepo{db: db}
 }
 
-func (r *RotatingSavingsRepo) CreateRotatingGroup(ctx context.Context, g entity.RotatingSavingsGroup) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = pool.Exec(ctx, `
+func (r *RotatingSavingsRepo) CreateRotatingGroupTx(ctx context.Context, tx pgx.Tx, g entity.RotatingSavingsGroup) error {
+	_, err := tx.Exec(ctx, `
 		INSERT INTO rotating_savings_groups (
 			id, user_id, account_id, name, member_count, user_slots,
 			contribution_amount, payout_cycle_no, fixed_interest_amount,
@@ -103,13 +98,8 @@ func (r *RotatingSavingsRepo) ListRotatingGroups(ctx context.Context, userID uui
 	return out, nil
 }
 
-func (r *RotatingSavingsRepo) UpdateRotatingGroup(ctx context.Context, g entity.RotatingSavingsGroup) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = pool.Exec(ctx, `
+func (r *RotatingSavingsRepo) UpdateRotatingGroupTx(ctx context.Context, tx pgx.Tx, g entity.RotatingSavingsGroup) error {
+	_, err := tx.Exec(ctx, `
 		UPDATE rotating_savings_groups
 		SET
 			account_id = $3,
@@ -142,11 +132,6 @@ func (r *RotatingSavingsRepo) DeleteRotatingGroup(ctx context.Context, userID, g
 	return err
 }
 
-func (r *RotatingSavingsRepo) CreateContribution(ctx context.Context, c entity.RotatingSavingsContribution) error {
-	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return r.CreateContributionTx(ctx, tx, c)
-	})
-}
 
 func (r *RotatingSavingsRepo) CreateContributionTx(ctx context.Context, tx pgx.Tx, c entity.RotatingSavingsContribution) error {
 	_, err := tx.Exec(ctx, `
@@ -204,11 +189,6 @@ func (r *RotatingSavingsRepo) DeleteContribution(ctx context.Context, contributi
 	return err
 }
 
-func (r *RotatingSavingsRepo) AddAuditLog(ctx context.Context, log entity.RotatingSavingsAuditLog) error {
-	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return r.AddAuditLogTx(ctx, tx, log)
-	})
-}
 
 func (r *RotatingSavingsRepo) AddAuditLogTx(ctx context.Context, tx pgx.Tx, log entity.RotatingSavingsAuditLog) error {
 	_, err := tx.Exec(ctx, `
