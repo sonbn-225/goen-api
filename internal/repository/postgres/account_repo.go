@@ -24,15 +24,17 @@ func NewAccountRepo(db *database.Postgres) *AccountRepo {
 
 func (r *AccountRepo) CreateAccountWithOwner(ctx context.Context, account entity.Account, ownerUserID uuid.UUID) error {
 	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
+		settingsJSON, _ := json.Marshal(account.Settings)
+
 		_, err := tx.Exec(ctx, `
 			INSERT INTO accounts (
-				id, name, account_number, color, account_type, currency, parent_account_id, status, closed_at,
+				id, name, account_number, account_type, currency, parent_account_id, status, settings, closed_at,
 				created_at, updated_at, deleted_at
 			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		`,
-			account.ID, account.Name, account.AccountNumber, account.Color,
+			account.ID, account.Name, account.AccountNumber,
 			account.AccountType, account.Currency, account.ParentAccountID, account.Status,
-			account.ClosedAt, account.CreatedAt, account.UpdatedAt, account.DeletedAt,
+			settingsJSON, account.ClosedAt, account.CreatedAt, account.UpdatedAt, account.DeletedAt,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert account: %w", err)
@@ -50,16 +52,6 @@ func (r *AccountRepo) CreateAccountWithOwner(ctx context.Context, account entity
 			return fmt.Errorf("failed to link user to account: %w", err)
 		}
 
-		if account.AccountType == "broker" {
-			_, err := tx.Exec(ctx, `
-				INSERT INTO investment_accounts (id, account_id, created_at, updated_at)
-				VALUES ($1,$2,$3,$4)
-			`, uuid.New(), account.ID, account.CreatedAt, account.UpdatedAt)
-			if err != nil {
-				return fmt.Errorf("failed to create investment account extension: %w", err)
-			}
-		}
-
 		return nil
 	})
 }
@@ -71,7 +63,7 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID uuid.UUID)
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT a.id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
+		SELECT a.id, a.name, a.account_number, a.account_type, a.currency, a.parent_account_id, a.status, a.settings, a.closed_at,
 		       a.created_at, a.updated_at, a.deleted_at,
 		       COALESCE(SUM(
 		         CASE
@@ -81,16 +73,14 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID uuid.UUID)
 		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -COALESCE(t.from_amount, t.amount)
 		           ELSE 0
 		         END
-		       ), 0)::text AS balance,
-		       ia.id AS investment_account_id
+		       ), 0)::text AS balance
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
 		LEFT JOIN transactions t
 		  ON t.deleted_at IS NULL AND t.status = 'posted'
 		 AND (t.account_id = a.id OR t.from_account_id = a.id OR t.to_account_id = a.id)
-		LEFT JOIN investment_accounts ia ON ia.account_id = a.id
 		WHERE ua.user_id = $1 AND ua.status = 'active' AND a.deleted_at IS NULL
-		GROUP BY a.id, ia.id
+		GROUP BY a.id
 		ORDER BY a.created_at DESC
 	`, userID)
 	if err != nil {
@@ -101,13 +91,17 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID uuid.UUID)
 	var out []entity.Account
 	for rows.Next() {
 		var a entity.Account
+		var settingsJSON []byte
 		err := rows.Scan(
-			&a.ID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
-			&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
-			&a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
+			&a.ID, &a.Name, &a.AccountNumber, &a.AccountType, &a.Currency,
+			&a.ParentAccountID, &a.Status, &settingsJSON, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
+			&a.DeletedAt, &a.Balance,
 		)
 		if err != nil {
 			return nil, err
+		}
+		if len(settingsJSON) > 0 {
+			_ = json.Unmarshal(settingsJSON, &a.Settings)
 		}
 		out = append(out, a)
 	}
@@ -121,7 +115,7 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID uuid.UUID, a
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT a.id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
+		SELECT a.id, a.name, a.account_number, a.account_type, a.currency, a.parent_account_id, a.status, a.settings, a.closed_at,
 		       a.created_at, a.updated_at, a.deleted_at,
 		       COALESCE(SUM(
 		         CASE
@@ -131,29 +125,31 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID uuid.UUID, a
 		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -COALESCE(t.from_amount, t.amount)
 		           ELSE 0
 		         END
-		       ), 0)::text AS balance,
-		       ia.id AS investment_account_id
+		       ), 0)::text AS balance
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
 		LEFT JOIN transactions t
 		  ON t.deleted_at IS NULL AND t.status = 'posted'
 		 AND (t.account_id = a.id OR t.from_account_id = a.id OR t.to_account_id = a.id)
-		LEFT JOIN investment_accounts ia ON ia.account_id = a.id
 		WHERE a.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
-		GROUP BY a.id, ia.id
+		GROUP BY a.id
 	`, accountID, userID)
 
 	var a entity.Account
+	var settingsJSON []byte
 	err = row.Scan(
-		&a.ID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
-		&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
-		&a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
+		&a.ID, &a.Name, &a.AccountNumber, &a.AccountType, &a.Currency,
+		&a.ParentAccountID, &a.Status, &settingsJSON, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
+		&a.DeletedAt, &a.Balance,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("account not found")
 		}
 		return nil, err
+	}
+	if len(settingsJSON) > 0 {
+		_ = json.Unmarshal(settingsJSON, &a.Settings)
 	}
 	return &a, nil
 }
@@ -189,17 +185,26 @@ func (r *AccountRepo) PatchAccount(ctx context.Context, actorUserID uuid.UUID, a
 				closedAt = nil
 			}
 		}
+		settingsJSON, _ := json.Marshal(cur.Settings)
 
-		color := cur.Color
-		if patch.Color != nil {
-			color = patch.Color
+		if patch.Settings != nil {
+			if patch.Settings.Color != nil {
+				cur.Settings.Color = patch.Settings.Color
+			}
+			if patch.Settings.Investment != nil {
+				cur.Settings.Investment = patch.Settings.Investment
+			}
+			if patch.Settings.Savings != nil {
+				cur.Settings.Savings = patch.Settings.Savings
+			}
+			settingsJSON, _ = json.Marshal(cur.Settings)
 		}
 
 		_, err = tx.Exec(ctx, `
 			UPDATE accounts
-			SET name = $1, color = $2, status = $3, closed_at = $4, updated_at = $5
+			SET name = $1, status = $2, closed_at = $3, settings = $4, updated_at = $5
 			WHERE id = $6 AND deleted_at IS NULL
-		`, name, color, status, closedAt, now, accountID)
+		`, name, status, closedAt, settingsJSON, now, accountID)
 		if err != nil {
 			return err
 		}
@@ -459,7 +464,7 @@ func (r *AccountRepo) requireAccountOwner(ctx context.Context, tx pgx.Tx, userID
 
 func (r *AccountRepo) getAccountInTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
 	row := tx.QueryRow(ctx, `
-		SELECT a.id, a.name, a.account_number, a.color, a.account_type, a.currency, a.parent_account_id, a.status, a.closed_at,
+		SELECT a.id, a.name, a.account_number, a.account_type, a.currency, a.parent_account_id, a.status, a.settings, a.closed_at,
 		       a.created_at, a.updated_at, a.deleted_at,
 		       COALESCE(SUM(
 		         CASE
@@ -469,29 +474,31 @@ func (r *AccountRepo) getAccountInTx(ctx context.Context, tx pgx.Tx, userID uuid
 		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -COALESCE(t.from_amount, t.amount)
 		           ELSE 0
 		         END
-		       ), 0)::text AS balance,
-		       ia.id AS investment_account_id
+		       ), 0)::text AS balance
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
 		LEFT JOIN transactions t
 		  ON t.deleted_at IS NULL AND t.status = 'posted'
 		 AND (t.account_id = a.id OR t.from_account_id = a.id OR t.to_account_id = a.id)
-		LEFT JOIN investment_accounts ia ON ia.account_id = a.id
 		WHERE a.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
-		GROUP BY a.id, ia.id
+		GROUP BY a.id
 	`, accountID, userID)
 
 	var a entity.Account
+	var settingsJSON []byte
 	err := row.Scan(
-		&a.ID, &a.Name, &a.AccountNumber, &a.Color, &a.AccountType, &a.Currency,
-		&a.ParentAccountID, &a.Status, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
-		&a.DeletedAt, &a.Balance, &a.InvestmentAccountID,
+		&a.ID, &a.Name, &a.AccountNumber, &a.AccountType, &a.Currency,
+		&a.ParentAccountID, &a.Status, &settingsJSON, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
+		&a.DeletedAt, &a.Balance,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("account not found")
 		}
 		return nil, err
+	}
+	if len(settingsJSON) > 0 {
+		_ = json.Unmarshal(settingsJSON, &a.Settings)
 	}
 	return &a, nil
 }

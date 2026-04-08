@@ -4,35 +4,44 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
+	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
+// TransactionService handles the core ledger logic of the application.
+// It serves as the "Sổ cái trung tâm" (Central Ledger), recording every movement of money
+// across accounts, categories, and tags. Other services (Debt, Investment, Savings) 
+// depend on this service to reflect their financial state in the user's balances.
 type TransactionService struct {
 	repo        interfaces.TransactionRepository
 	tagSvc      interfaces.TagService
 	debtSvc     interfaces.DebtService
 	accountRepo interfaces.AccountRepository
+	db          *database.Postgres
 }
 
-func NewTransactionService(repo interfaces.TransactionRepository, tagSvc interfaces.TagService, accountRepo interfaces.AccountRepository) *TransactionService {
-	return &TransactionService{repo: repo, tagSvc: tagSvc, accountRepo: accountRepo}
+// NewTransactionService creates a new instance of the central ledger service.
+func NewTransactionService(repo interfaces.TransactionRepository, tagSvc interfaces.TagService, accountRepo interfaces.AccountRepository, db *database.Postgres) *TransactionService {
+	return &TransactionService{repo: repo, tagSvc: tagSvc, accountRepo: accountRepo, db: db}
 }
 
+// SetDebtService is used for dependency injection to resolve circular dependency with DebtService.
 func (s *TransactionService) SetDebtService(ds interfaces.DebtService) {
 	s.debtSvc = ds
 }
 
+// List returns a paginated list of transactions filtered by various criteria.
 func (s *TransactionService) List(ctx context.Context, userID uuid.UUID, req dto.ListTransactionsRequest) ([]dto.TransactionResponse, *string, int, error) {
 	filter := entity.TransactionListFilter{
 		Page:  req.Page,
@@ -68,6 +77,7 @@ func (s *TransactionService) List(ctx context.Context, userID uuid.UUID, req dto
 	return dto.NewTransactionResponses(items), cursor, total, nil
 }
 
+// Get retrieves a single transaction by its ID, ensuring it belongs to the specified user.
 func (s *TransactionService) Get(ctx context.Context, userID, transactionID uuid.UUID) (*dto.TransactionResponse, error) {
 	it, err := s.repo.GetTransaction(ctx, userID, transactionID)
 	if err != nil {
@@ -80,6 +90,11 @@ func (s *TransactionService) Get(ctx context.Context, userID, transactionID uuid
 	return &resp, nil
 }
 
+// Create records a new financial movement. It handles:
+// 1. Regular Expenses/Income (with optional line-item split)
+// 2. Transfers between accounts (from_account -> to_account)
+// 3. Shared Expenses (auto-creating debts for participants)
+// All operations are wrapped in a single database transaction for atomic safety.
 func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateTransactionRequest) (*dto.TransactionResponse, error) {
 	kind := strings.TrimSpace(string(req.Type))
 	if kind != string(entity.TransactionTypeExpense) && kind != string(entity.TransactionTypeIncome) && kind != string(entity.TransactionTypeTransfer) {
@@ -120,6 +135,9 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 			Amount:     amount,
 		})
 	}
+
+	// Resolve tags for transaction level if TagService is available
+	tagIDs, _ := s.ensureTags(ctx, userID, req.TagIDs, req.Lang)
 
 	// Sum line items if present (except transfer)
 	if kind != "transfer" && len(req.LineItems) > 0 {
@@ -179,86 +197,80 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 		Status:        entity.TransactionStatusPosted,
 	}
 
-	tagIDs, _ := s.ensureTags(ctx, userID, req.TagIDs, req.Lang)
+	var resp *dto.TransactionResponse
+	err = s.db.WithTx(ctx, func(txConn pgx.Tx) error {
+		// 1. Create Transaction
+		if err := s.repo.CreateTransactionTx(ctx, txConn, userID, tx, lineItems, tagIDs); err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "fk_tli_category" {
+				return apperr.BadRequest("invalid_category", "invalid category_id")
+			}
+			return err
+		}
 
-	participants := []entity.GroupExpenseParticipant{}
-	if len(req.GroupParticipants) > 0 {
-		participants = s.allocateGroupParticipants(userID, id, tx.Amount, req.OwnerOriginalAmount, req.GroupParticipants)
-		// Auto-debt side (if svc available)
-		if s.debtSvc != nil && tx.AccountID != nil {
-			for _, p := range participants {
-				// Simple debt create
-				debtName := p.ParticipantName
-				if description != nil {
-					debtName = *description + " (" + p.ParticipantName + ")"
+		// 2. Create Debts for Shared Expenses
+		if len(req.GroupParticipants) > 0 {
+			shares := s.allocateGroupParticipants(userID, id, tx.Amount, req.OwnerOriginalAmount, req.GroupParticipants)
+			if s.debtSvc != nil && tx.AccountID != nil {
+				for _, share := range shares {
+					debtName := share.Name
+					if description != nil {
+						debtName = *description + " (" + share.Name + ")"
+					}
+					originTxId := id.String()
+					_, err := s.debtSvc.CreateTx(ctx, txConn, userID, dto.CreateDebtRequest{
+						AccountID:                tx.AccountID.String(),
+						OriginatingTransactionID: &originTxId,
+						Direction:                "lent",
+						Name:                     &debtName,
+						ContactName:              &share.Name,
+						Principal:                share.Amount,
+						StartDate:                tx.OccurredDate,
+						DueDate:                  "2099-12-31", // Default far-future due date
+					})
+					if err != nil {
+						return err
+					}
 				}
-				_, _ = s.debtSvc.Create(ctx, userID, dto.CreateDebtRequest{
-					AccountID: tx.AccountID.String(),
-					Direction: "lent",
-					Name:      &debtName,
-					Principal: p.ShareAmount,
-					StartDate: tx.OccurredDate,
-					DueDate:   "2099-12-31",
-				})
 			}
 		}
-	}
 
-	if err := s.repo.CreateTransaction(ctx, userID, tx, lineItems, tagIDs, participants); err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "fk_tli_category" {
-			return nil, apperr.BadRequest("invalid_category", "invalid category_id")
+		// Fetch back for response
+		it, err := s.repo.GetTransaction(ctx, userID, id)
+		if err != nil {
+			return err
 		}
-		return nil, err
-	}
+		if it == nil {
+			return errors.New("failed to retrieve created transaction")
+		}
+		tr := dto.NewTransactionResponse(*it)
+		resp = &tr
 
-	it, err := s.repo.GetTransaction(ctx, userID, id)
+		// Audit Logging
+		if it.AccountID != nil {
+			_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
+				BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
+				AccountID:   *it.AccountID,
+				ActorUserID: userID,
+				Action:      "transaction_created",
+				EntityType:  "transaction",
+				EntityID:    it.ID,
+				OccurredAt:  time.Now().UTC(),
+			})
+		}
+
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	if it == nil {
-		return nil, nil
-	}
-	resp := dto.NewTransactionResponse(*it)
 
-	// Audit Logging
-	if it.AccountID != nil {
-		_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
-			BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
-			AccountID:   *it.AccountID,
-			ActorUserID: userID,
-			Action:      "transaction_created",
-			EntityType:  "transaction",
-			EntityID:    it.ID,
-			OccurredAt:  time.Now().UTC(),
-		})
-	}
-	if it.FromAccountID != nil {
-		_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
-			BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
-			AccountID:   *it.FromAccountID,
-			ActorUserID: userID,
-			Action:      "transaction_created",
-			EntityType:  "transaction",
-			EntityID:    it.ID,
-			OccurredAt:  time.Now().UTC(),
-		})
-	}
-	if it.ToAccountID != nil {
-		_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
-			BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
-			AccountID:   *it.ToAccountID,
-			ActorUserID: userID,
-			Action:      "transaction_created",
-			EntityType:  "transaction",
-			EntityID:    it.ID,
-			OccurredAt:  time.Now().UTC(),
-		})
-	}
-
-	return &resp, nil
+	return resp, nil
 }
 
+// Patch applies partial updates to an existing transaction. 
+// It supports updating description, amount, status, categories, and tags.
 func (s *TransactionService) Patch(ctx context.Context, userID, transactionID uuid.UUID, req dto.TransactionPatchRequest) (*dto.TransactionResponse, error) {
 	tagIDs, _ := s.ensureTags(ctx, userID, req.TagIDs, req.Lang)
 
@@ -274,6 +286,18 @@ func (s *TransactionService) Patch(ctx context.Context, userID, transactionID uu
 		if err == nil {
 			patch.OccurredAt = &t
 		}
+	}
+	if req.LineItems != nil {
+		lis := make([]entity.TransactionLineItem, len(*req.LineItems))
+		for i, li := range *req.LineItems {
+			lis[i] = entity.TransactionLineItem{
+				CategoryID: li.CategoryID,
+				TagIDs:     li.TagIDs,
+				Amount:     li.Amount,
+				Note:       li.Note,
+			}
+		}
+		patch.LineItems = &lis
 	}
 
 	it, err := s.repo.PatchTransaction(ctx, userID, transactionID, patch)
@@ -325,6 +349,18 @@ func (s *TransactionService) BatchPatch(ctx context.Context, userID uuid.UUID, r
 			Amount:      utils.NormalizeOptionalString(req.Patch.Amount),
 			Status:      req.Patch.Status,
 		}
+		if req.Patch.LineItems != nil {
+			lis := make([]entity.TransactionLineItem, len(*req.Patch.LineItems))
+			for i, li := range *req.Patch.LineItems {
+				lis[i] = entity.TransactionLineItem{
+					CategoryID: li.CategoryID,
+					TagIDs:     li.TagIDs,
+					Amount:     li.Amount,
+					Note:       li.Note,
+				}
+			}
+			p.LineItems = &lis
+		}
 		patches[id] = p
 	}
 
@@ -349,8 +385,8 @@ func (s *TransactionService) Delete(ctx context.Context, userID, transactionID u
 		// Audit Logging
 		if tx.AccountID != nil {
 			_ = s.accountRepo.RecordAccountAuditEvent(ctx, entity.AccountAuditEvent{
-				BaseEntity: entity.BaseEntity{ID: utils.NewID()},
-				AccountID:  *tx.AccountID,
+				BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
+				AccountID:   *tx.AccountID,
 				ActorUserID: userID,
 				Action:      "transaction_deleted",
 				EntityType:  "transaction",
@@ -362,270 +398,44 @@ func (s *TransactionService) Delete(ctx context.Context, userID, transactionID u
 	return err
 }
 
-// Imports
-func (s *TransactionService) StageImport(ctx context.Context, userID uuid.UUID, items []dto.StageImportedItem) (int, int, []string, error) {
-	// 1. Fetch rules for auto-mapping
-	rules, err := s.repo.ListImportMappingRules(ctx, userID)
-	if err != nil {
-		return 0, 0, nil, err
-	}
-
-	normalize := func(v string) string {
-		return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(v)), " "))
-	}
-
-	accountRules := map[string]uuid.UUID{}
-	categoryRules := map[string]uuid.UUID{}
-	for _, rule := range rules {
-		key := normalize(rule.SourceName)
-		if key == "" {
-			continue
-		}
-		if rule.Kind == "account" {
-			accountRules[key] = rule.MappedID
-		}
-		if rule.Kind == "category" {
-			categoryRules[key] = rule.MappedID
-		}
-	}
-
-	// 2. Prepare entities
-	creates := make([]entity.ImportedTransactionCreate, 0, len(items))
-	for _, item := range items {
-		tDate, err := s.normalizeImportDate(item.TransactionDate)
-		if err != nil {
-			continue
-		}
-
-		create := entity.ImportedTransactionCreate{
-			Source:               "generic", // Default source
-			TransactionDate:      tDate,
-			Amount:               item.Amount,
-			Description:          item.Description,
-			TransactionType:      item.TransactionType,
-			ImportedAccountName:  item.AccountName,
-			ImportedCategoryName: item.CategoryName,
-			RawPayload:           item.Raw,
-		}
-
-		// Auto-map
-		if item.AccountName != nil {
-			if id, ok := accountRules[normalize(*item.AccountName)]; ok {
-				create.MappedAccountID = &id
-			}
-		}
-		if item.CategoryName != nil {
-			if id, ok := categoryRules[normalize(*item.CategoryName)]; ok {
-				create.MappedCategoryID = &id
-			}
-		}
-
-		creates = append(creates, create)
-	}
-
-	if len(creates) == 0 {
-		return 0, len(items), nil, nil
-	}
-
-	// 3. Save
-	staged, err := s.repo.CreateImportedTransactions(ctx, userID, creates)
-	if err != nil {
-		return 0, 0, nil, err
-	}
-
-	return len(staged), len(items) - len(staged), nil, nil
-}
-
-func (s *TransactionService) ListImported(ctx context.Context, userID uuid.UUID) ([]dto.ImportedTransactionResponse, error) {
-	items, err := s.repo.ListImportedTransactions(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	return dto.NewImportedTransactionResponses(items), nil
-}
-
-func (s *TransactionService) PatchImported(ctx context.Context, userID uuid.UUID, importID uuid.UUID, patch entity.ImportedTransactionPatch) (*dto.ImportedTransactionResponse, error) {
-	it, err := s.repo.PatchImportedTransaction(ctx, userID, importID, patch)
-	if err != nil {
-		return nil, err
-	}
-	if it == nil {
-		return nil, nil
-	}
-	resp := dto.NewImportedTransactionResponse(*it)
-	return &resp, nil
-}
-
-func (s *TransactionService) DeleteImported(ctx context.Context, userID, importID uuid.UUID) error {
-	return s.repo.DeleteImportedTransaction(ctx, userID, importID)
-}
-
-func (s *TransactionService) ClearImported(ctx context.Context, userID uuid.UUID) error {
-	_, err := s.repo.DeleteAllImportedTransactions(ctx, userID)
-	return err
-}
-
-// Rules
-func (s *TransactionService) UpsertMappingRules(ctx context.Context, userID uuid.UUID, inputs []dto.MappingRuleInput) ([]dto.ImportMappingRuleResponse, error) {
-	upserts := make([]entity.ImportMappingRuleUpsert, len(inputs))
-	for i, in := range inputs {
-		upserts[i] = entity.ImportMappingRuleUpsert{
-			Kind:       entity.ImportMappingRuleKind(in.Kind),
-			SourceName: in.SourceName,
-			MappedID:   in.MappedID,
-		}
-	}
-	rules, err := s.repo.UpsertImportMappingRules(ctx, userID, upserts)
-	if err != nil {
-		return nil, err
-	}
-	return dto.NewImportMappingRuleResponses(rules), nil
-}
-
-func (s *TransactionService) ListMappingRules(ctx context.Context, userID uuid.UUID) ([]dto.ImportMappingRuleResponse, error) {
-	rules, err := s.repo.ListImportMappingRules(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	return dto.NewImportMappingRuleResponses(rules), nil
-}
-
-func (s *TransactionService) DeleteMappingRule(ctx context.Context, userID, ruleID uuid.UUID) error {
-	return s.repo.DeleteImportMappingRule(ctx, userID, ruleID)
-}
-
-// Create from Imports
-func (s *TransactionService) CreateFromImported(ctx context.Context, userID, importID uuid.UUID) (*dto.TransactionResponse, error) {
-	it, err := s.repo.GetImportedTransaction(ctx, userID, importID)
+func (s *TransactionService) ListForExport(ctx context.Context, userID uuid.UUID, filter entity.TransactionListFilter) ([]entity.ExportTransactionRow, error) {
+	// Reuse existing search/list logic but with a larger limit for direct export
+	filter.Limit = 10000
+	transactions, _, _, err := s.repo.ListTransactions(ctx, userID, filter)
 	if err != nil {
 		return nil, err
 	}
 
-	// Prepare create request
-	req := dto.CreateTransactionRequest{
-		OccurredDate: &it.TransactionDate,
-		Amount:       it.Amount,
-		Description:  it.Description,
-		Type:         "expense", // Default
-	}
-	if it.TransactionType != nil {
-		req.Type = entity.TransactionType(strings.ToLower(*it.TransactionType))
-	}
-	if it.MappedAccountID != nil {
-		if req.Type == "transfer" {
-			req.FromAccountID = it.MappedAccountID
-		} else {
-			req.AccountID = it.MappedAccountID
+	rows := make([]entity.ExportTransactionRow, len(transactions))
+	for i, t := range transactions {
+		var catName *string
+		if len(t.CategoryNames) > 0 {
+			catName = &t.CategoryNames[0]
 		}
-	}
-	if it.MappedCategoryID != nil {
-		req.CategoryID = it.MappedCategoryID
-	}
-
-	tx, err := s.Create(ctx, userID, req)
-	if err != nil {
-		return nil, err
-	}
-
-	// Cleanup
-	_ = s.repo.DeleteImportedTransaction(ctx, userID, importID)
-
-	return tx, nil
-}
-
-func (s *TransactionService) CreateManyFromImported(ctx context.Context, userID uuid.UUID, importIDs []uuid.UUID) (*dto.BatchImportResult, error) {
-	res := &dto.BatchImportResult{}
-	for _, id := range importIDs {
-		_, err := s.CreateFromImported(ctx, userID, id)
-		if err != nil {
-			res.Skipped++
-			res.Errors = append(res.Errors, fmt.Sprintf("ID %v: %v", id, err))
-		} else {
-			res.Created++
+		var tagName *string
+		if len(t.TagNames) > 0 {
+			tagName = &t.TagNames[0]
 		}
-	}
-	return res, nil
-}
 
-func (s *TransactionService) ApplyRulesAndCreate(ctx context.Context, userID uuid.UUID) (*dto.BatchImportResult, error) {
-	// 1. Get rules and items
-	rules, _ := s.repo.ListImportMappingRules(ctx, userID)
-	items, _ := s.repo.ListImportedTransactions(ctx, userID)
-
-	normalize := func(v string) string {
-		return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(v)), " "))
-	}
-
-	accountRules := map[string]uuid.UUID{}
-	categoryRules := map[string]uuid.UUID{}
-	for _, rule := range rules {
-		k := normalize(rule.SourceName)
-		if rule.Kind == "account" {
-			accountRules[k] = rule.MappedID
-		} else {
-			categoryRules[k] = rule.MappedID
+		rows[i] = entity.ExportTransactionRow{
+			ID:           t.ID,
+			Description:  t.Description,
+			Amount:       t.Amount,
+			Type:         string(t.Type),
+			OccurredDate: t.OccurredDate,
+			AccountName:  t.AccountName,
+			CategoryName: catName,
+			TagName:      tagName,
+			ExternalRef:  t.ExternalRef,
 		}
 	}
 
-	// 2. Patch items that can be auto-mapped
-	for _, it := range items {
-		patch := entity.ImportedTransactionPatch{}
-		changed := false
-		if it.MappedAccountID == nil && it.ImportedAccountName != nil {
-			if id, ok := accountRules[normalize(*it.ImportedAccountName)]; ok {
-				patch.MappedAccountID = &id
-				changed = true
-			}
-		}
-		if it.MappedCategoryID == nil && it.ImportedCategoryName != nil {
-			if id, ok := categoryRules[normalize(*it.ImportedCategoryName)]; ok {
-				patch.MappedCategoryID = &id
-				changed = true
-			}
-		}
-		if changed {
-			_, _ = s.repo.PatchImportedTransaction(ctx, userID, it.ID, patch)
-		}
-	}
-
-	// 3. Create all that are fully mapped
-	items, _ = s.repo.ListImportedTransactions(ctx, userID)
-	res := &dto.BatchImportResult{}
-	for _, it := range items {
-		if it.MappedAccountID == nil {
-			continue
-		}
-		if !strings.EqualFold(utils.Coalesce(it.TransactionType, ""), "transfer") && it.MappedCategoryID == nil {
-			continue
-		}
-
-		_, err := s.CreateFromImported(ctx, userID, it.ID)
-		if err != nil {
-			res.Skipped++
-			res.Errors = append(res.Errors, fmt.Sprintf("ID %v: %v", it.ID, err))
-		} else {
-			res.Created++
-		}
-	}
-	return res, nil
-}
-
-func (s *TransactionService) normalizeImportDate(v string) (string, error) {
-	v = strings.TrimSpace(v)
-	if v == "" {
-		return "", errors.New("empty date")
-	}
-	layouts := []string{"2006-01-02", "2006/01/02", "02/01/2006", "2-1-2006", "02-01-2006", time.RFC3339}
-	for _, l := range layouts {
-		if t, err := time.Parse(l, v); err == nil {
-			return t.Format("2006-01-02"), nil
-		}
-	}
-	return "", errors.New("invalid date format")
+	return rows, nil
 }
 
 // Helpers
 func (s *TransactionService) ensureTags(ctx context.Context, userID uuid.UUID, inputs []uuid.UUID, lang string) ([]uuid.UUID, error) {
+
 	if s.tagSvc == nil || len(inputs) == 0 {
 		return nil, nil
 	}
@@ -640,7 +450,12 @@ func (s *TransactionService) ensureTags(ctx context.Context, userID uuid.UUID, i
 	return inputs, nil
 }
 
-func (s *TransactionService) allocateGroupParticipants(userID uuid.UUID, txID uuid.UUID, txAmt string, ownerAmt *string, inputs []dto.GroupParticipantInput) []entity.GroupExpenseParticipant {
+type ComputedShare struct {
+	Name   string
+	Amount string
+}
+
+func (s *TransactionService) allocateGroupParticipants(userID uuid.UUID, txID uuid.UUID, txAmt string, ownerAmt *string, inputs []dto.GroupParticipantInput) []ComputedShare {
 	totalPaid, ok := new(big.Rat).SetString(txAmt)
 	if !ok {
 		return nil
@@ -687,23 +502,14 @@ func (s *TransactionService) allocateGroupParticipants(userID uuid.UUID, txID uu
 		}
 	}
 
-	out := []entity.GroupExpenseParticipant{}
+	out := make([]ComputedShare, 0, len(involved))
 	for i, p := range involved {
 		if p.name == "owner" {
 			continue
 		}
-		out = append(out, entity.GroupExpenseParticipant{
-			AuditEntity: entity.AuditEntity{
-				BaseEntity: entity.BaseEntity{
-					ID: utils.NewID(),
-				},
-			},
-			UserID:          userID,
-			TransactionID:   txID,
-			ParticipantName: p.name,
-			OriginalAmount:  p.origStr,
-			ShareAmount:     shares[i].FloatString(2),
-			IsSettled:       false,
+		out = append(out, ComputedShare{
+			Name:   p.name,
+			Amount: shares[i].FloatString(2),
 		})
 	}
 	return out

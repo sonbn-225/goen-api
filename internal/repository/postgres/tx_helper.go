@@ -3,15 +3,16 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
-// createTransactionTx is a shared helper to insert a transaction and its associated data
+// CreateTransactionTx is a shared helper to insert a transaction and its associated data
 // within an existing database transaction (pgx.Tx).
-func createTransactionTx(ctx context.Context, txConn pgx.Tx, userID uuid.UUID, tx entity.Transaction, lineItems []entity.TransactionLineItem, tagIDs []uuid.UUID, participants []entity.GroupExpenseParticipant) error {
+func CreateTransactionTx(ctx context.Context, txConn pgx.Tx, userID uuid.UUID, tx entity.Transaction, lineItems []entity.TransactionLineItem, tagIDs []uuid.UUID) error {
 	// 1. Permission Check
 	switch tx.Type {
 	case "expense", "income":
@@ -91,23 +92,7 @@ func createTransactionTx(ctx context.Context, txConn pgx.Tx, userID uuid.UUID, t
 		}
 	}
 
-	// 5. Group Participants
-	for _, p := range participants {
-		pID := p.ID
-		if pID == uuid.Nil {
-			pID = uuid.New()
-		}
-		_, err = txConn.Exec(ctx, `
-			INSERT INTO group_expense_participants (
-				id, user_id, transaction_id, participant_name, original_amount, share_amount,
-				is_settled, settlement_transaction_id, created_at, updated_at
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		`, pID, userID, tx.ID, p.ParticipantName, p.OriginalAmount, p.ShareAmount,
-			p.IsSettled, p.SettlementTransactionID, p.CreatedAt, p.UpdatedAt)
-		if err != nil {
-			return err
-		}
-	}
+
 
 	return nil
 }
@@ -126,4 +111,29 @@ func requireAccountPermission(ctx context.Context, tx pgx.Tx, userID, accountID 
 		return errors.New("forbidden: insufficient permission on account")
 	}
 	return nil
+}
+
+// DeleteTransactionTx is a shared helper to soft-delete a transaction and its associated data
+// within an existing database transaction (pgx.Tx).
+func DeleteTransactionTx(ctx context.Context, tx pgx.Tx, userID, transactionID uuid.UUID) error {
+	now := time.Now().UTC()
+	// 1. Verify owner (simple check for existence and user_accounts link)
+	var id uuid.UUID
+	err := tx.QueryRow(ctx, `
+		SELECT t.id 
+		FROM transactions t
+		LEFT JOIN accounts a ON a.id = t.account_id
+		LEFT JOIN user_accounts ua ON ua.account_id = a.id
+		WHERE t.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND t.deleted_at IS NULL
+	`, transactionID, userID).Scan(&id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errors.New("transaction not found or access denied")
+		}
+		return err
+	}
+
+	// 2. Soft Delete
+	_, err = tx.Exec(ctx, "UPDATE transactions SET deleted_at = $1, updated_at = $1 WHERE id = $2", now, transactionID)
+	return err
 }

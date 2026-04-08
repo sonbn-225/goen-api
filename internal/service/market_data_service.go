@@ -19,21 +19,21 @@ import (
 type MarketDataService struct {
 	cfg       *config.Config
 	repo      interfaces.MarketDataRepository
-	redis     *database.Redis
-	investSvc interfaces.InvestmentService
+	redis  *database.Redis
+	secSvc interfaces.SecurityService
 }
 
 func NewMarketDataService(
 	cfg *config.Config,
 	repo interfaces.MarketDataRepository,
 	redis *database.Redis,
-	investSvc interfaces.InvestmentService,
+	secSvc interfaces.SecurityService,
 ) *MarketDataService {
 	return &MarketDataService{
-		cfg:       cfg,
-		repo:      repo,
-		redis:     redis,
-		investSvc: investSvc,
+		cfg:    cfg,
+		repo:   repo,
+		redis:  redis,
+		secSvc: secSvc,
 	}
 }
 
@@ -42,7 +42,7 @@ func (s *MarketDataService) EnqueueSecurityPricesDaily(ctx context.Context, user
 		return dto.RefreshOneResponse{}, errors.New("redis is not configured")
 	}
 
-	if _, err := s.investSvc.GetSecurity(ctx, req.SecurityID); err != nil {
+	if _, err := s.secSvc.GetSecurity(ctx, req.SecurityID); err != nil {
 		return dto.RefreshOneResponse{}, err
 	}
 
@@ -77,7 +77,7 @@ func (s *MarketDataService) EnqueueSecurityEvents(ctx context.Context, userID uu
 		return dto.RefreshOneResponse{}, errors.New("redis is not configured")
 	}
 
-	if _, err := s.investSvc.GetSecurity(ctx, req.SecurityID); err != nil {
+	if _, err := s.secSvc.GetSecurity(ctx, req.SecurityID); err != nil {
 		return dto.RefreshOneResponse{}, err
 	}
 
@@ -182,7 +182,7 @@ func (s *MarketDataService) EnqueueBySymbols(ctx context.Context, userID uuid.UU
 }
 
 func (s *MarketDataService) GetSecurityStatus(ctx context.Context, userID, securityID uuid.UUID) (dto.SecurityStatus, error) {
-	if _, err := s.investSvc.GetSecurity(ctx, securityID); err != nil {
+	if _, err := s.secSvc.GetSecurity(ctx, securityID); err != nil {
 		return dto.SecurityStatus{}, err
 	}
 

@@ -35,6 +35,7 @@ func (h *DebtHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 				r.Delete("/", h.Delete)
 				r.Post("/payments", h.AddPayment)
 				r.Get("/payments", h.ListPayments)
+				r.Post("/repay", h.Repay)
 			})
 		})
 	})
@@ -268,4 +269,46 @@ func (h *DebtHandler) ListPayments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.WriteSuccess(w, http.StatusOK, items)
+}
+
+// Repay godoc
+// @Summary Repay Debt (1-step)
+// @Description Automatically create a payment transaction and link it to the debt
+// @Tags Debts
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Debt ID"
+// @Param request body dto.DebtRepayRequest true "Repayment Payload"
+// @Success 200 {object} response.SuccessEnvelope{data=dto.DebtResponse}
+// @Failure 400 {object} response.ErrorEnvelope
+// @Failure 401 {object} response.ErrorEnvelope
+// @Failure 404 {object} response.ErrorEnvelope
+// @Router /debts/{id}/repay [post]
+func (h *DebtHandler) Repay(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid debt id format", nil)
+		return
+	}
+	var req dto.DebtRepayRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
+		return
+	}
+	res, err := h.svc.Repay(r.Context(), userID, id, req)
+	if err != nil {
+		response.HandleError(w, err)
+		return
+	}
+	if res == nil {
+		response.WriteError(w, http.StatusNotFound, "not_found", "debt not found", nil)
+		return
+	}
+	response.WriteSuccess(w, http.StatusOK, res)
 }

@@ -25,10 +25,10 @@ func (r *CategoryRepo) GetCategory(ctx context.Context, userID uuid.UUID, catego
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT c.id, c.key, c.parent_category_id, p.key AS parent_key, c.type, c.sort_order, c.is_active, c.icon, c.color, c.created_at, c.updated_at, c.deleted_at
+		SELECT c.id, c.key, c.parent_category_id, p.key AS parent_key, c.type, c.sort_order, c.is_active, c.icon, c.color
 		FROM categories c
 		LEFT JOIN categories p ON p.id = c.parent_category_id
-		WHERE c.id = $1 AND c.deleted_at IS NULL
+		WHERE c.id = $1
 	`, categoryID)
 
 	var c entity.Category
@@ -42,9 +42,6 @@ func (r *CategoryRepo) GetCategory(ctx context.Context, userID uuid.UUID, catego
 		&c.IsActive,
 		&c.Icon,
 		&c.Color,
-		&c.CreatedAt,
-		&c.UpdatedAt,
-		&c.DeletedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("category not found")
@@ -62,10 +59,10 @@ func (r *CategoryRepo) ListCategories(ctx context.Context, userID uuid.UUID) ([]
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT c.id, c.key, c.parent_category_id, p.key AS parent_key, c.type, c.sort_order, c.is_active, c.icon, c.color, c.created_at, c.updated_at, c.deleted_at
+		SELECT c.id, c.key, c.parent_category_id, p.key AS parent_key, c.type, c.sort_order, c.is_active, c.icon, c.color
 		FROM categories c
 		LEFT JOIN categories p ON p.id = c.parent_category_id
-		WHERE c.deleted_at IS NULL AND c.is_active = true
+		WHERE c.is_active = true
 		ORDER BY COALESCE(c.sort_order, 0) ASC, c.key ASC
 	`)
 	if err != nil {
@@ -86,9 +83,6 @@ func (r *CategoryRepo) ListCategories(ctx context.Context, userID uuid.UUID) ([]
 			&c.IsActive,
 			&c.Icon,
 			&c.Color,
-			&c.CreatedAt,
-			&c.UpdatedAt,
-			&c.DeletedAt,
 		); err != nil {
 			return nil, err
 		}

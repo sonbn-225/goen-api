@@ -302,16 +302,15 @@ VALUES
     ('cat_sys_rotating_savings_payout', 'cat_sys_internal', 'income', 10021, true, 'coins', 'cyan');
 
 
-INSERT INTO categories (key, type, sort_order, is_active, icon, color, created_at, updated_at)
-SELECT key, type, sort_order, is_active, icon, color, NOW(), NOW()
+INSERT INTO categories (key, type, sort_order, is_active, icon, color)
+SELECT key, type, sort_order, is_active, icon, color
 FROM seed_categories
 ON CONFLICT (key) DO UPDATE
 SET type = EXCLUDED.type,
     sort_order = EXCLUDED.sort_order,
     is_active = EXCLUDED.is_active,
     icon = EXCLUDED.icon,
-    color = EXCLUDED.color,
-    updated_at = NOW(); -- Chỉ cập nhật thời gian updated_at khi conflict, bảo toàn created_at cũ
+    color = EXCLUDED.color;
 
 UPDATE categories c
 SET parent_category_id = p.id

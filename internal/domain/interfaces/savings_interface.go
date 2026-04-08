@@ -4,12 +4,14 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
 type SavingsRepository interface {
 	CreateSavings(ctx context.Context, userID uuid.UUID, s entity.Savings) error
+	CreateSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, s entity.Savings) error
 	GetSavings(ctx context.Context, userID uuid.UUID, savingsID uuid.UUID) (*entity.Savings, error)
 	ListSavings(ctx context.Context, userID uuid.UUID) ([]entity.Savings, error)
 	UpdateSavings(ctx context.Context, userID uuid.UUID, s entity.Savings) error

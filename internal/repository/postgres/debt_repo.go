@@ -21,23 +21,24 @@ func NewDebtRepo(db *database.Postgres) *DebtRepo {
 }
 
 func (r *DebtRepo) CreateDebt(ctx context.Context, debt entity.Debt) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
+	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
+		return r.CreateDebtTx(ctx, tx, debt)
+	})
+}
 
-	tag, err := pool.Exec(ctx, `
+func (r *DebtRepo) CreateDebtTx(ctx context.Context, tx pgx.Tx, debt entity.Debt) error {
+	tag, err := tx.Exec(ctx, `
 		INSERT INTO debts (
 			id, user_id, account_id, direction, name, contact_id, principal,
 			start_date, due_date, interest_rate, interest_rule,
 			outstanding_principal, accrued_interest, status, closed_at,
-			created_at, updated_at
+			originating_transaction_id, created_at, updated_at
 		)
 		SELECT
 			$1,$2,$3,$4,$5,$6,$7::numeric,
 			$8::date,$9::date,$10::numeric,$11,
 			$12::numeric,$13::numeric,$14,$15,
-			$16,$17
+			$16,$17,$18
 		WHERE EXISTS (
 			SELECT 1 FROM user_accounts ua
 			WHERE ua.user_id = $2 AND ua.account_id = $3 AND ua.status = 'active'
@@ -46,7 +47,7 @@ func (r *DebtRepo) CreateDebt(ctx context.Context, debt entity.Debt) error {
 		debt.ID, debt.UserID, debt.AccountID, debt.Direction, debt.Name, debt.ContactID,
 		debt.Principal, debt.StartDate, debt.DueDate, debt.InterestRate, debt.InterestRule,
 		debt.OutstandingPrincipal, debt.AccruedInterest, debt.Status, debt.ClosedAt,
-		debt.CreatedAt, debt.UpdatedAt,
+		debt.OriginatingTransactionID, debt.CreatedAt, debt.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -72,7 +73,7 @@ func (r *DebtRepo) GetDebt(ctx context.Context, userID uuid.UUID, id uuid.UUID) 
 			to_char(d.start_date, 'YYYY-MM-DD'), to_char(d.due_date, 'YYYY-MM-DD'),
 			d.interest_rate::text, d.interest_rule,
 			d.outstanding_principal::text, d.accrued_interest::text,
-			d.status, d.closed_at, d.created_at, d.updated_at, d.deleted_at
+			d.status, d.closed_at, d.originating_transaction_id, d.created_at, d.updated_at, d.deleted_at
 			
 		FROM debts d
 		LEFT JOIN accounts a ON a.id = d.account_id
@@ -87,7 +88,7 @@ func (r *DebtRepo) GetDebt(ctx context.Context, userID uuid.UUID, id uuid.UUID) 
 		&d.ContactName, &d.ContactAvatarURL, &d.Principal, &d.Currency,
 		&d.StartDate, &d.DueDate, &d.InterestRate, &d.InterestRule,
 		&d.OutstandingPrincipal, &d.AccruedInterest, &d.Status, &d.ClosedAt,
-		&d.CreatedAt, &d.UpdatedAt, &d.DeletedAt,
+		&d.OriginatingTransactionID, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -113,7 +114,7 @@ func (r *DebtRepo) ListDebts(ctx context.Context, userID uuid.UUID) ([]entity.De
 			to_char(d.start_date, 'YYYY-MM-DD'), to_char(d.due_date, 'YYYY-MM-DD'),
 			d.interest_rate::text, d.interest_rule,
 			d.outstanding_principal::text, d.accrued_interest::text,
-			d.status, d.closed_at, d.created_at, d.updated_at, d.deleted_at
+			d.status, d.closed_at, d.originating_transaction_id, d.created_at, d.updated_at, d.deleted_at
 			
 		FROM debts d
 		LEFT JOIN accounts a ON a.id = d.account_id
@@ -135,7 +136,7 @@ func (r *DebtRepo) ListDebts(ctx context.Context, userID uuid.UUID) ([]entity.De
 			&d.ContactName, &d.ContactAvatarURL, &d.Principal, &d.Currency,
 			&d.StartDate, &d.DueDate, &d.InterestRate, &d.InterestRule,
 			&d.OutstandingPrincipal, &d.AccruedInterest, &d.Status, &d.ClosedAt,
-			&d.CreatedAt, &d.UpdatedAt, &d.DeletedAt,
+			&d.OriginatingTransactionID, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -165,31 +166,35 @@ func (r *DebtRepo) DeleteDebt(ctx context.Context, userID uuid.UUID, id uuid.UUI
 
 func (r *DebtRepo) CreatePaymentLink(ctx context.Context, userID uuid.UUID, link entity.DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus entity.DebtStatus, closedAt *time.Time) error {
 	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
-		// Verify ownership
-		var ok bool
-		err := tx.QueryRow(ctx, "SELECT TRUE FROM debts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL", link.DebtID, userID).Scan(&ok)
-		if err != nil {
-			return fmt.Errorf("debt ownership verification failed: %w", err)
-		}
-
-		// Insert Link
-		_, err = tx.Exec(ctx, `
-			INSERT INTO debt_payment_links (id, debt_id, transaction_id, principal_paid, interest_paid, created_at, updated_at)
-			VALUES ($1, $2, $3, $4::numeric, $5::numeric, $6, $7)
-		`, link.ID, link.DebtID, link.TransactionID, link.PrincipalPaid, link.InterestPaid, link.CreatedAt, link.CreatedAt)
-		if err != nil {
-			return err
-		}
-
-		// Update Debt
-		_, err = tx.Exec(ctx, `
-			UPDATE debts
-			SET principal = $1::numeric, outstanding_principal = $2::numeric, accrued_interest = $3::numeric,
-			    status = $4, closed_at = $5, updated_at = $6
-			WHERE id = $7 AND user_id = $8 AND deleted_at IS NULL
-		`, newPrincipal, newOutstandingPrincipal, newAccruedInterest, newStatus, closedAt, link.CreatedAt, link.DebtID, userID)
-		return err
+		return r.CreatePaymentLinkTx(ctx, tx, userID, link, newPrincipal, newOutstandingPrincipal, newAccruedInterest, newStatus, closedAt)
 	})
+}
+
+func (r *DebtRepo) CreatePaymentLinkTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, link entity.DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus entity.DebtStatus, closedAt *time.Time) error {
+	// 1. Verify ownership
+	var ok bool
+	err := tx.QueryRow(ctx, "SELECT TRUE FROM debts WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL", link.DebtID, userID).Scan(&ok)
+	if err != nil {
+		return fmt.Errorf("debt ownership verification failed: %w", err)
+	}
+
+	// 2. Insert Link
+	_, err = tx.Exec(ctx, `
+		INSERT INTO debt_payment_links (id, debt_id, transaction_id, principal_paid, interest_paid, created_at, updated_at)
+		VALUES ($1, $2, $3, $4::numeric, $5::numeric, $6, $7)
+	`, link.ID, link.DebtID, link.TransactionID, link.PrincipalPaid, link.InterestPaid, link.CreatedAt, link.CreatedAt)
+	if err != nil {
+		return err
+	}
+
+	// 3. Update Debt
+	_, err = tx.Exec(ctx, `
+		UPDATE debts
+		SET principal = $1::numeric, outstanding_principal = $2::numeric, accrued_interest = $3::numeric,
+			status = $4, closed_at = $5, updated_at = $6
+		WHERE id = $7 AND user_id = $8 AND deleted_at IS NULL
+	`, newPrincipal, newOutstandingPrincipal, newAccruedInterest, newStatus, closedAt, link.CreatedAt, link.DebtID, userID)
+	return err
 }
 
 func (r *DebtRepo) ListPaymentLinks(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtPaymentLink, error) {

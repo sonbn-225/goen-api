@@ -7,276 +7,109 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
-type PatchInvestmentAccountRequest struct {
-	FeeSettings any `json:"fee_settings,omitempty"`
-	TaxSettings any `json:"tax_settings,omitempty"`
-}
-
-type InvestmentAccountResponse struct {
-	ID          uuid.UUID `json:"id"`
-	AccountID   uuid.UUID `json:"account_id"`
-	Currency    string    `json:"currency"`
-	FeeSettings any       `json:"fee_settings,omitempty"`
-	TaxSettings any       `json:"tax_settings,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-func NewInvestmentAccountResponse(a entity.InvestmentAccount) InvestmentAccountResponse {
-	return InvestmentAccountResponse{
-		ID:          a.ID,
-		AccountID:   a.AccountID,
-		Currency:    a.Currency,
-		FeeSettings: a.FeeSettings,
-		TaxSettings: a.TaxSettings,
-		CreatedAt:   a.CreatedAt,
-		UpdatedAt:   a.UpdatedAt,
-	}
-}
-
-func NewInvestmentAccountResponses(items []entity.InvestmentAccount) []InvestmentAccountResponse {
-	out := make([]InvestmentAccountResponse, len(items))
-	for i, it := range items {
-		out[i] = NewInvestmentAccountResponse(it)
-	}
-	return out
-}
-
+// CreateTradeRequest is the payload for recording a new security trade.
+// Used in: InvestmentHandler, InvestmentService, InvestmentInterface
 type CreateTradeRequest struct {
-	SecurityID       uuid.UUID  `json:"security_id"`
-	FeeTransactionID *uuid.UUID `json:"fee_transaction_id,omitempty"`
-	TaxTransactionID *uuid.UUID `json:"tax_transaction_id,omitempty"`
-	Provenance       *string    `json:"provenance,omitempty"`
-	Side             entity.TradeSide  `json:"side"` // buy, sell
-	Quantity         string     `json:"quantity"`
-	Price            string     `json:"price"`
-	Fees             *string    `json:"fees,omitempty"`
-	Taxes            *string    `json:"taxes,omitempty"`
-	OccurredAt       *string    `json:"occurred_at,omitempty"`
-	OccurredDate     *string    `json:"occurred_date,omitempty"`
-	OccurredTime     *string    `json:"occurred_time,omitempty"`
-	Note             *string    `json:"note,omitempty"`
+	SecurityID       uuid.UUID  `json:"security_id"`                // ID of the security being traded
+	FeeTransactionID *uuid.UUID `json:"fee_transaction_id,omitempty"` // Optional ID of an existing fee transaction
+	TaxTransactionID *uuid.UUID `json:"tax_transaction_id,omitempty"` // Optional ID of an existing tax transaction
+	Provenance       *string    `json:"provenance,omitempty"`        // Origin of the trade (e.g., "manual")
+	Side             entity.TradeSide  `json:"side"`                 // Buy or Sell
+	Quantity         string     `json:"quantity"`                   // Number of shares traded (decimal string)
+	Price            string     `json:"price"`                      // Price per share (decimal string)
+	Fees             *string    `json:"fees,omitempty"`             // Total trading fees (decimal string)
+	Taxes            *string    `json:"taxes,omitempty"`            // Total trading taxes (decimal string)
+	OccurredAt       *string    `json:"occurred_at,omitempty"`       // Full occurrence timestamp
+	OccurredDate     *string    `json:"occurred_date,omitempty"`     // Date of the trade (YYYY-MM-DD)
+	OccurredTime     *string    `json:"occurred_time,omitempty"`     // Time of the trade (HH:MM:SS)
+	Note             *string    `json:"note,omitempty"`              // Optional trade memo
 
-	PrincipalCategoryID  *uuid.UUID `json:"principal_category_id,omitempty"`
-	PrincipalDescription *string    `json:"principal_description,omitempty"`
-	FeeCategoryID        *uuid.UUID `json:"fee_category_id,omitempty"`
-	FeeDescription       *string    `json:"fee_description,omitempty"`
-	TaxCategoryID        *uuid.UUID `json:"tax_category_id,omitempty"`
-	TaxDescription       *string    `json:"tax_description,omitempty"`
+	PrincipalCategoryID  *uuid.UUID `json:"principal_category_id,omitempty"`  // Category ID for the principal transaction
+	PrincipalDescription *string    `json:"principal_description,omitempty"` // Description for the principal transaction
+	FeeCategoryID        *uuid.UUID `json:"fee_category_id,omitempty"`        // Category ID for the fee transaction
+	FeeDescription       *string    `json:"fee_description,omitempty"`       // Description for the fee transaction
+	TaxCategoryID        *uuid.UUID `json:"tax_category_id,omitempty"`        // Category ID for the tax transaction
+	TaxDescription       *string    `json:"tax_description,omitempty"`       // Description for the tax transaction
 }
 
+// TradeResponse represents a single security trade transaction.
+// Used in: InvestmentHandler, InvestmentService, InvestmentInterface
 type TradeResponse struct {
-	ID               uuid.UUID  `json:"id"`
-	BrokerAccountID  uuid.UUID  `json:"broker_account_id"`
-	SecurityID       uuid.UUID  `json:"security_id"`
-	FeeTransactionID *uuid.UUID `json:"fee_transaction_id,omitempty"`
-	TaxTransactionID *uuid.UUID `json:"tax_transaction_id,omitempty"`
-	Side             entity.TradeSide  `json:"side"`
-	Quantity         string     `json:"quantity"`
-	Price            string     `json:"price"`
-	Fees             string     `json:"fees"`
-	Taxes            string     `json:"taxes"`
-	OccurredAt       time.Time  `json:"occurred_at"`
-	Note             *string    `json:"note,omitempty"`
+	ID               uuid.UUID  `json:"id"`                             // Unique trade identifier
+	AccountID        uuid.UUID  `json:"account_id"`                     // ID of the account
+	SecurityID       uuid.UUID  `json:"security_id"`                    // ID of the traded security
+	FeeTransactionID *uuid.UUID `json:"fee_transaction_id,omitempty"`     // ID of the linked fee transaction
+	TaxTransactionID *uuid.UUID `json:"tax_transaction_id,omitempty"`     // ID of the linked tax transaction
+	Side             entity.TradeSide  `json:"side"`                     // Buy or Sell
+	Quantity         string     `json:"quantity"`                       // Shares traded
+	Price            string     `json:"price"`                          // Execution price
+	Fees             string     `json:"fees"`                           // Total fees paid
+	Taxes            string     `json:"taxes"`                          // Total taxes paid
+	OccurredAt       time.Time  `json:"occurred_at"`                    // Time of the trade
+	Note             *string    `json:"note,omitempty"`                 // Trade memo
 }
 
-func NewTradeResponse(t entity.Trade) TradeResponse {
-	return TradeResponse{
-		ID:               t.ID,
-		BrokerAccountID:  t.BrokerAccountID,
-		SecurityID:       t.SecurityID,
-		FeeTransactionID: t.FeeTransactionID,
-		TaxTransactionID: t.TaxTransactionID,
-		Side:             t.Side,
-		Quantity:         t.Quantity,
-		Price:            t.Price,
-		Fees:             t.Fees,
-		Taxes:            t.Taxes,
-		OccurredAt:       t.OccurredAt,
-		Note:             t.Note,
-	}
-}
-
-func NewTradeResponses(items []entity.Trade) []TradeResponse {
-	out := make([]TradeResponse, len(items))
-	for i, it := range items {
-		out[i] = NewTradeResponse(it)
-	}
-	return out
-}
-
-type SecurityResponse struct {
-	ID         uuid.UUID `json:"id"`
-	Symbol     string    `json:"symbol"`
-	Name       *string   `json:"name,omitempty"`
-	AssetClass *string   `json:"asset_class,omitempty"`
-	Currency   *string   `json:"currency,omitempty"`
-}
-
-func NewSecurityResponse(s entity.Security) SecurityResponse {
-	return SecurityResponse{
-		ID:         s.ID,
-		Symbol:     s.Symbol,
-		Name:       s.Name,
-		AssetClass: s.AssetClass,
-		Currency:   s.Currency,
-	}
-}
-
-func NewSecurityResponses(items []entity.Security) []SecurityResponse {
-	out := make([]SecurityResponse, len(items))
-	for i, it := range items {
-		out[i] = NewSecurityResponse(it)
-	}
-	return out
-}
-
+// HoldingResponse represents a security position in an investment account.
+// Used in: InvestmentHandler, InvestmentService, InvestmentInterface
 type HoldingResponse struct {
-	ID              uuid.UUID  `json:"id"`
-	BrokerAccountID uuid.UUID  `json:"broker_account_id"`
-	SecurityID      uuid.UUID  `json:"security_id"`
-	Quantity        string     `json:"quantity"`
-	CostBasisTotal  *string    `json:"cost_basis_total,omitempty"`
-	AvgCost         *string    `json:"avg_cost,omitempty"`
-	MarketPrice     *string    `json:"market_price,omitempty"`
-	MarketValue     *string    `json:"market_value,omitempty"`
-	UnrealizedPnL   *string    `json:"unrealized_pnl,omitempty"`
-	AsOf            *time.Time `json:"as_of,omitempty"`
+	ID              uuid.UUID  `json:"id"`                             // Unique identifier for the holding record
+	AccountID       uuid.UUID  `json:"account_id"`                     // ID of the account
+	SecurityID      uuid.UUID  `json:"security_id"`                    // ID of the security held
+	Quantity        string     `json:"quantity"`                       // Total shares currently held
+	CostBasisTotal  *string    `json:"cost_basis_total,omitempty"`      // Total cost of all shares in position
+	AvgCost         *string    `json:"avg_cost,omitempty"`              // Average cost per share
+	MarketPrice     *string    `json:"market_price,omitempty"`          // Current market price
+	MarketValue     *string    `json:"market_value,omitempty"`          // Total market value of position
+	UnrealizedPnL   *string    `json:"unrealized_pnl,omitempty"`        // Paper profit/loss
+	AsOf            *time.Time `json:"as_of,omitempty"`                 // Timestamp of the market valuation
 }
 
-func NewHoldingResponse(h entity.Holding) HoldingResponse {
-	return HoldingResponse{
-		ID:              h.ID,
-		BrokerAccountID: h.BrokerAccountID,
-		SecurityID:      h.SecurityID,
-		Quantity:        h.Quantity,
-		CostBasisTotal:  h.CostBasisTotal,
-		AvgCost:         h.AvgCost,
-		MarketPrice:     h.MarketPrice,
-		MarketValue:     h.MarketValue,
-		UnrealizedPnL:   h.UnrealizedPnL,
-		AsOf:            h.AsOf,
-	}
-}
-
-func NewHoldingResponses(items []entity.Holding) []HoldingResponse {
-	out := make([]HoldingResponse, len(items))
-	for i, it := range items {
-		out[i] = NewHoldingResponse(it)
-	}
-	return out
-}
-
-type SecurityPriceDailyResponse struct {
-	ID         uuid.UUID `json:"id"`
-	SecurityID uuid.UUID `json:"security_id"`
-	PriceDate  string    `json:"price_date"`
-	Open       *string   `json:"open,omitempty"`
-	High       *string   `json:"high,omitempty"`
-	Low        *string   `json:"low,omitempty"`
-	Close      string    `json:"close"`
-	Volume     *string   `json:"volume,omitempty"`
-}
-
-func NewSecurityPriceDailyResponse(p entity.SecurityPriceDaily) SecurityPriceDailyResponse {
-	return SecurityPriceDailyResponse{
-		ID:         p.ID,
-		SecurityID: p.SecurityID,
-		PriceDate:  p.PriceDate,
-		Open:       p.Open,
-		High:       p.High,
-		Low:        p.Low,
-		Close:      p.Close,
-		Volume:     p.Volume,
-	}
-}
-
-func NewSecurityPriceDailyResponses(items []entity.SecurityPriceDaily) []SecurityPriceDailyResponse {
-	out := make([]SecurityPriceDailyResponse, len(items))
-	for i, it := range items {
-		out[i] = NewSecurityPriceDailyResponse(it)
-	}
-	return out
-}
-
-type SecurityEventResponse struct {
-	ID                 uuid.UUID `json:"id"`
-	SecurityID         uuid.UUID `json:"security_id"`
-	EventType          entity.SecurityEventType `json:"event_type"`
-	ExDate             *string   `json:"ex_date,omitempty"`
-	RecordDate         *string   `json:"record_date,omitempty"`
-	PayDate            *string   `json:"pay_date,omitempty"`
-	EffectiveDate      *string   `json:"effective_date,omitempty"`
-	CashAmountPerShare *string   `json:"cash_amount_per_share,omitempty"`
-	RatioNumerator     *string   `json:"ratio_numerator,omitempty"`
-	RatioDenominator   *string   `json:"ratio_denominator,omitempty"`
-	SubscriptionPrice  *string   `json:"subscription_price,omitempty"`
-	Currency           *string   `json:"currency,omitempty"`
-	Note               *string   `json:"note,omitempty"`
-}
-
-func NewSecurityEventResponse(e entity.SecurityEvent) SecurityEventResponse {
-	return SecurityEventResponse{
-		ID:                 e.ID,
-		SecurityID:         e.SecurityID,
-		EventType:          e.EventType,
-		ExDate:             e.ExDate,
-		RecordDate:         e.RecordDate,
-		PayDate:            e.PayDate,
-		EffectiveDate:      e.EffectiveDate,
-		CashAmountPerShare: e.CashAmountPerShare,
-		RatioNumerator:     e.RatioNumerator,
-		RatioDenominator:   e.RatioDenominator,
-		SubscriptionPrice:  e.SubscriptionPrice,
-		Currency:           e.Currency,
-		Note:               e.Note,
-	}
-}
-
-func NewSecurityEventResponses(items []entity.SecurityEvent) []SecurityEventResponse {
-	out := make([]SecurityEventResponse, len(items))
-	for i, it := range items {
-		out[i] = NewSecurityEventResponse(it)
-	}
-	return out
-}
-
+// EligibleAction represents a corporate action that a user is entitled to.
+// Used in: InvestmentHandler, InvestmentService, InvestmentInterface
 type EligibleAction struct {
-	Event            SecurityEventResponse `json:"event"`
-	HoldingQuantity  string                `json:"holding_quantity"`
-	EntitledQuantity string                `json:"entitled_quantity"`
-	Status           entity.SecurityEventElectionStatus `json:"status"` // eligible, claimed, dismissed
-	ElectionID       *uuid.UUID            `json:"election_id,omitempty"`
+	Event            SecurityEventResponse `json:"event"`            // The corporate action details
+	HoldingQuantity  string                `json:"holding_quantity"` // Shares held on the eligibility date
+	EntitledQuantity string                `json:"entitled_quantity"` // Calculated entitlement (decimal string)
+	Status           entity.SecurityEventElectionStatus `json:"status"` // Current claim status (eligible/claimed)
+	ElectionID       *uuid.UUID            `json:"election_id,omitempty"` // ID of the existing claim/election record
 }
 
+// ClaimCorporateActionRequest is the payload for claiming a corporate action.
+// Used in: InvestmentHandler, InvestmentService, InvestmentInterface
 type ClaimCorporateActionRequest struct {
-	ElectedQuantity *string `json:"elected_quantity,omitempty"`
-	Note            *string `json:"note,omitempty"`
+	ElectedQuantity *string `json:"elected_quantity,omitempty"` // Amount of entitlement user chooses to claim
+	Note            *string `json:"note,omitempty"`             // Optional user notes for the claim
 }
 
+// BackfillTradePrincipalResponse represents the result of the trade principal backfill operation.
+// Used in: InvestmentHandler, InvestmentService, InvestmentInterface
 type BackfillTradePrincipalResponse struct {
-	TradesTotal          int `json:"trades_total"`
-	TransactionsCreated  int `json:"transactions_created"`
-	TransactionsExisting int `json:"transactions_existing"`
-	SkippedZeroNotional  int `json:"skipped_zero_notional"`
-	SkippedStockDividend int `json:"skipped_stock_dividend"`
+	TradesTotal          int `json:"trades_total"`           // Total trades scanned
+	TransactionsCreated  int `json:"transactions_created"`   // New principal transactions created
+	TransactionsExisting int `json:"transactions_existing"`  // Trades that already had principal transactions
+	SkippedZeroNotional  int `json:"skipped_zero_notional"`  // Trades skipped because notional amount was zero
+	SkippedStockDividend int `json:"skipped_stock_dividend"`  // Trades skipped because they were stock dividends
 }
 
+// RealizedPNLReportItem represents realized profit and loss for a specific security.
+// Used in: InvestmentHandler, InvestmentService, InvestmentInterface
 type RealizedPNLReportItem struct {
-	SecurityID        uuid.UUID `json:"security_id"`
-	Symbol            string    `json:"symbol"`
-	GrossRealizedGain string    `json:"gross_realized_gain"`
-	TradeGain         string    `json:"trade_gain"`
-	DividendGain      string    `json:"dividend_gain"`
-	Proceeds          string    `json:"proceeds"`
-	CostBasis         string    `json:"cost_basis"`
-	Fees              string    `json:"fees"`
-	Taxes             string    `json:"taxes"`
-	NetPNL            string    `json:"net_pnl"`
+	SecurityID        uuid.UUID `json:"security_id"`          // ID of the security
+	Symbol            string    `json:"symbol"`               // Security ticker
+	GrossRealizedGain string    `json:"gross_realized_gain"` // Total gain before fees and taxes
+	TradeGain         string    `json:"trade_gain"`           // Gain from price appreciation
+	DividendGain      string    `json:"dividend_gain"`        // Gain from dividends
+	Proceeds          string    `json:"proceeds"`             // Total sale proceeds
+	CostBasis         string    `json:"cost_basis"`           // Original cost of sold shares
+	Fees              string    `json:"fees"`                 // Total fees associated with the sales
+	Taxes             string    `json:"taxes"`                // Total taxes associated with the sales
+	NetPNL            string    `json:"net_pnl"`              // Final profit/loss after fees and taxes
 }
 
+// RealizedPNLReport represents the overall realized profit and loss report.
+// Used in: InvestmentHandler, InvestmentService, InvestmentInterface
 type RealizedPNLReport struct {
-	Items      []RealizedPNLReportItem `json:"items"`
-	TotalNet   string                  `json:"total_net"`
-	TotalGross string                  `json:"total_gross"`
+	Items      []RealizedPNLReportItem `json:"items"`       // PnL breakdown per security
+	TotalNet   string                  `json:"total_net"`    // Overall net profit/loss
+	TotalGross string                  `json:"total_gross"`  // Overall gross profit/loss
 }

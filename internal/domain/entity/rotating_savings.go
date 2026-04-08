@@ -6,78 +6,47 @@ import (
 	"github.com/google/uuid"
 )
 
-type RotatingSavingsCycleFrequency string
-
-const (
-	RotatingSavingsCycleFrequencyWeekly  RotatingSavingsCycleFrequency = "weekly"
-	RotatingSavingsCycleFrequencyMonthly RotatingSavingsCycleFrequency = "monthly"
-)
-
-type RotatingSavingsStatus string
-
-const (
-	RotatingSavingsStatusActive    RotatingSavingsStatus = "active"
-	RotatingSavingsStatusCompleted RotatingSavingsStatus = "completed"
-	RotatingSavingsStatusClosed    RotatingSavingsStatus = "closed"
-)
-
-// RotatingSavingsGroup represents a "Choi Ho/Hui/Phuong" group.
+// RotatingSavingsGroup represents a "Choi Ho/Hui/Phuong" group or ROSCA.
 type RotatingSavingsGroup struct {
 	AuditEntity
-	UserID              uuid.UUID                     `json:"user_id"`
-	AccountID           uuid.UUID                     `json:"account_id"`
-	Name                string                        `json:"name"`
-	Currency            *string                       `json:"currency"`
-	MemberCount         int                           `json:"member_count"`
-	UserSlots           int                           `json:"user_slots"`
-	ContributionAmount  float64                       `json:"contribution_amount"`
-	PayoutCycleNo       *int                          `json:"payout_cycle_no"`
-	FixedInterestAmount *float64                      `json:"fixed_interest_amount"`
-	CycleFrequency      RotatingSavingsCycleFrequency `json:"cycle_frequency"`
-	StartDate           string                        `json:"start_date"` // YYYY-MM-DD
-	Status              RotatingSavingsStatus         `json:"status"`
+	UserID              uuid.UUID                     `json:"user_id"`              // ID of the user who created the group
+	AccountID           uuid.UUID                     `json:"account_id"`           // ID of the account linked for contributions/payouts
+	Name                string                        `json:"name"`                 // Name of the rotating savings group
+	Currency            *string                       `json:"currency"`             // Currency used in the group
+	MemberCount         int                           `json:"member_count"`         // Total number of members in the group
+	UserSlots           int                           `json:"user_slots"`           // Number of slots taken by the user
+	ContributionAmount  float64                       `json:"contribution_amount"`  // Amount contributed per slot per cycle
+	PayoutCycleNo       *int                          `json:"payout_cycle_no"`      // Cycle number when the user receives the payout
+	FixedInterestAmount *float64                      `json:"fixed_interest_amount"` // Fixed interest added to the payout (if any)
+	CycleFrequency      RotatingSavingsCycleFrequency `json:"cycle_frequency"`      // How often cycles occur (weekly/monthly)
+	StartDate           string                        `json:"start_date"`           // Start date of the first cycle (YYYY-MM-DD)
+	Status              RotatingSavingsStatus         `json:"status"`               // Current group status (active/completed/closed)
 }
 
-type RotatingSavingsContributionKind string
-
-const (
-	RotatingSavingsContributionKindContribution RotatingSavingsContributionKind = "contribution"
-	RotatingSavingsContributionKindPayout       RotatingSavingsContributionKind = "payout"
-	RotatingSavingsContributionKindCollected    RotatingSavingsContributionKind = "collected"
-)
-
-// RotatingSavingsContribution represents an individual payment or payout in a group.
+// RotatingSavingsContribution represents an individual payment or payout in a group cycle.
 type RotatingSavingsContribution struct {
 	BaseEntity
-	GroupID             uuid.UUID                       `json:"group_id"`
-	TransactionID       uuid.UUID                       `json:"transaction_id"`
-	Kind                RotatingSavingsContributionKind `json:"kind"`
-	CycleNo             *int                            `json:"cycle_no"`
-	DueDate             *string                         `json:"due_date"`
-	Amount              float64                         `json:"amount"`
-	SlotsTaken          int                             `json:"slots_taken"`
-	CollectedFeePerSlot float64                         `json:"collected_fee_per_slot"`
-	OccurredAt          time.Time                       `json:"occurred_at"`
-	Note                *string                         `json:"note"`
-	CreatedAt           time.Time                       `json:"created_at"`
+	GroupID             uuid.UUID                       `json:"group_id"`               // ID of the rotating savings group
+	TransactionID       uuid.UUID                       `json:"transaction_id"`          // ID of the financial transaction
+	Kind                RotatingSavingsContributionKind `json:"kind"`                   // Type (contribution/payout/collected)
+	CycleNo             *int                            `json:"cycle_no"`               // Cycle number for this payment
+	DueDate             *string                         `json:"due_date"`               // Due date for the payment (YYYY-MM-DD)
+	Amount              float64                         `json:"amount"`                 // Amount of the payment/payout
+	SlotsTaken          int                             `json:"slots_taken"`            // Number of user slots this payment covers
+	CollectedFeePerSlot float64                         `json:"collected_fee_per_slot"` // Fee per slot for the collector
+	OccurredAt          time.Time                       `json:"occurred_at"`            // Timestamp of the payment
+	Note                *string                         `json:"note"`                   // Optional memo
+	CreatedAt           time.Time                       `json:"created_at"`             // Creation timestamp
 }
 
-type RotatingSavingsAuditAction string
-
-const (
-	RotatingSavingsAuditActionGroupCreated        RotatingSavingsAuditAction = "group_created"
-	RotatingSavingsAuditActionGroupUpdated        RotatingSavingsAuditAction = "group_updated"
-	RotatingSavingsAuditActionContributionCreated RotatingSavingsAuditAction = "contribution_created"
-)
-
-// RotatingSavingsAuditLog tracks changes and actions within a group.
+// RotatingSavingsAuditLog tracks modifications and actions taken within a rotating savings group.
 type RotatingSavingsAuditLog struct {
 	BaseEntity
-	UserID    uuid.UUID                  `json:"user_id"`
-	GroupID   *uuid.UUID                 `json:"group_id"`
-	Action    RotatingSavingsAuditAction `json:"action"`
-	Details   map[string]any             `json:"details"`
-	CreatedAt time.Time                  `json:"created_at"`
+	UserID    uuid.UUID                  `json:"user_id"`    // ID of the user who performed the action
+	GroupID   *uuid.UUID                 `json:"group_id"`   // ID of the affected group
+	Action    RotatingSavingsAuditAction `json:"action"`    // Type of action (group_created/updated/etc.)
+	Details   map[string]any             `json:"details"`   // Detailed changes or event data
+	CreatedAt time.Time                  `json:"created_at"` // Creation timestamp
 }
 
 

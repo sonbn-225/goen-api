@@ -6,85 +6,32 @@ import (
 	"github.com/google/uuid"
 )
 
-type AccountType string
-
-const (
-	AccountTypeBank    AccountType = "bank"
-	AccountTypeWallet  AccountType = "wallet"
-	AccountTypeCash    AccountType = "cash"
-	AccountTypeBroker  AccountType = "broker"
-	AccountTypeCard    AccountType = "card"
-	AccountTypeSavings AccountType = "savings"
-)
-
-type AccountStatus string
-
-const (
-	AccountStatusActive AccountStatus = "active"
-	AccountStatusClosed AccountStatus = "closed"
-)
-
+// Account represents a financial account (bank, wallet, cash, etc.) owned by a user.
 type Account struct {
 	AuditEntity
-	Name                string        `json:"name"`
-	AccountNumber       *string       `json:"account_number,omitempty"`
-	Color               *string       `json:"color,omitempty"`
-	AccountType         AccountType   `json:"account_type"`
-	Currency            string        `json:"currency"`
-	ParentAccountID     *uuid.UUID    `json:"parent_account_id,omitempty"`
-	Status              AccountStatus `json:"status"`
-	ClosedAt            *time.Time    `json:"closed_at,omitempty"`
-	Balance             string        `json:"balance"`               // Joined
-	InvestmentAccountID *uuid.UUID    `json:"investment_account_id"` // Joined
+	Name                string          `json:"name"`                          // Account name (e.g., "Main Savings", "MoMo")
+	AccountNumber       *string         `json:"account_number,omitempty"`       // Optional account number or identifier
+	AccountType         AccountType     `json:"account_type"`                  // Type of account (bank, wallet, brokerage, etc.)
+	Currency            string          `json:"currency"`                      // Primary currency (e.g., "VND", "USD")
+	ParentAccountID     *uuid.UUID      `json:"parent_account_id,omitempty"`     // ID of the parent account for sub-accounts
+	Status              AccountStatus   `json:"status"`                        // Current account status (active/closed)
+	ClosedAt            *time.Time      `json:"closed_at,omitempty"`            // Timestamp when the account was closed
+	Balance             string          `json:"balance"`                       // Current calculated balance (decimal string)
+	Settings            AccountSettings `json:"settings"`                      // Specialized configuration for specific account types
 }
 
+
+// AccountPatch defines the fields that can be updated for an Account.
 type AccountPatch struct {
-	Name   *string        `json:"name,omitempty"`
-	Color  *string        `json:"color,omitempty"`
-	Status *AccountStatus `json:"status,omitempty"`
+	Name     *string          `json:"name,omitempty"`     // New account name
+	Status   *AccountStatus   `json:"status,omitempty"`   // New account status
+	Settings *AccountSettings `json:"settings,omitempty"` // Updated settings configuration
 }
 
+// AccountBalance represents the current balance of an account in a specific currency.
 type AccountBalance struct {
-	AccountID uuid.UUID `json:"account_id"`
-	Currency  string    `json:"currency"`
-	Balance   string    `json:"balance"`
-}
-
-type AccountSharePermission string
-
-const (
-	AccountSharePermissionOwner  AccountSharePermission = "owner"
-	AccountSharePermissionViewer AccountSharePermission = "viewer"
-	AccountSharePermissionEditor AccountSharePermission = "editor"
-)
-
-type AccountShareStatus string
-
-const (
-	AccountShareStatusActive  AccountShareStatus = "active"
-	AccountShareStatusRevoked AccountShareStatus = "revoked"
-)
-
-type AccountShare struct {
-	AuditEntity
-	AccountID       uuid.UUID              `json:"account_id"`
-	UserID          uuid.UUID              `json:"user_id"`
-	Permission      AccountSharePermission `json:"permission"`
-	Status          AccountShareStatus     `json:"status"`
-	RevokedAt       *time.Time             `json:"revoked_at,omitempty"`
-	UserEmail       *string                `json:"user_email,omitempty"`
-	UserPhone       *string                `json:"user_phone,omitempty"`
-	UserDisplayName *string                `json:"user_display_name,omitempty"`
-}
-
-type AccountAuditEvent struct {
-	BaseEntity
-	AccountID   uuid.UUID      `json:"account_id"`
-	ActorUserID uuid.UUID      `json:"actor_user_id"`
-	Action      string         `json:"action"`
-	EntityType  string         `json:"entity_type"`
-	EntityID    uuid.UUID      `json:"entity_id"`
-	OccurredAt  time.Time      `json:"occurred_at"`
-	Diff        map[string]any `json:"diff,omitempty"`
+	AccountID uuid.UUID `json:"account_id"` // ID of the account
+	Currency  string    `json:"currency"`   // Currency of the balance
+	Balance   string    `json:"balance"`    // Balance amount (decimal string)
 }
 

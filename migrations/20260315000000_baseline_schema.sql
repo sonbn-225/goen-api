@@ -222,7 +222,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   parent_account_id uuid,
   status account_status NOT NULL DEFAULT 'active',
   account_number text,
-  color varchar,
+  settings jsonb NOT NULL DEFAULT '{}'::jsonb,
   closed_at timestamptz,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
@@ -233,7 +233,6 @@ CREATE TABLE IF NOT EXISTS accounts (
 
 CREATE INDEX IF NOT EXISTS idx_accounts_parent_account_id ON accounts(parent_account_id);
 CREATE INDEX IF NOT EXISTS idx_accounts_account_number ON accounts(account_number);
-CREATE INDEX IF NOT EXISTS idx_accounts_color ON accounts(color);
 
 CREATE TABLE IF NOT EXISTS user_accounts (
   id uuid PRIMARY KEY,
@@ -376,29 +375,7 @@ ON transaction_line_items
 FOR EACH ROW
 EXECUTE FUNCTION enforce_tli_non_transfer();
 
-CREATE TABLE IF NOT EXISTS group_expense_participants (
-  id uuid PRIMARY KEY,
-  user_id uuid NOT NULL,
-  transaction_id uuid NOT NULL,
-  participant_name text NOT NULL,
-  original_amount numeric(18,2) NOT NULL,
-  share_amount numeric(18,2) NOT NULL,
-  is_settled boolean NOT NULL DEFAULT false,
-  settlement_transaction_id uuid,
-  created_at timestamptz NOT NULL,
-  updated_at timestamptz NOT NULL,
-  deleted_at timestamptz,
 
-  CONSTRAINT fk_gep_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_gep_transaction_id FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
-  CONSTRAINT fk_gep_settlement_transaction_id FOREIGN KEY (settlement_transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
-  CONSTRAINT ck_gep_amounts_positive CHECK (original_amount > 0 AND share_amount > 0)
-);
-
-CREATE INDEX IF NOT EXISTS idx_gep_username ON group_expense_participants(user_id);
-CREATE INDEX IF NOT EXISTS idx_gep_transaction_id ON group_expense_participants(transaction_id);
-CREATE INDEX IF NOT EXISTS idx_gep_user_settled ON group_expense_participants(user_id, is_settled);
-CREATE INDEX IF NOT EXISTS idx_gep_user_participant_name ON group_expense_participants(user_id, lower(participant_name));
 
 CREATE TABLE IF NOT EXISTS categories (
   id uuid PRIMARY KEY DEFAULT uuidv7(),
@@ -409,9 +386,6 @@ CREATE TABLE IF NOT EXISTS categories (
   is_active boolean NOT NULL DEFAULT true,
   icon text,
   color text,
-  created_at timestamptz NOT NULL,
-  updated_at timestamptz NOT NULL,
-  deleted_at timestamptz,
 
   CONSTRAINT fk_categories_parent FOREIGN KEY (parent_category_id) REFERENCES categories(id),
   CONSTRAINT chk_categories_type CHECK (type IS NULL OR type IN ('expense','income','both'))
@@ -616,6 +590,7 @@ CREATE TABLE IF NOT EXISTS debts (
   accrued_interest numeric(18,2) NOT NULL DEFAULT 0,
   status debt_status NOT NULL DEFAULT 'active',
   contact_id uuid,
+  originating_transaction_id uuid,
   closed_at timestamptz,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
@@ -624,6 +599,7 @@ CREATE TABLE IF NOT EXISTS debts (
   CONSTRAINT fk_debts_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT fk_debts_account_id FOREIGN KEY (account_id) REFERENCES accounts(id),
   CONSTRAINT fk_debts_contact_id FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE SET NULL,
+  CONSTRAINT fk_debts_orig_tx_id FOREIGN KEY (originating_transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
   CONSTRAINT ck_debts_due_after_start CHECK (due_date >= start_date),
   CONSTRAINT ck_debts_outstanding_nonneg CHECK (outstanding_principal >= 0),
   CONSTRAINT ck_debts_accrued_nonneg CHECK (accrued_interest >= 0)
@@ -673,20 +649,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_debt_installments_debt_no
 CREATE INDEX IF NOT EXISTS idx_debt_installments_debt_due_date
   ON debt_installments(debt_id, due_date);
 
-CREATE TABLE IF NOT EXISTS investment_accounts (
-  id uuid PRIMARY KEY,
-  account_id uuid NOT NULL,
-  fee_settings jsonb,
-  tax_settings jsonb,
-  created_at timestamptz NOT NULL,
-  updated_at timestamptz NOT NULL,
-  deleted_at timestamptz,
-
-  CONSTRAINT fk_investment_accounts_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_investment_accounts_account_id
-  ON investment_accounts(account_id);
+-- Investment/Brokerage features are now integrated directly into accounts table via settings.
 
 CREATE TABLE IF NOT EXISTS securities (
   id uuid PRIMARY KEY,
@@ -776,7 +739,7 @@ CREATE INDEX IF NOT EXISTS idx_market_data_sync_states_last_success_at
 CREATE TABLE IF NOT EXISTS security_event_elections (
   id uuid PRIMARY KEY,
   user_id uuid NOT NULL,
-  broker_account_id uuid NOT NULL,
+  account_id uuid NOT NULL,
   security_event_id uuid NOT NULL,
   security_id uuid NOT NULL,
   entitlement_date date NOT NULL,
@@ -791,22 +754,22 @@ CREATE TABLE IF NOT EXISTS security_event_elections (
   deleted_at timestamptz,
 
   CONSTRAINT fk_security_event_elections_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_security_event_elections_broker_account_id FOREIGN KEY (broker_account_id) REFERENCES investment_accounts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_security_event_elections_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_security_event_elections_security_event_id FOREIGN KEY (security_event_id) REFERENCES security_events(id) ON DELETE CASCADE,
   CONSTRAINT fk_security_event_elections_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE,
   CONSTRAINT ck_security_event_elections_nonneg CHECK (elected_quantity >= 0 AND entitled_quantity >= 0 AND holding_quantity_at_entitlement_date >= 0),
   CONSTRAINT ck_security_event_elections_elected_le_entitled CHECK (elected_quantity <= entitled_quantity)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_security_event_elections_broker_event
-  ON security_event_elections(broker_account_id, security_event_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_security_event_elections_account_event
+  ON security_event_elections(account_id, security_event_id);
 
 CREATE INDEX IF NOT EXISTS idx_security_event_elections_user_status
   ON security_event_elections(user_id, status);
 
 CREATE TABLE IF NOT EXISTS trades (
   id uuid PRIMARY KEY,
-  broker_account_id uuid NOT NULL,
+  account_id uuid NOT NULL,
   security_id uuid NOT NULL,
   fee_transaction_id uuid,
   tax_transaction_id uuid,
@@ -821,14 +784,14 @@ CREATE TABLE IF NOT EXISTS trades (
   updated_at timestamptz NOT NULL,
   deleted_at timestamptz,
 
-  CONSTRAINT fk_trades_broker_account_id FOREIGN KEY (broker_account_id) REFERENCES investment_accounts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_trades_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_trades_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE,
   CONSTRAINT fk_trades_fee_transaction_id FOREIGN KEY (fee_transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
   CONSTRAINT fk_trades_tax_transaction_id FOREIGN KEY (tax_transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_trades_broker_occurred_at
-  ON trades(broker_account_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_trades_account_occurred_at
+  ON trades(account_id, occurred_at DESC);
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_trades_fee_transaction_id
   ON trades(fee_transaction_id)
@@ -840,7 +803,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_trades_tax_transaction_id
 
 CREATE TABLE IF NOT EXISTS holdings (
   id uuid PRIMARY KEY,
-  broker_account_id uuid NOT NULL,
+  account_id uuid NOT NULL,
   security_id uuid NOT NULL,
   quantity numeric(18,8) NOT NULL,
   cost_basis_total numeric(18,2),
@@ -854,16 +817,16 @@ CREATE TABLE IF NOT EXISTS holdings (
   updated_at timestamptz NOT NULL,
   deleted_at timestamptz,
 
-  CONSTRAINT fk_holdings_broker_account_id FOREIGN KEY (broker_account_id) REFERENCES investment_accounts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_holdings_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_holdings_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_holdings_broker_security
-  ON holdings(broker_account_id, security_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_holdings_account_security
+  ON holdings(account_id, security_id);
 
 CREATE TABLE IF NOT EXISTS share_lots (
   id uuid PRIMARY KEY,
-  broker_account_id uuid NOT NULL,
+  account_id uuid NOT NULL,
   security_id uuid NOT NULL,
   quantity numeric(18,8) NOT NULL,
   acquisition_date date NOT NULL,
@@ -875,14 +838,14 @@ CREATE TABLE IF NOT EXISTS share_lots (
   updated_at timestamptz NOT NULL,
   deleted_at timestamptz,
 
-  CONSTRAINT fk_share_lots_broker_account_id FOREIGN KEY (broker_account_id) REFERENCES investment_accounts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_share_lots_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
   CONSTRAINT fk_share_lots_security_id FOREIGN KEY (security_id) REFERENCES securities(id) ON DELETE CASCADE,
   CONSTRAINT fk_share_lots_buy_trade_id FOREIGN KEY (buy_trade_id) REFERENCES trades(id) ON DELETE SET NULL,
   CONSTRAINT ck_share_lots_nonneg CHECK (quantity >= 0 AND cost_basis_per_share >= 0)
 );
 
-CREATE INDEX IF NOT EXISTS idx_share_lots_broker_security_acq
-  ON share_lots(broker_account_id, security_id, acquisition_date ASC);
+CREATE INDEX IF NOT EXISTS idx_share_lots_account_security_acq
+  ON share_lots(account_id, security_id, acquisition_date ASC);
 
 CREATE INDEX IF NOT EXISTS idx_share_lots_status
   ON share_lots(status);
@@ -936,60 +899,44 @@ CREATE INDEX IF NOT EXISTS idx_audit_events_account_id_occurred_at
 CREATE INDEX IF NOT EXISTS idx_audit_events_account_entity
   ON audit_events(account_id, entity_type, entity_id, occurred_at DESC);
 
-CREATE TABLE IF NOT EXISTS imported_transactions (
+CREATE TABLE IF NOT EXISTS staged_imports (
   id uuid PRIMARY KEY,
   user_id uuid NOT NULL,
-  source text NOT NULL DEFAULT 'goen-v1',
+  resource_type text NOT NULL, -- 'transaction', 'contact', etc.
+  source text NOT NULL DEFAULT 'manual',
+  external_id text, -- ID from source for idempotency
 
-  transaction_date date NOT NULL,
-  amount numeric(18,2) NOT NULL,
-  description text,
-  transaction_type text,
-
-  imported_account_name text,
-  imported_category_name text,
-
-  mapped_account_id uuid,
-  mapped_category_id uuid,
-
-  raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  data jsonb NOT NULL DEFAULT '{}'::jsonb, -- amount, date, description, etc.
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb, -- mapped_account_id, mapped_category_id, etc.
+  status text NOT NULL DEFAULT 'pending',
 
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
-  deleted_at timestamptz,
 
-  CONSTRAINT fk_imported_transactions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_imported_transactions_mapped_account_id FOREIGN KEY (mapped_account_id) REFERENCES accounts(id),
-  CONSTRAINT fk_imported_transactions_mapped_category_id FOREIGN KEY (mapped_category_id) REFERENCES categories(id)
+  CONSTRAINT fk_staged_imports_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_imported_transactions_user_date
-  ON imported_transactions(user_id, transaction_date DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_staged_imports_user_resource ON staged_imports(user_id, resource_type, status);
+CREATE INDEX IF NOT EXISTS idx_staged_imports_data_gin ON staged_imports USING GIN (data);
+CREATE INDEX IF NOT EXISTS idx_staged_imports_metadata_gin ON staged_imports USING GIN (metadata);
 
-CREATE INDEX IF NOT EXISTS idx_imported_transactions_user_mapped
-  ON imported_transactions(user_id, mapped_account_id, mapped_category_id);
-
-CREATE INDEX IF NOT EXISTS idx_imported_transactions_raw_payload_gin
-  ON imported_transactions USING GIN (raw_payload);
-
-CREATE TABLE IF NOT EXISTS import_mapping_rules (
+CREATE TABLE IF NOT EXISTS staged_import_rules (
   id uuid PRIMARY KEY,
   user_id uuid NOT NULL,
-  kind text NOT NULL,
-  source_name text NOT NULL,
-  normalized_source_name text NOT NULL,
+  resource_type text NOT NULL, -- 'transaction'
+  rule_type text NOT NULL, -- 'account', 'category'
+  match_key text NOT NULL DEFAULT 'source_name',
+  match_value text NOT NULL,
   mapped_id uuid NOT NULL,
+
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
-  deleted_at timestamptz,
 
-  CONSTRAINT fk_import_mapping_rules_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT chk_import_mapping_rules_kind CHECK (kind IN ('account', 'category')),
-  CONSTRAINT uq_import_mapping_rules_unique UNIQUE (user_id, kind, normalized_source_name)
+  CONSTRAINT fk_staged_import_rules_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT uq_staged_import_rules_unique UNIQUE (user_id, resource_type, rule_type, match_key, match_value)
 );
 
-CREATE INDEX IF NOT EXISTS idx_import_mapping_rules_user_kind
-  ON import_mapping_rules(user_id, kind, normalized_source_name);
+CREATE INDEX IF NOT EXISTS idx_staged_import_rules_lookup ON staged_import_rules(user_id, resource_type, rule_type, match_value);
 
 -- Convert suitable time-series tables to hypertables.
 -- Requirements: any UNIQUE/PRIMARY KEY constraints must include the time column.

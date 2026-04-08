@@ -7,27 +7,37 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
+	"github.com/sonbn-225/goen-api/internal/repository/postgres"
 )
 
+// RotatingSavingsService manages "Hụi/Họ" (Rotating Savings and Credit Associations - ROSCA).
+// It handles group creation, payment schedules, and member contributions/payouts.
+// All financial movements are recorded as ledge transactions in the central TransactionService.
 type RotatingSavingsService struct {
 	repo       interfaces.RotatingSavingsRepository
 	accountSvc interfaces.AccountService
 	txSvc      interfaces.TransactionService
+	db         *database.Postgres
 }
 
+// NewRotatingSavingsService creates a new rotating savings management service.
 func NewRotatingSavingsService(
 	repo interfaces.RotatingSavingsRepository,
 	accountSvc interfaces.AccountService,
 	txSvc interfaces.TransactionService,
+	db *database.Postgres,
 ) *RotatingSavingsService {
 	return &RotatingSavingsService{
 		repo:       repo,
 		accountSvc: accountSvc,
 		txSvc:      txSvc,
+		db:         db,
 	}
 }
 
@@ -349,6 +359,9 @@ func (s *RotatingSavingsService) ListGroups(ctx context.Context, userID uuid.UUI
 	return summaries, nil
 }
 
+// CreateContribution records a member's payment ("Đóng hụi") or receiving a payout ("Lĩnh hụi").
+// It atomically creates a ledger transaction in the specified account and 
+// links it to the contribution record in the group.
 func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID, groupID uuid.UUID, req dto.RotatingSavingsContributionRequest) (*dto.RotatingSavingsContributionResponse, error) {
 	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
 	if err != nil {
@@ -358,9 +371,9 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 		return nil, errors.New("group not found")
 	}
 
-	txType := "expense"
+	txType := entity.TransactionTypeExpense
 	if req.Kind == entity.RotatingSavingsContributionKindPayout {
-		txType = "income"
+		txType = entity.TransactionTypeIncome
 	}
 
 	desc := "Đóng hụi"
@@ -379,49 +392,75 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 		desc = desc + " - " + *req.Note
 	}
 
-	tx, err := s.txSvc.Create(ctx, userID, dto.CreateTransactionRequest{
-		Type: entity.TransactionType(txType), OccurredDate: &req.OccurredDate, Amount: req.Amount, CategoryID: &catID, Description: &desc, AccountID: &g.AccountID,
+	parsedAmount, _ := strconv.ParseFloat(req.Amount, 64)
+	occAt, _ := time.Parse("2006-01-02", req.OccurredDate)
+
+	var resp *dto.RotatingSavingsContributionResponse
+
+	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		// 1. Create Ledger Transaction
+		ledgerTx := entity.Transaction{
+			AuditEntity:  entity.AuditEntity{BaseEntity: entity.BaseEntity{ID: utils.NewID()}},
+			Type:         txType,
+			OccurredAt:   occAt.UTC(),
+			OccurredDate: req.OccurredDate,
+			Amount:       req.Amount,
+			Description:  &desc,
+			AccountID:    &g.AccountID,
+			Status:       entity.TransactionStatusPosted,
+		}
+		ledgerLine := []entity.TransactionLineItem{
+			{BaseEntity: entity.BaseEntity{ID: utils.NewID()}, Amount: req.Amount, CategoryID: &catID, Note: &desc},
+		}
+
+		if err := postgres.CreateTransactionTx(ctx, tx, userID, ledgerTx, ledgerLine, nil); err != nil {
+			return err
+		}
+
+		// 2. Create Contribution Record
+		c := entity.RotatingSavingsContribution{
+			BaseEntity: entity.BaseEntity{
+				ID: utils.NewID(),
+			},
+			GroupID:             groupID,
+			TransactionID:       ledgerTx.ID,
+			Kind:                req.Kind,
+			CycleNo:             req.CycleNo,
+			DueDate:             req.DueDate,
+			Amount:              parsedAmount,
+			SlotsTaken:          req.SlotsTaken,
+			CollectedFeePerSlot: req.CollectedFeePerSlot,
+			OccurredAt:          time.Now().UTC(),
+			Note:                req.Note,
+			CreatedAt:           time.Now().UTC(),
+		}
+
+		if err := s.repo.CreateContributionTx(ctx, tx, c); err != nil {
+			return err
+		}
+
+		// 3. Add Audit Log
+		_ = s.repo.AddAuditLogTx(ctx, tx, entity.RotatingSavingsAuditLog{
+			BaseEntity: entity.BaseEntity{
+				ID: utils.NewID(),
+			},
+			UserID:    userID,
+			GroupID:   &groupID,
+			Action:    entity.RotatingSavingsAuditActionContributionCreated,
+			Details:   map[string]any{"kind": c.Kind, "amount": req.Amount},
+			CreatedAt: time.Now().UTC(),
+		})
+
+		tr := dto.NewRotatingSavingsContributionResponse(c)
+		resp = &tr
+		return nil
 	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	parsedAmount, _ := strconv.ParseFloat(req.Amount, 64)
-
-	c := entity.RotatingSavingsContribution{
-		BaseEntity: entity.BaseEntity{
-			ID: utils.NewID(),
-		},
-		GroupID:             groupID,
-		TransactionID:       tx.ID,
-		Kind:                req.Kind,
-		CycleNo:             req.CycleNo,
-		DueDate:             req.DueDate,
-		Amount:              parsedAmount,
-		SlotsTaken:          req.SlotsTaken,
-		CollectedFeePerSlot: req.CollectedFeePerSlot,
-		OccurredAt:          time.Now().UTC(),
-		Note:                req.Note,
-		CreatedAt:           time.Now().UTC(),
-	}
-
-	if err := s.repo.CreateContribution(ctx, c); err != nil {
-		return nil, err
-	}
-
-	_ = s.repo.AddAuditLog(ctx, entity.RotatingSavingsAuditLog{
-		BaseEntity: entity.BaseEntity{
-			ID: utils.NewID(),
-		},
-		UserID:    userID,
-		GroupID:   &groupID,
-		Action:    entity.RotatingSavingsAuditActionContributionCreated,
-		Details:   map[string]any{"kind": c.Kind, "amount": req.Amount},
-		CreatedAt: time.Now().UTC(),
-	})
-
-	resp := dto.NewRotatingSavingsContributionResponse(c)
-	return &resp, nil
+	return resp, nil
 }
 
 func (s *RotatingSavingsService) DeleteContribution(ctx context.Context, userID, groupID, id uuid.UUID) error {
