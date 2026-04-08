@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,65 +20,14 @@ func NewBudgetRepo(db *database.Postgres) *BudgetRepo {
 	return &BudgetRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-func (r *BudgetRepo) CreateBudget(ctx context.Context, userID uuid.UUID, b entity.Budget) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = pool.Exec(ctx, `
-		INSERT INTO budgets (
-			id, user_id, name, period, period_start, period_end, amount,
-			alert_threshold_percent, rollover_mode, category_id, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-	`,
-		b.ID, userID, b.Name, b.Period, b.PeriodStart, b.PeriodEnd, b.Amount,
-		b.AlertThresholdPercent, b.RolloverMode, b.CategoryID, b.CreatedAt, b.UpdatedAt,
-	)
-	return err
-}
+// --- Nhóm 1: Truy vấn Thống kê & Danh sách (Read-only Optimized) ---
 
 func (r *BudgetRepo) GetBudget(ctx context.Context, userID uuid.UUID, budgetID uuid.UUID) (*entity.Budget, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	row := pool.QueryRow(ctx, `
-		SELECT
-			id, user_id, name, period, 
-			CASE WHEN period_start IS NULL THEN NULL ELSE to_char(period_start, 'YYYY-MM-DD') END,
-			CASE WHEN period_end IS NULL THEN NULL ELSE to_char(period_end, 'YYYY-MM-DD') END,
-			amount::text, alert_threshold_percent, rollover_mode, category_id,
-			created_at, updated_at, deleted_at
-		FROM budgets
-		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
-	`, budgetID, userID)
-
-	var b entity.Budget
-	var spent string
-	if err := row.Scan(
-		&b.ID, &b.UserID, &b.Name, &b.Period, &b.PeriodStart, &b.PeriodEnd,
-		&b.Amount, &b.AlertThresholdPercent, &b.RolloverMode, &b.CategoryID,
-		&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt,
-	); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.New("budget not found")
-		}
-		return nil, err
-	}
-
-	// Compute spent (simplified, should use recursive tree if category_id exists)
-	if b.CategoryID != nil && b.PeriodStart != nil && b.PeriodEnd != nil {
-		s, _ := r.ComputeSpent(ctx, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
-		spent = s
-	} else {
-		spent = "0"
-	}
-	b.Spent = spent
-	// Remaining calculation (simplified, assuming numeric amounts)
-	b.Remaining = "0" // Placeholder, in real app would use decimal arithmetic
-	return &b, nil
+	return r.getBudget(ctx, pool, userID, budgetID)
 }
 
 func (r *BudgetRepo) ListBudgets(ctx context.Context, userID uuid.UUID) ([]entity.Budget, error) {
@@ -112,7 +62,7 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID uuid.UUID) ([]entit
 		); err != nil {
 			return nil, err
 		}
-		
+
 		if b.CategoryID != nil && b.PeriodStart != nil && b.PeriodEnd != nil {
 			s, _ := r.ComputeSpent(ctx, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
 			b.Spent = s
@@ -120,28 +70,10 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID uuid.UUID) ([]entit
 			b.Spent = "0"
 		}
 		b.Remaining = "0" // Placeholder
-		
+
 		results = append(results, b)
 	}
 	return results, nil
-}
-
-func (r *BudgetRepo) UpdateBudget(ctx context.Context, userID uuid.UUID, b entity.Budget) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = pool.Exec(ctx, `
-		UPDATE budgets
-		SET name = $1, amount = $2::numeric, alert_threshold_percent = $3, rollover_mode = $4, updated_at = $5
-		WHERE id = $6 AND user_id = $7 AND deleted_at IS NULL
-	`, b.Name, b.Amount, b.AlertThresholdPercent, b.RolloverMode, b.UpdatedAt, b.ID, userID)
-	return err
-}
-
-func (r *BudgetRepo) DeleteBudget(ctx context.Context, userID uuid.UUID, budgetID uuid.UUID) error {
-	return r.SoftDelete(ctx, "budgets", budgetID, &userID)
 }
 
 func (r *BudgetRepo) ComputeSpent(ctx context.Context, userID uuid.UUID, categoryID uuid.UUID, startDate string, endDate string) (string, error) {
@@ -181,3 +113,92 @@ func (r *BudgetRepo) ComputeSpent(ctx context.Context, userID uuid.UUID, categor
 	return spent, nil
 }
 
+// --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
+
+func (r *BudgetRepo) CreateBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, b entity.Budget) error {
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	_, err = q.Exec(ctx, `
+		INSERT INTO budgets (
+			id, user_id, name, period, period_start, period_end, amount,
+			alert_threshold_percent, rollover_mode, category_id, created_at, updated_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+	`,
+		b.ID, userID, b.Name, b.Period, b.PeriodStart, b.PeriodEnd, b.Amount,
+		b.AlertThresholdPercent, b.RolloverMode, b.CategoryID, b.CreatedAt, b.UpdatedAt,
+	)
+	return err
+}
+
+func (r *BudgetRepo) UpdateBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, b entity.Budget) error {
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	_, err = q.Exec(ctx, `
+		UPDATE budgets
+		SET name = $1, amount = $2::numeric, alert_threshold_percent = $3, rollover_mode = $4, updated_at = $5
+		WHERE id = $6 AND user_id = $7 AND deleted_at IS NULL
+	`, b.Name, b.Amount, b.AlertThresholdPercent, b.RolloverMode, b.UpdatedAt, b.ID, userID)
+	return err
+}
+
+func (r *BudgetRepo) DeleteBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, budgetID uuid.UUID) error {
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	_, err = q.Exec(ctx, `UPDATE budgets SET deleted_at = NOW() WHERE id = $1 AND user_id = $2`, budgetID, userID)
+	return err
+}
+
+// GetBudgetTx lấy thông tin ngân sách trong transaction (cho mục đích nhất quán hoặc audit).
+func (r *BudgetRepo) GetBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, budgetID uuid.UUID) (*entity.Budget, error) {
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	return r.getBudget(ctx, q, userID, budgetID)
+}
+
+// --- Internal Helpers ---
+
+func (r *BudgetRepo) getBudget(ctx context.Context, q database.Queryer, userID uuid.UUID, budgetID uuid.UUID) (*entity.Budget, error) {
+	row := q.QueryRow(ctx, `
+		SELECT
+			id, user_id, name, period, 
+			CASE WHEN period_start IS NULL THEN NULL ELSE to_char(period_start, 'YYYY-MM-DD') END,
+			CASE WHEN period_end IS NULL THEN NULL ELSE to_char(period_end, 'YYYY-MM-DD') END,
+			amount::text, alert_threshold_percent, rollover_mode, category_id,
+			created_at, updated_at, deleted_at
+		FROM budgets
+		WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+	`, budgetID, userID)
+
+	var b entity.Budget
+	if err := row.Scan(
+		&b.ID, &b.UserID, &b.Name, &b.Period, &b.PeriodStart, &b.PeriodEnd,
+		&b.Amount, &b.AlertThresholdPercent, &b.RolloverMode, &b.CategoryID,
+		&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("budget not found")
+		}
+		return nil, fmt.Errorf("failed to scan budget: %w", err)
+	}
+
+	// Compute spent (simplified)
+	if b.CategoryID != nil && b.PeriodStart != nil && b.PeriodEnd != nil {
+		s, _ := r.ComputeSpent(ctx, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
+		b.Spent = s
+	} else {
+		b.Spent = "0"
+	}
+	b.Remaining = "0" // Placeholder
+	return &b, nil
+}

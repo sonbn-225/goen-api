@@ -72,7 +72,7 @@ func (s *PublicService) GetPaymentInfo(ctx context.Context, userRef string) (*en
 		return nil, errors.New("invalid default account id format")
 	}
  
-	acc, err := s.accountRepo.GetAccountForUserTx(ctx, nil, u.ID, accID)
+	acc, err := s.accountRepo.GetAccountForUser(ctx, u.ID, accID)
 	if err != nil {
 		return nil, err
 	}

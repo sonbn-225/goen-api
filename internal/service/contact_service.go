@@ -47,7 +47,7 @@ func (s *ContactService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 		}
 	}
 
-	if err := s.repo.CreateContact(ctx, c); err != nil {
+	if err := s.repo.CreateContactTx(ctx, nil, c); err != nil {
 		return nil, err
 	}
 	return s.Get(ctx, userID, c.ID)
@@ -116,14 +116,14 @@ func (s *ContactService) Update(ctx context.Context, userID, contactID uuid.UUID
 		}
 	}
 
-	if err := s.repo.UpdateContact(ctx, userID, *cur); err != nil {
+	if err := s.repo.UpdateContactTx(ctx, nil, userID, *cur); err != nil {
 		return nil, err
 	}
 	return s.Get(ctx, userID, contactID)
 }
 
 func (s *ContactService) Delete(ctx context.Context, userID, contactID uuid.UUID) error {
-	return s.repo.DeleteContact(ctx, userID, contactID)
+	return s.repo.DeleteContactTx(ctx, nil, userID, contactID)
 }
 
 func (s *ContactService) GetOrCreateByName(ctx context.Context, userID uuid.UUID, name string) (uuid.UUID, error) {

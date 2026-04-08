@@ -41,7 +41,7 @@ func (s *TagService) Create(ctx context.Context, userID uuid.UUID, req dto.Creat
 		Color:  color,
 	}
  
-	if err := s.repo.CreateTag(ctx, userID, t); err != nil {
+	if err := s.repo.CreateTagTx(ctx, nil, userID, t); err != nil {
 		return nil, err
 	}
  
@@ -116,7 +116,7 @@ func (s *TagService) GetOrCreateByName(ctx context.Context, userID uuid.UUID, na
 		t.NameEN = &name
 	}
  
-	if err := s.repo.CreateTag(ctx, userID, t); err != nil {
+	if err := s.repo.CreateTagTx(ctx, nil, userID, t); err != nil {
 		return uuid.Nil, err
 	}
  

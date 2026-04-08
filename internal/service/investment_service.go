@@ -91,7 +91,7 @@ func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, accountID, 
 					}
 				}
 			}
-			if err := s.repo.DeleteShareLotsByTradeID(ctx, userID, tr.ID); err != nil {
+			if err := s.repo.DeleteShareLotsByTradeIDTx(ctx, tx, userID, tr.ID); err != nil {
 				return err
 			}
 		} else {
@@ -121,7 +121,7 @@ func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, accountID, 
 					return err
 				}
 			}
-			if err := s.repo.DeleteRealizedLogsByTradeID(ctx, userID, tr.ID); err != nil {
+			if err := s.repo.DeleteRealizedLogsByTradeIDTx(ctx, tx, userID, tr.ID); err != nil {
 				return err
 			}
 		}
@@ -139,12 +139,12 @@ func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, accountID, 
 		}
 
 		// 3. Delete Trade Record
-		if err := s.repo.DeleteTrade(ctx, userID, tr.ID); err != nil {
+		if err := s.repo.DeleteTradeTx(ctx, tx, userID, tr.ID); err != nil {
 			return err
 		}
 
 		// 4. Update Holding Summary
-		return s.upsertHoldingFromLots(ctx, userID, accountID, tr.SecurityID)
+		return s.upsertHoldingFromLots(ctx, tx, userID, accountID, tr.SecurityID)
 	})
 }
 
@@ -163,7 +163,7 @@ func (s *InvestmentService) UpdateTrade(ctx context.Context, userID, accountID, 
 // 4. Updates or creates ShareLots (for acquisition tracking).
 // 5. Updates the overall Holding summary for the security.
 func (s *InvestmentService) CreateTrade(ctx context.Context, userID, accountID uuid.UUID, req dto.CreateTradeRequest) (*dto.TradeResponse, error) {
-	acc, err := s.accRepo.GetAccountForUserTx(ctx, nil, userID, accountID)
+	acc, err := s.accRepo.GetAccountForUser(ctx, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +390,7 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, accountID u
 	}
 
 	// 5. Update Holding Summary
-	_ = s.upsertHoldingFromLots(ctx, userID, accountID, sid)
+	_ = s.upsertHoldingFromLots(ctx, nil, userID, accountID, sid)
 
 	return resp, nil
 }
@@ -492,7 +492,7 @@ func (s *InvestmentService) planFIFOSell(lots []entity.ShareLot, sellQty string)
 	return plan, "0", nil
 }
 
-func (s *InvestmentService) upsertHoldingFromLots(ctx context.Context, userID, accountID, securityID uuid.UUID) error {
+func (s *InvestmentService) upsertHoldingFromLots(ctx context.Context, tx pgx.Tx, userID, accountID, securityID uuid.UUID) error {
 	lots, err := s.repo.ListShareLots(ctx, userID, accountID, securityID)
 	if err != nil {
 		return err
@@ -525,7 +525,7 @@ func (s *InvestmentService) upsertHoldingFromLots(ctx context.Context, userID, a
 		CostBasisTotal: strPtr(totalCost.FloatString(2)),
 		AvgCost:        strPtr(avg.FloatString(2)),
 	}
-	_, err = s.repo.UpsertHolding(ctx, userID, h)
+	_, err = s.repo.UpsertHoldingTx(ctx, tx, userID, h)
 	return err
 }
 

@@ -10,6 +10,8 @@ import (
 
 // ReportRepository định nghĩa lớp truy cập dữ liệu cho các báo cáo phân tích và thống kê.
 type ReportRepository interface {
+	// --- Nhóm 1: Truy vấn Báo cáo (Read-only Optimized) ---
+
 	// GetCashflow trả về dữ liệu lịch sử thu nhập và chi phí cho một số tháng nhất định.
 	GetCashflow(ctx context.Context, userID uuid.UUID, months int) ([]entity.CashflowStat, error)
 	// GetTopExpenses trả về các danh mục chi tiêu cao nhất cho một tháng cụ thể.

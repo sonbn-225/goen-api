@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
@@ -13,6 +14,12 @@ import (
 // BaseRepo provides common functionality for PostgreSQL repositories.
 type BaseRepo struct {
 	db *database.Postgres
+}
+
+// Queryer trả về pgx.Tx nếu có, hoặc connection pool nếu tx là nil.
+// Giúp thống nhất truy vấn có hoặc không có transaction.
+func (r *BaseRepo) Queryer(ctx context.Context, tx pgx.Tx) (database.Queryer, error) {
+	return r.db.Queryer(ctx, tx)
 }
 
 // NewBaseRepo creates a new BaseRepo instance.

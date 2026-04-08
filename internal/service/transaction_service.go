@@ -26,8 +26,9 @@ type TransactionService struct {
 	repo        interfaces.TransactionRepository
 	tagSvc      interfaces.TagService
 	debtSvc     interfaces.DebtService
-	accountRepo interfaces.AccountRepository
-	db          *database.Postgres
+	accountRepo        interfaces.AccountRepository
+	rotatingSavingsSvc interfaces.RotatingSavingsService
+	db                 *database.Postgres
 }
 
 // NewTransactionService khởi tạo một thực thể mới của dịch vụ sổ cái trung tâm.
@@ -38,6 +39,11 @@ func NewTransactionService(repo interfaces.TransactionRepository, tagSvc interfa
 // SetDebtService được sử dụng để tiêm phụ thuộc nhằm giải quyết vòng lặp phụ thuộc với DebtService.
 func (s *TransactionService) SetDebtService(ds interfaces.DebtService) {
 	s.debtSvc = ds
+}
+
+// SetRotatingSavingsService được sử dụng để tiêm phụ thuộc nhằm giải quyết vòng lặp phụ thuộc với RotatingSavingsService.
+func (s *TransactionService) SetRotatingSavingsService(svc interfaces.RotatingSavingsService) {
+	s.rotatingSavingsSvc = svc
 }
 
 // List trả về danh sách phân trang các giao dịch được lọc theo nhiều tiêu chí khác nhau.
@@ -78,7 +84,7 @@ func (s *TransactionService) List(ctx context.Context, userID uuid.UUID, req dto
 
 // Get lấy thông tin một giao dịch duy nhất theo ID, đảm bảo nó thuộc về người dùng được chỉ định.
 func (s *TransactionService) Get(ctx context.Context, userID, transactionID uuid.UUID) (*dto.TransactionResponse, error) {
-	it, err := s.repo.GetTransactionTx(ctx, nil, userID, transactionID)
+	it, err := s.repo.GetTransaction(ctx, userID, transactionID)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +305,7 @@ func (s *TransactionService) Patch(ctx context.Context, userID, transactionID uu
 		patch.LineItems = &lis
 	}
 
-	it, err := s.repo.PatchTransaction(ctx, userID, transactionID, patch)
+	it, err := s.repo.PatchTransactionTx(ctx, nil, userID, transactionID, patch)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +369,7 @@ func (s *TransactionService) BatchPatch(ctx context.Context, userID uuid.UUID, r
 		patches[id] = p
 	}
 
-	updated, failed, err := s.repo.BatchPatchTransactions(ctx, userID, req.TransactionIDs, patches, mode)
+	updated, failed, err := s.repo.BatchPatchTransactionsTx(ctx, nil, userID, req.TransactionIDs, patches, mode)
 	if err != nil {
 		return nil, err
 	}
@@ -386,6 +392,13 @@ func (s *TransactionService) Delete(ctx context.Context, userID, transactionID u
 		// 2. Dọn dẹp các khoản nợ/thanh toán liên kết
 		if s.debtSvc != nil {
 			if err := s.debtSvc.CleanupTransactionLinksTx(ctx, txConn, userID, transactionID); err != nil {
+				return err
+			}
+		}
+
+		// 2.1 Dọn dẹp các liên kết hụi/họ
+		if s.rotatingSavingsSvc != nil {
+			if err := s.rotatingSavingsSvc.CleanupTransactionLinksTx(ctx, txConn, userID, transactionID); err != nil {
 				return err
 			}
 		}

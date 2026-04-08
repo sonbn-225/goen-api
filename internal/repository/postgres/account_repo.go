@@ -23,18 +23,14 @@ func NewAccountRepo(db *database.Postgres) *AccountRepo {
 }
 
 func (r *AccountRepo) CreateAccountWithOwnerTx(ctx context.Context, tx pgx.Tx, account entity.Account, ownerUserID uuid.UUID) error {
-	var q database.Queryer = tx
-	if tx == nil {
-		pool, err := r.db.Pool(ctx)
-		if err != nil {
-			return err
-		}
-		q = pool
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
 	}
 
 	settingsJSON, _ := json.Marshal(account.Settings)
 
-	_, err := q.Exec(ctx, `
+	_, err = q.Exec(ctx, `
 		INSERT INTO accounts (
 			id, name, account_number, account_type, currency, parent_account_id, status, settings, closed_at,
 			created_at, updated_at, deleted_at
@@ -63,17 +59,13 @@ func (r *AccountRepo) CreateAccountWithOwnerTx(ctx context.Context, tx pgx.Tx, a
 	return nil
 }
 
-func (r *AccountRepo) ListAccountsForUserTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.Account, error) {
-	var q database.Queryer = tx
-	if tx == nil {
-		pool, err := r.db.Pool(ctx)
-		if err != nil {
-			return nil, err
-		}
-		q = pool
+func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID uuid.UUID) ([]entity.Account, error) {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	rows, err := q.Query(ctx, `
+	rows, err := pool.Query(ctx, `
 		SELECT a.id, a.name, a.account_number, a.account_type, a.currency, a.parent_account_id, a.status, a.settings, a.closed_at,
 		       a.created_at, a.updated_at, a.deleted_at,
 		       COALESCE(SUM(
@@ -119,17 +111,13 @@ func (r *AccountRepo) ListAccountsForUserTx(ctx context.Context, tx pgx.Tx, user
 	return out, rows.Err()
 }
 
-func (r *AccountRepo) GetAccountForUserTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
-	var q database.Queryer = tx
-	if tx == nil {
-		pool, err := r.db.Pool(ctx)
-		if err != nil {
-			return nil, err
-		}
-		q = pool
+func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	row := q.QueryRow(ctx, `
+	row := pool.QueryRow(ctx, `
 		SELECT a.id, a.name, a.account_number, a.account_type, a.currency, a.parent_account_id, a.status, a.settings, a.closed_at,
 		       a.created_at, a.updated_at, a.deleted_at,
 		       COALESCE(SUM(
@@ -152,7 +140,7 @@ func (r *AccountRepo) GetAccountForUserTx(ctx context.Context, tx pgx.Tx, userID
 
 	var a entity.Account
 	var settingsJSON []byte
-	err := row.Scan(
+	err = row.Scan(
 		&a.ID, &a.Name, &a.AccountNumber, &a.AccountType, &a.Currency,
 		&a.ParentAccountID, &a.Status, &settingsJSON, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
 		&a.DeletedAt, &a.Balance,
@@ -170,16 +158,16 @@ func (r *AccountRepo) GetAccountForUserTx(ctx context.Context, tx pgx.Tx, userID
 }
 
 func (r *AccountRepo) PatchAccountTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID, patch entity.AccountPatch) (*entity.Account, error) {
-	var q database.Queryer = tx
-	if tx == nil {
-		return nil, errors.New("transaction required for patch account")
-	}
-
-	if err := r.requireAccountOwner(ctx, tx, actorUserID, accountID); err != nil {
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
 		return nil, err
 	}
 
-	cur, err := r.getAccountInTx(ctx, tx, actorUserID, accountID)
+	if err := r.requireAccountOwner(ctx, q, actorUserID, accountID); err != nil {
+		return nil, err
+	}
+
+	cur, err := r.getAccountQueryer(ctx, q, actorUserID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +190,7 @@ func (r *AccountRepo) PatchAccountTx(ctx context.Context, tx pgx.Tx, actorUserID
 			closedAt = nil
 		}
 	}
-	
+
 	if patch.Settings != nil {
 		if patch.Settings.Color != nil {
 			cur.Settings.Color = patch.Settings.Color
@@ -225,21 +213,21 @@ func (r *AccountRepo) PatchAccountTx(ctx context.Context, tx pgx.Tx, actorUserID
 		return nil, err
 	}
 
-	return r.getAccountInTx(ctx, tx, actorUserID, accountID)
+	return r.getAccountQueryer(ctx, q, actorUserID, accountID)
 }
 
 func (r *AccountRepo) DeleteAccountTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID) error {
-	var q database.Queryer = tx
-	if tx == nil {
-		return errors.New("transaction required for delete account")
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
 	}
 
-	if err := r.requireAccountOwner(ctx, tx, actorUserID, accountID); err != nil {
+	if err := r.requireAccountOwner(ctx, q, actorUserID, accountID); err != nil {
 		return err
 	}
 
 	now := utils.Now()
-	_, err := q.Exec(ctx, `
+	_, err = q.Exec(ctx, `
 		UPDATE accounts
 		SET deleted_at = $1, updated_at = $1, status = $2
 		WHERE id = $3 AND deleted_at IS NULL
@@ -247,18 +235,14 @@ func (r *AccountRepo) DeleteAccountTx(ctx context.Context, tx pgx.Tx, actorUserI
 	return err
 }
 
-func (r *AccountRepo) HasRelatedTransferTransactionsForAccountTx(ctx context.Context, tx pgx.Tx, accountID uuid.UUID) (bool, error) {
-	var q database.Queryer = tx
-	if tx == nil {
-		pool, err := r.db.Pool(ctx)
-		if err != nil {
-			return false, err
-		}
-		q = pool
+func (r *AccountRepo) HasRelatedTransferTransactionsForAccount(ctx context.Context, accountID uuid.UUID) (bool, error) {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return false, err
 	}
 
 	var exists bool
-	err := q.QueryRow(ctx, `
+	err = pool.QueryRow(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM transactions
 			WHERE deleted_at IS NULL AND type = 'transfer'
@@ -268,17 +252,13 @@ func (r *AccountRepo) HasRelatedTransferTransactionsForAccountTx(ctx context.Con
 	return exists, err
 }
 
-func (r *AccountRepo) ListAccountBalancesForUserTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.AccountBalance, error) {
-	var q database.Queryer = tx
-	if tx == nil {
-		pool, err := r.db.Pool(ctx)
-		if err != nil {
-			return nil, err
-		}
-		q = pool
+func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID uuid.UUID) ([]entity.AccountBalance, error) {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	rows, err := q.Query(ctx, `
+	rows, err := pool.Query(ctx, `
 		SELECT a.id AS account_id, a.currency,
 		       COALESCE(SUM(
 		         CASE
@@ -314,17 +294,13 @@ func (r *AccountRepo) ListAccountBalancesForUserTx(ctx context.Context, tx pgx.T
 	return out, rows.Err()
 }
 
-func (r *AccountRepo) ListAccountSharesTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID) ([]entity.AccountShare, error) {
-	var q database.Queryer = tx
-	if tx == nil {
-		pool, err := r.db.Pool(ctx)
-		if err != nil {
-			return nil, err
-		}
-		q = pool
+func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID) ([]entity.AccountShare, error) {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	rows, err := q.Query(ctx, `
+	rows, err := pool.Query(ctx, `
 		SELECT ua.id, ua.account_id, ua.user_id, ua.permission, ua.status, ua.revoked_at,
 		       ua.created_at, ua.updated_at,
 		       u.email, u.phone, u.display_name
@@ -355,17 +331,18 @@ func (r *AccountRepo) ListAccountSharesTx(ctx context.Context, tx pgx.Tx, actorU
 }
 
 func (r *AccountRepo) UpsertAccountShareTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID, targetUserID uuid.UUID, permission string) (*entity.AccountShare, error) {
-	if tx == nil {
-		return nil, errors.New("transaction required for upsert account share")
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := r.requireAccountOwner(ctx, tx, actorUserID, accountID); err != nil {
+	if err := r.requireAccountOwner(ctx, q, actorUserID, accountID); err != nil {
 		return nil, err
 	}
 
 	now := utils.Now()
 	uaID := uuid.New()
-	row := tx.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		INSERT INTO user_accounts (
 			id, account_id, user_id, permission, status, revoked_at,
 			created_at, updated_at
@@ -383,21 +360,22 @@ func (r *AccountRepo) UpsertAccountShareTx(ctx context.Context, tx pgx.Tx, actor
 		return nil, err
 	}
 
-	_ = tx.QueryRow(ctx, `SELECT email, phone, display_name FROM users WHERE id = $1`, targetUserID).Scan(&it.UserEmail, &it.UserPhone, &it.UserDisplayName)
+	_ = q.QueryRow(ctx, `SELECT email, phone, display_name FROM users WHERE id = $1`, targetUserID).Scan(&it.UserEmail, &it.UserPhone, &it.UserDisplayName)
 	return &it, nil
 }
 
 func (r *AccountRepo) RevokeAccountShareTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID, targetUserID uuid.UUID) error {
-	if tx == nil {
-		return errors.New("transaction required for revoke account share")
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
 	}
 
-	if err := r.requireAccountOwner(ctx, tx, actorUserID, accountID); err != nil {
+	if err := r.requireAccountOwner(ctx, q, actorUserID, accountID); err != nil {
 		return err
 	}
 
 	now := utils.Now()
-	_, err := tx.Exec(ctx, `
+	_, err = q.Exec(ctx, `
 		UPDATE user_accounts
 		SET status = 'revoked', revoked_at = $1, updated_at = $1
 		WHERE account_id = $2 AND user_id = $3 AND permission != 'owner'
@@ -405,17 +383,13 @@ func (r *AccountRepo) RevokeAccountShareTx(ctx context.Context, tx pgx.Tx, actor
 	return err
 }
 
-func (r *AccountRepo) ListAccountAuditEventsTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID, limit int) ([]entity.AccountAuditEvent, error) {
-	var q database.Queryer = tx
-	if tx == nil {
-		pool, err := r.db.Pool(ctx)
-		if err != nil {
-			return nil, err
-		}
-		q = pool
+func (r *AccountRepo) ListAccountAuditEvents(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID, limit int) ([]entity.AccountAuditEvent, error) {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	rows, err := q.Query(ctx, `
+	rows, err := pool.Query(ctx, `
 		SELECT id, account_id, actor_user_id, action, entity_type, entity_id, occurred_at, diff
 		FROM audit_events
 		WHERE account_id = $1
@@ -448,13 +422,9 @@ func (r *AccountRepo) ListAccountAuditEventsTx(ctx context.Context, tx pgx.Tx, a
 }
 
 func (r *AccountRepo) RecordAccountAuditEventTx(ctx context.Context, tx pgx.Tx, event entity.AccountAuditEvent) error {
-	var q database.Queryer = tx
-	if tx == nil {
-		pool, err := r.db.Pool(ctx)
-		if err != nil {
-			return err
-		}
-		q = pool
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
 	}
 
 	var diffJSON []byte
@@ -462,16 +432,16 @@ func (r *AccountRepo) RecordAccountAuditEventTx(ctx context.Context, tx pgx.Tx, 
 		diffJSON, _ = json.Marshal(event.Diff)
 	}
 
-	_, err := q.Exec(ctx, `
+	_, err = q.Exec(ctx, `
 		INSERT INTO audit_events (id, account_id, actor_user_id, action, entity_type, entity_id, occurred_at, diff)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, event.ID, event.AccountID, event.ActorUserID, event.Action, event.EntityType, event.EntityID, event.OccurredAt, diffJSON)
+	`, event.ID, event.AccountID, event.ActorUserID, event.Action, event.EntityType, event.ID, event.OccurredAt, diffJSON)
 	return err
 }
 
-func (r *AccountRepo) requireAccountOwner(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) error {
+func (r *AccountRepo) requireAccountOwner(ctx context.Context, q database.Queryer, userID uuid.UUID, accountID uuid.UUID) error {
 	var one int
-	err := tx.QueryRow(ctx, `
+	err := q.QueryRow(ctx, `
 		SELECT 1 FROM user_accounts
 		WHERE user_id = $1 AND account_id = $2 AND status = 'active' AND permission = 'owner'
 	`, userID, accountID).Scan(&one)
@@ -484,8 +454,16 @@ func (r *AccountRepo) requireAccountOwner(ctx context.Context, tx pgx.Tx, userID
 	return nil
 }
 
-func (r *AccountRepo) getAccountInTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
-	row := tx.QueryRow(ctx, `
+func (r *AccountRepo) GetAccountForUserTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	return r.getAccountQueryer(ctx, q, userID, accountID)
+}
+
+func (r *AccountRepo) getAccountQueryer(ctx context.Context, q database.Queryer, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
+	row := q.QueryRow(ctx, `
 		SELECT a.id, a.name, a.account_number, a.account_type, a.currency, a.parent_account_id, a.status, a.settings, a.closed_at,
 		       a.created_at, a.updated_at, a.deleted_at,
 		       COALESCE(SUM(

@@ -19,7 +19,7 @@ func NewReportService(r interfaces.ReportRepository, a interfaces.AccountReposit
 }
 
 func (s *ReportService) GetDashboardReport(ctx context.Context, userID uuid.UUID) (*dto.DashboardReportResponse, error) {
-	balances, err := s.accountRepo.ListAccountBalancesForUserTx(ctx, nil, userID)
+	balances, err := s.accountRepo.ListAccountBalancesForUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

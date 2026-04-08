@@ -36,7 +36,7 @@ func NewAccountService(
 }
 
 func (s *AccountService) List(ctx context.Context, userID uuid.UUID) ([]dto.AccountResponse, error) {
-	items, err := s.repo.ListAccountsForUserTx(ctx, nil, userID)
+	items, err := s.repo.ListAccountsForUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (s *AccountService) List(ctx context.Context, userID uuid.UUID) ([]dto.Acco
 }
 
 func (s *AccountService) Get(ctx context.Context, userID, accountID uuid.UUID) (*dto.AccountResponse, error) {
-	it, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID)
+	it, err := s.repo.GetAccountForUser(ctx, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (s *AccountService) Patch(ctx context.Context, userID, accountID uuid.UUID,
 
 	// We use db.WithTx here because PatchAccountTx requires a transaction
 	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		cur, err := s.repo.GetAccountForUserTx(ctx, tx, userID, accountID)
+		cur, err := s.repo.GetAccountForUser(ctx, userID, accountID)
 		if err != nil {
 			return err
 		}
@@ -155,7 +155,7 @@ func (s *AccountService) Patch(ctx context.Context, userID, accountID uuid.UUID,
 }
 
 func (s *AccountService) Delete(ctx context.Context, userID, accountID uuid.UUID) error {
-	acc, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID)
+	acc, err := s.repo.GetAccountForUser(ctx, userID, accountID)
 	if err != nil {
 		return err
 	}
@@ -181,10 +181,10 @@ func (s *AccountService) Delete(ctx context.Context, userID, accountID uuid.UUID
 }
 
 func (s *AccountService) ListShares(ctx context.Context, userID, accountID uuid.UUID) ([]dto.AccountShareResponse, error) {
-	if _, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID); err != nil {
+	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
 		return nil, err
 	}
-	items, err := s.repo.ListAccountSharesTx(ctx, nil, userID, accountID)
+	items, err := s.repo.ListAccountShares(ctx, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID uuid
 	var err error
 
 	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		if _, err := s.repo.GetAccountForUserTx(ctx, tx, userID, accountID); err != nil {
+		if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
 			return err
 		}
 
@@ -232,7 +232,7 @@ func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID uuid
 
 func (s *AccountService) RevokeShare(ctx context.Context, userID, accountID, targetUserID uuid.UUID) error {
 	return s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		if _, err := s.repo.GetAccountForUserTx(ctx, tx, userID, accountID); err != nil {
+		if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
 			return err
 		}
 		return s.repo.RevokeAccountShareTx(ctx, tx, userID, accountID, targetUserID)
@@ -240,7 +240,7 @@ func (s *AccountService) RevokeShare(ctx context.Context, userID, accountID, tar
 }
 
 func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID uuid.UUID, limit int) ([]dto.AccountAuditEventResponse, error) {
-	if _, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID); err != nil {
+	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
 		return nil, err
 	}
 
@@ -251,7 +251,7 @@ func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID 
 		limit = 200
 	}
 
-	items, err := s.repo.ListAccountAuditEventsTx(ctx, nil, userID, accountID, limit)
+	items, err := s.repo.ListAccountAuditEvents(ctx, userID, accountID, limit)
 	if err != nil {
 		return nil, err
 	}

@@ -37,6 +37,7 @@ type RotatingSavingsContribution struct {
 	OccurredAt          time.Time                       `json:"occurred_at"`            // Timestamp of the payment
 	Note                *string                         `json:"note"`                   // Optional memo
 	CreatedAt           time.Time                       `json:"created_at"`             // Creation timestamp
+	UpdatedAt           time.Time                       `json:"updated_at"`             // Update timestamp
 }
 
 // RotatingSavingsAuditLog tracks modifications and actions taken within a rotating savings group.
@@ -47,6 +48,7 @@ type RotatingSavingsAuditLog struct {
 	Action    RotatingSavingsAuditAction `json:"action"`    // Type of action (group_created/updated/etc.)
 	Details   map[string]any             `json:"details"`   // Detailed changes or event data
 	CreatedAt time.Time                  `json:"created_at"` // Creation timestamp
+	UpdatedAt time.Time                  `json:"updated_at"` // Update timestamp
 }
 
 

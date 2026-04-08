@@ -7,24 +7,29 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
 type InterchangeService struct {
 	repo  interfaces.InterchangeRepository
 	txSvc interfaces.TransactionService
+	db    *database.Postgres
 }
 
 func NewInterchangeService(
 	repo interfaces.InterchangeRepository,
 	txSvc interfaces.TransactionService,
+	db *database.Postgres,
 ) *InterchangeService {
 	return &InterchangeService{
 		repo:  repo,
 		txSvc: txSvc,
+		db:    db,
 	}
 }
 
@@ -50,7 +55,12 @@ func (s *InterchangeService) StageImport(ctx context.Context, userID uuid.UUID, 
 		})
 	}
 
-	staged, err := s.repo.UpsertStagedImports(ctx, userID, creates)
+	var staged []entity.StagedImport
+	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		var err error
+		staged, err = s.repo.UpsertStagedImportsTx(ctx, tx, userID, creates)
+		return err
+	})
 	if err != nil {
 		return 0, 0, nil, err
 	}
@@ -86,7 +96,7 @@ func (s *InterchangeService) PatchStaged(ctx context.Context, userID, id uuid.UU
 		Metadata: req.Metadata,
 		Status:   req.Status,
 	}
-	item, err := s.repo.PatchStagedImport(ctx, userID, id, patch)
+	item, err := s.repo.PatchStagedImportTx(ctx, nil, userID, id, patch)
 	if err != nil {
 		return nil, err
 	}
@@ -104,11 +114,11 @@ func (s *InterchangeService) PatchStaged(ctx context.Context, userID, id uuid.UU
 }
 
 func (s *InterchangeService) DeleteStaged(ctx context.Context, userID, id uuid.UUID) error {
-	return s.repo.DeleteStagedImport(ctx, userID, id)
+	return s.repo.DeleteStagedImportTx(ctx, nil, userID, id)
 }
 
 func (s *InterchangeService) ClearStaged(ctx context.Context, userID uuid.UUID, resourceType string) error {
-	_, err := s.repo.DeleteAllStagedImports(ctx, userID, resourceType)
+	_, err := s.repo.DeleteAllStagedImportsTx(ctx, nil, userID, resourceType)
 	return err
 }
 
@@ -123,7 +133,12 @@ func (s *InterchangeService) UpsertRules(ctx context.Context, userID uuid.UUID, 
 			MappedID:     r.MappedID,
 		}
 	}
-	resItems, err := s.repo.UpsertImportRules(ctx, userID, upserts)
+	var resItems []entity.StagedImportRule
+	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		var err error
+		resItems, err = s.repo.UpsertImportRulesTx(ctx, tx, userID, upserts)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +177,7 @@ func (s *InterchangeService) ListRules(ctx context.Context, userID uuid.UUID, re
 }
 
 func (s *InterchangeService) DeleteRule(ctx context.Context, userID, id uuid.UUID) error {
-	return s.repo.DeleteImportRule(ctx, userID, id)
+	return s.repo.DeleteImportRuleTx(ctx, nil, userID, id)
 }
 
 func (s *InterchangeService) CreateManyFromStaged(ctx context.Context, userID uuid.UUID, resourceType string, ids []uuid.UUID) (*dto.BatchImportResult, error) {
@@ -192,7 +207,7 @@ func (s *InterchangeService) CreateManyFromStaged(ctx context.Context, userID uu
 
 		// Mark as processed
 		status := "processed"
-		_, _ = s.repo.PatchStagedImport(ctx, userID, id, entity.StagedImportPatch{Status: &status})
+		_, _ = s.repo.PatchStagedImportTx(ctx, nil, userID, id, entity.StagedImportPatch{Status: &status})
 		result.Created++
 	}
 
@@ -239,7 +254,7 @@ func (s *InterchangeService) ApplyRulesAndCreate(ctx context.Context, userID uui
 		}
 
 		if updated {
-			_, _ = s.repo.PatchStagedImport(ctx, userID, item.ID, entity.StagedImportPatch{Metadata: item.Metadata})
+			_, _ = s.repo.PatchStagedImportTx(ctx, nil, userID, item.ID, entity.StagedImportPatch{Metadata: item.Metadata})
 		}
 
 		// Check if fully mapped

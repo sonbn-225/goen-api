@@ -93,6 +93,13 @@ func (p *Postgres) WithTx(ctx context.Context, fn func(pgx.Tx) error) error {
 	return nil
 }
 
+func (p *Postgres) Queryer(ctx context.Context, tx pgx.Tx) (Queryer, error) {
+	if tx != nil {
+		return tx, nil
+	}
+	return p.Pool(ctx)
+}
+
 func ParseInt64(s string) (int64, error) {
 	var i int64
 	_, err := fmt.Sscanf(s, "%d", &i)
