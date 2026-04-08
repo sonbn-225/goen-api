@@ -11,13 +11,18 @@ import (
 
 // SavingsRepository định nghĩa lớp truy cập dữ liệu cho các mục tiêu và tài khoản tiết kiệm.
 type SavingsRepository interface {
-	// GetSavings lấy thông tin chi tiết của một mục tiêu tiết kiệm cụ thể.
-	GetSavings(ctx context.Context, userID uuid.UUID, savingsID uuid.UUID) (*entity.Savings, error)
-	// ListSavings trả về toàn bộ các mục tiêu tiết kiệm của một người dùng.
-	ListSavings(ctx context.Context, userID uuid.UUID) ([]entity.Savings, error)
-	// UpdateSavingsTx là phiên bản transactional để cập nhật các tham số của mục tiêu tiết kiệm.
+	// --- Nhóm 1: Truy vấn Tiết kiệm (Flexible Tx) ---
+
+	// GetSavingsTx lấy thông tin chi tiết của một mục tiêu tiết kiệm cụ thể.
+	GetSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, savingsID uuid.UUID) (*entity.Savings, error)
+	// ListSavingsTx trả về toàn bộ các mục tiêu tiết kiệm của một người dùng.
+	ListSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.Savings, error)
+
+	// --- Nhóm 2: Thao tác ghi (Transactional) ---
+
+	// UpdateSavingsTx cập nhật các tham số của mục tiêu tiết kiệm.
 	UpdateSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, s entity.Savings) error
-	// DeleteSavingsTx xóa mềm một mục tiêu tiết kiệm trong transaction.
+	// DeleteSavingsTx xóa mềm một mục tiêu tiết kiệm.
 	DeleteSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, savingsID uuid.UUID) error
 }
 
@@ -34,4 +39,3 @@ type SavingsService interface {
 	// DeleteSavings xóa một mục tiêu tiết kiệm.
 	DeleteSavings(ctx context.Context, userID, savingsID uuid.UUID) error
 }
-

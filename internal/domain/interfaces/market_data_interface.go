@@ -10,6 +10,8 @@ import (
 
 // MarketDataRepository định nghĩa lớp truy cập dữ liệu cho giá chứng khoán bên ngoài và các sự kiện doanh nghiệp.
 type MarketDataRepository interface {
+	// --- Nhóm 1: Truy vấn Dữ liệu Thị trường (Read-only Optimized) ---
+
 	// LoadSecurityIDsBySymbols phân giải các UUID nội bộ từ các mã niêm yết (ticker symbols).
 	LoadSecurityIDsBySymbols(ctx context.Context, symbols []string) (map[string]uuid.UUID, error)
 	// LoadSyncState lấy thời điểm cuối cùng dữ liệu thị trường được đồng bộ hóa cho một khóa cụ thể.
@@ -31,4 +33,3 @@ type MarketDataService interface {
 	// GetGlobalStatus trả về sức khỏe và trạng thái của các trình đồng bộ hóa chạy ngầm.
 	GetGlobalStatus(ctx context.Context) (dto.GlobalStatus, error)
 }
-

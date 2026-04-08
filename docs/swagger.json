@@ -1816,52 +1816,14 @@
                 }
             }
         },
-        "/diagnostics": {
-            "get": {
-                "description": "Retrieve metrics, configurations, and connectivity health (internal use docs)",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "System"
-                ],
-                "summary": "System Diagnostics",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/group-expenses": {
+        "/debts/{id}/repay": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a shared transaction splitting cost among participants",
+                "description": "Automatically create a payment transaction and link it to the debt",
                 "consumes": [
                     "application/json"
                 ],
@@ -1869,202 +1831,24 @@
                     "application/json"
                 ],
                 "tags": [
-                    "GroupExpenses"
+                    "Debts"
                 ],
-                "summary": "Create Group Expense",
-                "parameters": [
-                    {
-                        "description": "Group Expense Creation Payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.CreateGroupExpenseRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.CreateGroupExpenseResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/group-expenses/names": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Retrieve a list of unique names previously used in group expenses",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "GroupExpenses"
-                ],
-                "summary": "List Group Expense Participant Names",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Limit",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/group-expenses/participants/{transactionId}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Retrieve participant portions by an existing transaction ID",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "GroupExpenses"
-                ],
-                "summary": "List Group Expense Participants",
+                "summary": "Repay Debt (1-step)",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Transaction ID",
-                        "name": "transactionId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.GroupExpenseParticipantResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/group-expenses/settle/{participantId}": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Complete settlement of a specific group expense participant by ID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "GroupExpenses"
-                ],
-                "summary": "Settle Group Expense",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Participant ID",
-                        "name": "participantId",
+                        "description": "Debt ID",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Settlement details",
+                        "description": "Repayment Payload",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.GroupExpenseSettleRequest"
+                            "$ref": "#/definitions/dto.DebtRepayRequest"
                         }
                     }
                 ],
@@ -2080,7 +1864,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/dto.TransactionResponse"
+                                            "$ref": "#/definitions/dto.DebtResponse"
                                         }
                                     }
                                 }
@@ -2095,6 +1879,12 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorEnvelope"
                         }
@@ -2117,172 +1907,6 @@
                         "description": "ok",
                         "schema": {
                             "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/investments/accounts": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Retrieve a list of investment accounts for the current user",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Investments"
-                ],
-                "summary": "List Investment Accounts",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.InvestmentAccountResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/investments/accounts/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Retrieve a specific investment account by ID",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Investments"
-                ],
-                "summary": "Get Investment Account",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.InvestmentAccountResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            },
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Partially update settings like automated tracking for an investment account",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Investments"
-                ],
-                "summary": "Update Investment Account Settings",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update Payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.PatchInvestmentAccountRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.InvestmentAccountResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
                         }
                     }
                 }
@@ -2824,47 +2448,6 @@
                 }
             }
         },
-        "/investments/securities": {
-            "get": {
-                "description": "Retrieve list of all available securities in the system",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Securities"
-                ],
-                "summary": "List Securities",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.SecurityResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
         "/investments/securities/{id}/events/refresh": {
             "post": {
                 "security": [
@@ -3042,177 +2625,6 @@
                                     "properties": {
                                         "data": {
                                             "type": "object"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/investments/securities/{securityId}": {
-            "get": {
-                "description": "Retrieve details of a specific security by ID",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Securities"
-                ],
-                "summary": "Get Security",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "securityId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.SecurityResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/investments/securities/{securityId}/events": {
-            "get": {
-                "description": "Retrieve events (dividends, splits, etc) mapping to a security",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Securities"
-                ],
-                "summary": "List Security Events",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "securityId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "From Date (YYYY-MM-DD)",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "To Date (YYYY-MM-DD)",
-                        "name": "to",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.SecurityEventResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorEnvelope"
-                        }
-                    }
-                }
-            }
-        },
-        "/investments/securities/{securityId}/prices-daily": {
-            "get": {
-                "description": "Retrieve historical/daily prices for a security between dates",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Securities"
-                ],
-                "summary": "List Security Prices",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Security ID",
-                        "name": "securityId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "From Date (YYYY-MM-DD)",
-                        "name": "from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "To Date (YYYY-MM-DD)",
-                        "name": "to",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.SecurityPriceDailyResponse"
-                                            }
                                         }
                                     }
                                 }
@@ -4505,6 +3917,218 @@
                 }
             }
         },
+        "/securities": {
+            "get": {
+                "description": "Retrieve list of all available securities in the system",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Securities"
+                ],
+                "summary": "List Securities",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.SecurityResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/securities/{securityId}": {
+            "get": {
+                "description": "Retrieve details of a specific security by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Securities"
+                ],
+                "summary": "Get Security",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "securityId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.SecurityResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/securities/{securityId}/events": {
+            "get": {
+                "description": "Retrieve events (dividends, splits, etc) mapping to a security",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Securities"
+                ],
+                "summary": "List Security Events",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "securityId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "From Date (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To Date (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.SecurityEventResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/securities/{securityId}/prices-daily": {
+            "get": {
+                "description": "Retrieve historical/daily prices for a security between dates",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Securities"
+                ],
+                "summary": "List Security Prices",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Security ID",
+                        "name": "securityId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "From Date (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To Date (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessEnvelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.SecurityPriceDailyResponse"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/settings/me": {
             "patch": {
                 "security": [
@@ -4913,452 +4537,6 @@
                 }
             }
         },
-        "/transactions/import/apply-rules-create": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Automatically map all staged imports using rules and create transactions for fully mapped items",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Apply Rules and Create Transactions",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.BatchImportResult"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/transactions/import/rules": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Retrieve all auto-mapping rules for the authenticated user",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "List Import Mapping Rules",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.ImportMappingRuleResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Create or update multiple auto-mapping rules",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Upsert Import Mapping Rules",
-                "parameters": [
-                    {
-                        "description": "Rules Payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.UpsertMappingRulesRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.ImportMappingRuleResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/transactions/import/rules/{ruleId}": {
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Remove an auto-mapping rule",
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Delete Import Mapping Rule",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Rule ID",
-                        "name": "ruleId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    }
-                }
-            }
-        },
-        "/transactions/import/stage": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Stage generic transaction data for manual mapping and review",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Stage Imported Transactions",
-                "parameters": [
-                    {
-                        "description": "Import Payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.StageImportRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/transactions/import/staged": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Retrieve all transactions currently in the staging area",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "List Staged Imports",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.ImportedTransactionResponse"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Remove all items from the staging area",
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Clear All Staged Imports",
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    }
-                }
-            }
-        },
-        "/transactions/import/staged/create-many": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Finalize multiple staged imports at once",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Create Multiple Transactions from Staged Imports",
-                "parameters": [
-                    {
-                        "description": "Import IDs Payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.CreateManyImportedRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.BatchImportResult"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/transactions/import/staged/{importId}": {
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Remove an item from the staging area without creating a transaction",
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Delete Staged Import",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Import ID",
-                        "name": "importId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    }
-                }
-            },
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Manually map a staged import to an account and category",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Update Staged Import Mapping",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Import ID",
-                        "name": "importId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Mapping Payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.PatchImportedRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.ImportedTransactionResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
-        "/transactions/import/staged/{importId}/create": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Finalize a staged import by creating a real transaction",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Create Transaction from Staged Import",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Import ID",
-                        "name": "importId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/response.SuccessEnvelope"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.TransactionResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/transactions/{transactionId}": {
             "get": {
                 "security": [
@@ -5529,28 +4707,36 @@
             "type": "object",
             "properties": {
                 "account_id": {
+                    "description": "ID of the account the event relates to",
                     "type": "string"
                 },
                 "action": {
+                    "description": "Type of action (e.g., \"create\", \"update\")",
                     "type": "string"
                 },
                 "actor_user_id": {
+                    "description": "ID of the user who performed the action",
                     "type": "string"
                 },
                 "diff": {
+                    "description": "Detailed field changes (old vs new)",
                     "type": "object",
                     "additionalProperties": {}
                 },
                 "entity_id": {
+                    "description": "ID of the modified entity record",
                     "type": "string"
                 },
                 "entity_type": {
+                    "description": "Type of entity (always \"account\")",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique identifier for the audit event",
                     "type": "string"
                 },
                 "occurred_at": {
+                    "description": "Timestamp when the event occurred",
                     "type": "string"
                 }
             }
@@ -5559,34 +4745,102 @@
             "type": "object",
             "properties": {
                 "account_number": {
+                    "description": "Account number",
                     "type": "string"
                 },
                 "account_type": {
-                    "$ref": "#/definitions/entity.AccountType"
+                    "description": "Type of account",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.AccountType"
+                        }
+                    ]
                 },
                 "balance": {
-                    "type": "string"
-                },
-                "color": {
+                    "description": "Current account balance (decimal string)",
                     "type": "string"
                 },
                 "currency": {
+                    "description": "Primary currency",
                     "type": "string"
                 },
                 "id": {
-                    "type": "string"
-                },
-                "investment_account_id": {
+                    "description": "Unique account identifier",
                     "type": "string"
                 },
                 "name": {
+                    "description": "Account name",
                     "type": "string"
                 },
                 "parent_account_id": {
+                    "description": "ID of the parent account",
                     "type": "string"
                 },
+                "settings": {
+                    "description": "Specialized configuration (JSON)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.AccountSettingsResponse"
+                        }
+                    ]
+                },
                 "status": {
-                    "$ref": "#/definitions/entity.AccountStatus"
+                    "description": "Current account status",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.AccountStatus"
+                        }
+                    ]
+                }
+            }
+        },
+        "dto.AccountSettingsRequest": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "description": "Account UI Color",
+                    "type": "string"
+                },
+                "investment": {
+                    "description": "Brokerage specific configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.InvestmentSettingsRequest"
+                        }
+                    ]
+                },
+                "savings": {
+                    "description": "Savings goal specific configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.SavingsSettingsRequest"
+                        }
+                    ]
+                }
+            }
+        },
+        "dto.AccountSettingsResponse": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "description": "Account UI Color",
+                    "type": "string"
+                },
+                "investment": {
+                    "description": "Brokerage specific configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.InvestmentSettingsResponse"
+                        }
+                    ]
+                },
+                "savings": {
+                    "description": "Savings goal specific configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.SavingsSettingsResponse"
+                        }
+                    ]
                 }
             }
         },
@@ -5594,36 +4848,55 @@
             "type": "object",
             "properties": {
                 "account_id": {
+                    "description": "ID of the shared account",
                     "type": "string"
                 },
                 "created_at": {
+                    "description": "Timestamp when the share was created",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique identifier for the share record",
                     "type": "string"
                 },
                 "permission": {
-                    "$ref": "#/definitions/entity.AccountSharePermission"
+                    "description": "Current permission level",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.AccountSharePermission"
+                        }
+                    ]
                 },
                 "revoked_at": {
+                    "description": "Timestamp when access was revoked",
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/entity.AccountShareStatus"
+                    "description": "Current sharing status (active/revoked)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.AccountShareStatus"
+                        }
+                    ]
                 },
                 "updated_at": {
+                    "description": "Timestamp of the last update",
                     "type": "string"
                 },
                 "user_display_name": {
+                    "description": "Display name of the shared-to user (enriched)",
                     "type": "string"
                 },
                 "user_email": {
+                    "description": "Email of the shared-to user (enriched)",
                     "type": "string"
                 },
                 "user_id": {
+                    "description": "ID of the user access is shared with",
                     "type": "string"
                 },
                 "user_phone": {
+                    "description": "Phone of the shared-to user (enriched)",
                     "type": "string"
                 }
             }
@@ -5632,36 +4905,28 @@
             "type": "object",
             "properties": {
                 "access_token": {
+                    "description": "JWT access token for API authorization",
                     "type": "string"
                 },
                 "expires_in": {
+                    "description": "Access token duration in seconds",
                     "type": "integer"
                 },
                 "refresh_token": {
+                    "description": "Token used to get a new access token",
                     "type": "string"
                 },
                 "token_type": {
+                    "description": "Type of token (e.g., \"Bearer\")",
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/dto.UserResponse"
-                }
-            }
-        },
-        "dto.BatchImportResult": {
-            "type": "object",
-            "properties": {
-                "created": {
-                    "type": "integer"
-                },
-                "errors": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "skipped": {
-                    "type": "integer"
+                    "description": "Authenticated user profile information",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.UserResponse"
+                        }
+                    ]
                 }
             }
         },
@@ -5669,12 +4934,19 @@
             "type": "object",
             "properties": {
                 "mode": {
+                    "description": "Update mode (e.g., \"merge\" or \"replace\" tags)",
                     "type": "string"
                 },
                 "patch": {
-                    "$ref": "#/definitions/dto.TransactionPatchRequest"
+                    "description": "Changes to apply to all selected transactions",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.TransactionPatchRequest"
+                        }
+                    ]
                 },
                 "transaction_ids": {
+                    "description": "List of transactions to update",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -5686,21 +4958,26 @@
             "type": "object",
             "properties": {
                 "failed_count": {
+                    "description": "Number of failed updates",
                     "type": "integer"
                 },
                 "failed_ids": {
+                    "description": "IDs of records that failed to update",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "mode": {
+                    "description": "The update mode used",
                     "type": "string"
                 },
                 "updated_count": {
+                    "description": "Number of successful updates",
                     "type": "integer"
                 },
                 "updated_ids": {
+                    "description": "IDs of successfully updated records",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -5712,42 +4989,63 @@
             "type": "object",
             "properties": {
                 "alert_threshold_percent": {
+                    "description": "Alert threshold percentage",
                     "type": "integer"
                 },
                 "amount": {
+                    "description": "Total budget amount",
                     "type": "string"
                 },
                 "category_id": {
+                    "description": "ID of the tracked category",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique budget identifier",
                     "type": "string"
                 },
                 "name": {
+                    "description": "Budget name",
                     "type": "string"
                 },
                 "percent_used": {
+                    "description": "Percentage of budget already spent",
                     "type": "integer"
                 },
                 "period": {
-                    "$ref": "#/definitions/entity.BudgetPeriod"
+                    "description": "Budget period type",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.BudgetPeriod"
+                        }
+                    ]
                 },
                 "period_end": {
+                    "description": "Current period end date",
                     "type": "string"
                 },
                 "period_start": {
+                    "description": "Current period start date",
                     "type": "string"
                 },
                 "remaining": {
+                    "description": "Amount left in the budget",
                     "type": "string"
                 },
                 "rollover_mode": {
-                    "$ref": "#/definitions/entity.BudgetRolloverMode"
+                    "description": "Rollover configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.BudgetRolloverMode"
+                        }
+                    ]
                 },
                 "spent": {
+                    "description": "Total amount spent in the current period",
                     "type": "string"
                 },
                 "user_id": {
+                    "description": "ID of the user who owns the budget",
                     "type": "string"
                 }
             }
@@ -5756,31 +5054,44 @@
             "type": "object",
             "properties": {
                 "color": {
+                    "description": "UI color representation in hex",
                     "type": "string"
                 },
                 "icon": {
+                    "description": "Icon name for UI display",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique category identifier",
                     "type": "string"
                 },
                 "is_active": {
+                    "description": "Whether the category can be used for new transactions",
                     "type": "boolean"
                 },
                 "key": {
+                    "description": "Stable identifier key (e.g., \"food\")",
                     "type": "string"
                 },
                 "parent_category_id": {
+                    "description": "ID of the parent category",
                     "type": "string"
                 },
                 "parent_key": {
+                    "description": "Key of the parent category",
                     "type": "string"
                 },
                 "sort_order": {
+                    "description": "Display order in UI",
                     "type": "integer"
                 },
                 "type": {
-                    "$ref": "#/definitions/entity.CategoryType"
+                    "description": "Income or Expense",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.CategoryType"
+                        }
+                    ]
                 }
             }
         },
@@ -5788,33 +5099,43 @@
             "type": "object",
             "properties": {
                 "avatar_url": {
+                    "description": "URL to contact's avatar",
                     "type": "string"
                 },
                 "email": {
+                    "description": "Email address",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique contact identifier",
                     "type": "string"
                 },
                 "linked_avatar_url": {
+                    "description": "Avatar URL of the linked user (enriched)",
                     "type": "string"
                 },
                 "linked_display_name": {
+                    "description": "Display name of the linked user (enriched)",
                     "type": "string"
                 },
                 "linked_user_id": {
+                    "description": "ID of the platform user this contact is linked to",
                     "type": "string"
                 },
                 "name": {
+                    "description": "Name of the contact",
                     "type": "string"
                 },
                 "notes": {
+                    "description": "Private notes",
                     "type": "string"
                 },
                 "phone": {
+                    "description": "Phone number",
                     "type": "string"
                 },
                 "user_id": {
+                    "description": "ID of the user who owns this contact",
                     "type": "string"
                 }
             }
@@ -5823,22 +5144,32 @@
             "type": "object",
             "properties": {
                 "account_number": {
+                    "description": "Optional account number",
                     "type": "string"
                 },
                 "account_type": {
-                    "type": "string"
-                },
-                "color": {
+                    "description": "Type of account (e.g., \"bank\", \"wallet\")",
                     "type": "string"
                 },
                 "currency": {
+                    "description": "Primary currency code (e.g., \"VND\", \"USD\")",
                     "type": "string"
                 },
                 "name": {
+                    "description": "Name of the account (e.g., \"Main Savings\")",
                     "type": "string"
                 },
                 "parent_account_id": {
+                    "description": "ID of the parent account (for sub-accounts)",
                     "type": "string"
+                },
+                "settings": {
+                    "description": "Optional specialized settings for the account",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.AccountSettingsRequest"
+                        }
+                    ]
                 }
             }
         },
@@ -5850,28 +5181,44 @@
             ],
             "properties": {
                 "alert_threshold_percent": {
+                    "description": "Percentage of spending that triggers an alert",
                     "type": "integer"
                 },
                 "amount": {
+                    "description": "Total amount allowed for the period (decimal string)",
                     "type": "string"
                 },
                 "category_id": {
+                    "description": "ID of the category this budget tracks",
                     "type": "string"
                 },
                 "name": {
+                    "description": "Optional descriptive name for the budget",
                     "type": "string"
                 },
                 "period": {
-                    "$ref": "#/definitions/entity.BudgetPeriod"
+                    "description": "Recurrence period (monthly, weekly, etc.)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.BudgetPeriod"
+                        }
+                    ]
                 },
                 "period_end": {
+                    "description": "Optional fixed end date for the budget",
                     "type": "string"
                 },
                 "period_start": {
+                    "description": "Start date of the first period (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "rollover_mode": {
-                    "$ref": "#/definitions/entity.BudgetRolloverMode"
+                    "description": "How to handle unused funds in the next period",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.BudgetRolloverMode"
+                        }
+                    ]
                 }
             }
         },
@@ -5882,18 +5229,23 @@
             ],
             "properties": {
                 "avatar_url": {
+                    "description": "Optional URL to avatar image",
                     "type": "string"
                 },
                 "email": {
+                    "description": "Optional email address",
                     "type": "string"
                 },
                 "name": {
+                    "description": "Name of the contact",
                     "type": "string"
                 },
                 "notes": {
+                    "description": "Optional private notes",
                     "type": "string"
                 },
                 "phone": {
+                    "description": "Optional phone number",
                     "type": "string"
                 }
             }
@@ -5909,16 +5261,23 @@
             ],
             "properties": {
                 "account_id": {
+                    "description": "ID of the account linked to the debt (as string)",
                     "type": "string"
                 },
                 "contact_id": {
+                    "description": "Optional ID of an existing contact",
                     "type": "string"
                 },
                 "contact_name": {
+                    "description": "Name of the contact if not an existing one",
                     "type": "string"
                 },
+                "create_transaction": {
+                    "description": "Whether to automatically create a transaction for this debt",
+                    "type": "boolean"
+                },
                 "direction": {
-                    "description": "lent, borrowed",
+                    "description": "Direction of money (lent/borrowed)",
                     "allOf": [
                         {
                             "$ref": "#/definitions/entity.DebtDirection"
@@ -5926,83 +5285,32 @@
                     ]
                 },
                 "due_date": {
+                    "description": "Target date for full repayment (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "interest_rate": {
+                    "description": "Annual interest rate (decimal string)",
                     "type": "string"
                 },
                 "interest_rule": {
+                    "description": "Description of how interest is calculated",
                     "type": "string"
                 },
                 "name": {
+                    "description": "Optional name or purpose of the debt",
+                    "type": "string"
+                },
+                "originating_transaction_id": {
+                    "description": "Optional ID of the transaction that created this debt",
                     "type": "string"
                 },
                 "principal": {
+                    "description": "Original principal amount (decimal string)",
                     "type": "string"
                 },
                 "start_date": {
+                    "description": "Date the debt was initiated (YYYY-MM-DD)",
                     "type": "string"
-                }
-            }
-        },
-        "dto.CreateGroupExpenseRequest": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "amount": {
-                    "type": "string"
-                },
-                "category_id": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "external_ref": {
-                    "type": "string"
-                },
-                "notes": {
-                    "type": "string"
-                },
-                "occurred_at": {
-                    "type": "string"
-                },
-                "occurred_date": {
-                    "type": "string"
-                },
-                "occurred_time": {
-                    "type": "string"
-                },
-                "owner_original_amount": {
-                    "type": "string"
-                },
-                "participants": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dto.GroupExpenseParticipantRequest"
-                    }
-                },
-                "tag_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "dto.CreateGroupExpenseResponse": {
-            "type": "object",
-            "properties": {
-                "participants": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dto.GroupExpenseParticipantResponse"
-                    }
-                },
-                "transaction": {
-                    "$ref": "#/definitions/dto.TransactionResponse"
                 }
             }
         },
@@ -6010,26 +5318,19 @@
             "type": "object",
             "properties": {
                 "amount": {
+                    "description": "Amount allocated to this category (decimal string)",
                     "type": "string"
                 },
                 "category_id": {
+                    "description": "ID of the category for this line item",
                     "type": "string"
                 },
                 "note": {
+                    "description": "Optional memo for this line item",
                     "type": "string"
                 },
                 "tag_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "dto.CreateManyImportedRequest": {
-            "type": "object",
-            "properties": {
-                "import_ids": {
+                    "description": "IDs of tags for this line item",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -6041,13 +5342,15 @@
             "type": "object",
             "properties": {
                 "account_id": {
+                    "description": "ID of the account linked for contributions",
                     "type": "string"
                 },
                 "contribution_amount": {
+                    "description": "Amount per slot per cycle",
                     "type": "number"
                 },
                 "cycle_frequency": {
-                    "description": "weekly, monthly",
+                    "description": "How often cycles occur (weekly/monthly)",
                     "allOf": [
                         {
                             "$ref": "#/definitions/entity.RotatingSavingsCycleFrequency"
@@ -6055,22 +5358,31 @@
                     ]
                 },
                 "fixed_interest_amount": {
+                    "description": "Optional fixed interest added to payout",
                     "type": "number"
                 },
                 "member_count": {
+                    "description": "Total number of members in the group",
                     "type": "integer"
                 },
                 "name": {
+                    "description": "Name of the group",
                     "type": "string"
                 },
                 "start_date": {
-                    "description": "YYYY-MM-DD",
+                    "description": "Start date of the first cycle (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/entity.RotatingSavingsStatus"
+                    "description": "Initial status of the group",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.RotatingSavingsStatus"
+                        }
+                    ]
                 },
                 "user_slots": {
+                    "description": "Number of slots taken by the user",
                     "type": "integer"
                 }
             }
@@ -6079,30 +5391,39 @@
             "type": "object",
             "properties": {
                 "auto_renew": {
+                    "description": "Whether to auto-renew on maturity",
                     "type": "boolean"
                 },
                 "interest_rate": {
+                    "description": "Annual interest rate (decimal string)",
                     "type": "string"
                 },
                 "maturity_date": {
+                    "description": "Expected maturity date (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "name": {
+                    "description": "Name of the savings goal",
                     "type": "string"
                 },
                 "parent_account_id": {
+                    "description": "ID of the source account for funding",
                     "type": "string"
                 },
                 "principal": {
+                    "description": "Initial deposit amount (decimal string)",
                     "type": "string"
                 },
                 "savings_account_id": {
+                    "description": "ID of the dedicated savings account",
                     "type": "string"
                 },
                 "start_date": {
+                    "description": "Start date (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "term_months": {
+                    "description": "Duration in months",
                     "type": "integer"
                 }
             }
@@ -6111,12 +5432,15 @@
             "type": "object",
             "properties": {
                 "color": {
+                    "description": "UI color representation in hex",
                     "type": "string"
                 },
                 "name_en": {
+                    "description": "Name of the tag in English",
                     "type": "string"
                 },
                 "name_vi": {
+                    "description": "Name of the tag in Vietnamese",
                     "type": "string"
                 }
             }
@@ -6125,49 +5449,63 @@
             "type": "object",
             "properties": {
                 "fee_category_id": {
+                    "description": "Category ID for the fee transaction",
                     "type": "string"
                 },
                 "fee_description": {
+                    "description": "Description for the fee transaction",
                     "type": "string"
                 },
                 "fee_transaction_id": {
+                    "description": "Optional ID of an existing fee transaction",
                     "type": "string"
                 },
                 "fees": {
+                    "description": "Total trading fees (decimal string)",
                     "type": "string"
                 },
                 "note": {
+                    "description": "Optional trade memo",
                     "type": "string"
                 },
                 "occurred_at": {
+                    "description": "Full occurrence timestamp",
                     "type": "string"
                 },
                 "occurred_date": {
+                    "description": "Date of the trade (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "occurred_time": {
+                    "description": "Time of the trade (HH:MM:SS)",
                     "type": "string"
                 },
                 "price": {
+                    "description": "Price per share (decimal string)",
                     "type": "string"
                 },
                 "principal_category_id": {
+                    "description": "Category ID for the principal transaction",
                     "type": "string"
                 },
                 "principal_description": {
+                    "description": "Description for the principal transaction",
                     "type": "string"
                 },
                 "provenance": {
+                    "description": "Origin of the trade (e.g., \"manual\")",
                     "type": "string"
                 },
                 "quantity": {
+                    "description": "Number of shares traded (decimal string)",
                     "type": "string"
                 },
                 "security_id": {
+                    "description": "ID of the security being traded",
                     "type": "string"
                 },
                 "side": {
-                    "description": "buy, sell",
+                    "description": "Buy or Sell",
                     "allOf": [
                         {
                             "$ref": "#/definitions/entity.TradeSide"
@@ -6175,15 +5513,19 @@
                     ]
                 },
                 "tax_category_id": {
+                    "description": "Category ID for the tax transaction",
                     "type": "string"
                 },
                 "tax_description": {
+                    "description": "Description for the tax transaction",
                     "type": "string"
                 },
                 "tax_transaction_id": {
+                    "description": "Optional ID of an existing tax transaction",
                     "type": "string"
                 },
                 "taxes": {
+                    "description": "Total trading taxes (decimal string)",
                     "type": "string"
                 }
             }
@@ -6192,70 +5534,97 @@
             "type": "object",
             "properties": {
                 "account_id": {
+                    "description": "Primary account (for income/expense)",
                     "type": "string"
                 },
                 "amount": {
+                    "description": "Total transaction amount",
                     "type": "string"
                 },
                 "category_id": {
+                    "description": "Primary category (if no line items)",
                     "type": "string"
                 },
                 "description": {
+                    "description": "Main transaction description",
                     "type": "string"
                 },
                 "exchange_rate": {
+                    "description": "Manual exchange rate for transfers",
                     "type": "string"
                 },
                 "external_ref": {
+                    "description": "Optional reference from external system",
                     "type": "string"
                 },
                 "from_account_id": {
+                    "description": "Source account (for transfers)",
                     "type": "string"
                 },
                 "from_amount": {
+                    "description": "Amount deducted (for transfers)",
                     "type": "string"
                 },
                 "group_participants": {
+                    "description": "Shared expense participants",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.GroupParticipantInput"
                     }
                 },
                 "lang": {
+                    "description": "Preferred language for category names (enriched)",
                     "type": "string"
                 },
                 "line_items": {
+                    "description": "Detailed breakdown into categories",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.CreateLineItemRequest"
                     }
                 },
                 "occurred_at": {
+                    "description": "Full timestamp string",
                     "type": "string"
                 },
                 "occurred_date": {
+                    "description": "Date (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "occurred_time": {
+                    "description": "Time (HH:MM:SS)",
                     "type": "string"
                 },
                 "owner_original_amount": {
+                    "description": "The creator's share of a group expense",
+                    "type": "string"
+                },
+                "source": {
+                    "description": "Source of the transaction (e.g., 'manual', 'import')",
                     "type": "string"
                 },
                 "tag_ids": {
+                    "description": "Primary tags (if no line items)",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "to_account_id": {
+                    "description": "Destination account (for transfers)",
                     "type": "string"
                 },
                 "to_amount": {
+                    "description": "Amount added (for transfers)",
                     "type": "string"
                 },
                 "type": {
-                    "$ref": "#/definitions/entity.TransactionType"
+                    "description": "Income, Expense, or Transfer",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.TransactionType"
+                        }
+                    ]
                 }
             }
         },
@@ -6263,21 +5632,27 @@
             "type": "object",
             "properties": {
                 "created_at": {
+                    "description": "Timestamp when the link was created",
                     "type": "string"
                 },
                 "debt_id": {
+                    "description": "ID of the repaid debt",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique link identifier",
                     "type": "string"
                 },
                 "interest_paid": {
+                    "description": "Interest amount paid in this transaction",
                     "type": "string"
                 },
                 "principal_paid": {
+                    "description": "Principal amount paid in this transaction",
                     "type": "string"
                 },
                 "transaction_id": {
+                    "description": "ID of the payment transaction",
                     "type": "string"
                 }
             }
@@ -6289,16 +5664,40 @@
             ],
             "properties": {
                 "amount_paid": {
-                    "description": "Total paid, can be split by service",
+                    "description": "Total paid amount (decimal string)",
                     "type": "string"
                 },
                 "interest_paid": {
+                    "description": "Amount of interest covered by this payment",
                     "type": "string"
                 },
                 "principal_paid": {
+                    "description": "Amount of principal covered by this payment",
                     "type": "string"
                 },
                 "transaction_id": {
+                    "description": "ID of the transaction representing the payment",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.DebtRepayRequest": {
+            "type": "object",
+            "required": [
+                "account_id",
+                "amount"
+            ],
+            "properties": {
+                "account_id": {
+                    "description": "Account to pay from",
+                    "type": "string"
+                },
+                "amount": {
+                    "description": "Amount to pay",
+                    "type": "string"
+                },
+                "note": {
+                    "description": "Optional note",
                     "type": "string"
                 }
             }
@@ -6307,117 +5706,87 @@
             "type": "object",
             "properties": {
                 "account_id": {
+                    "description": "ID of the linked account",
                     "type": "string"
                 },
                 "accrued_interest": {
+                    "description": "Total interest accumulated so far",
                     "type": "string"
                 },
                 "contact_avatar_url": {
+                    "description": "Avatar URL of the contact (enriched)",
                     "type": "string"
                 },
                 "contact_id": {
+                    "description": "ID of the associated contact",
                     "type": "string"
                 },
                 "contact_name": {
+                    "description": "Name of the contact (enriched)",
                     "type": "string"
                 },
                 "created_at": {
+                    "description": "Timestamp when the record was created",
                     "type": "string"
                 },
                 "currency": {
+                    "description": "Currency of the debt (e.g., \"VND\")",
                     "type": "string"
                 },
                 "direction": {
-                    "$ref": "#/definitions/entity.DebtDirection"
+                    "description": "Lent or Borrowed",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.DebtDirection"
+                        }
+                    ]
                 },
                 "due_date": {
+                    "description": "Repayment due date",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique debt identifier",
                     "type": "string"
                 },
                 "interest_rate": {
+                    "description": "Annual interest rate",
                     "type": "string"
                 },
                 "interest_rule": {
+                    "description": "Interest calculation details",
                     "type": "string"
                 },
                 "name": {
+                    "description": "Name or purpose of the debt",
+                    "type": "string"
+                },
+                "originating_transaction_id": {
+                    "description": "ID of the transaction that created this debt",
                     "type": "string"
                 },
                 "outstanding_principal": {
+                    "description": "Remaining principal to be paid",
                     "type": "string"
                 },
                 "principal": {
+                    "description": "Original principal amount",
                     "type": "string"
                 },
                 "start_date": {
+                    "description": "Initiation date",
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/entity.DebtStatus"
+                    "description": "Current status of the debt",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.DebtStatus"
+                        }
+                    ]
                 },
                 "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.GroupExpenseParticipantRequest": {
-            "type": "object",
-            "properties": {
-                "create_debt": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "original_amount": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.GroupExpenseParticipantResponse": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "is_settled": {
-                    "type": "boolean"
-                },
-                "original_amount": {
-                    "type": "string"
-                },
-                "participant_name": {
-                    "type": "string"
-                },
-                "settlement_transaction_id": {
-                    "type": "string"
-                },
-                "share_amount": {
-                    "type": "string"
-                },
-                "transaction_id": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.GroupExpenseSettleRequest": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "occurred_at": {
-                    "type": "string"
-                },
-                "occurred_date": {
-                    "type": "string"
-                },
-                "occurred_time": {
+                    "description": "ID of the user who owns the record",
                     "type": "string"
                 }
             }
@@ -6426,12 +5795,15 @@
             "type": "object",
             "properties": {
                 "original_amount": {
+                    "description": "The amount they were originally responsible for",
                     "type": "string"
                 },
                 "participant_name": {
+                    "description": "Name of the person sharing the expense",
                     "type": "string"
                 },
                 "share_amount": {
+                    "description": "Their final calculated share after adjustments",
                     "type": "string"
                 }
             }
@@ -6439,127 +5811,75 @@
         "dto.HoldingResponse": {
             "type": "object",
             "properties": {
+                "account_id": {
+                    "description": "ID of the account",
+                    "type": "string"
+                },
                 "as_of": {
+                    "description": "Timestamp of the market valuation",
                     "type": "string"
                 },
                 "avg_cost": {
-                    "type": "string"
-                },
-                "broker_account_id": {
+                    "description": "Average cost per share",
                     "type": "string"
                 },
                 "cost_basis_total": {
+                    "description": "Total cost of all shares in position",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique identifier for the holding record",
                     "type": "string"
                 },
                 "market_price": {
+                    "description": "Current market price",
                     "type": "string"
                 },
                 "market_value": {
+                    "description": "Total market value of position",
                     "type": "string"
                 },
                 "quantity": {
+                    "description": "Total shares currently held",
                     "type": "string"
                 },
                 "security_id": {
+                    "description": "ID of the security held",
                     "type": "string"
                 },
                 "unrealized_pnl": {
+                    "description": "Paper profit/loss",
                     "type": "string"
                 }
             }
         },
-        "dto.ImportMappingRuleResponse": {
+        "dto.InvestmentSettingsRequest": {
             "type": "object",
             "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "kind": {
-                    "$ref": "#/definitions/entity.ImportMappingRuleKind"
-                },
-                "mapped_id": {
-                    "type": "string"
-                },
-                "source_name": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.ImportedTransactionResponse": {
-            "type": "object",
-            "properties": {
-                "amount": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "imported_account_name": {
-                    "type": "string"
-                },
-                "imported_category_name": {
-                    "type": "string"
-                },
-                "mapped_account_id": {
-                    "type": "string"
-                },
-                "mapped_category_id": {
-                    "type": "string"
-                },
-                "raw_payload": {
+                "fee_settings": {
+                    "description": "Configuration for trade fee calculations",
                     "type": "object",
                     "additionalProperties": {}
                 },
-                "source": {
-                    "type": "string"
-                },
-                "transaction_date": {
-                    "type": "string"
-                },
-                "transaction_type": {
-                    "type": "string"
+                "tax_settings": {
+                    "description": "Configuration for trade tax calculations",
+                    "type": "object",
+                    "additionalProperties": {}
                 }
             }
         },
-        "dto.InvestmentAccountResponse": {
+        "dto.InvestmentSettingsResponse": {
             "type": "object",
             "properties": {
-                "account_id": {
-                    "type": "string"
+                "fee_settings": {
+                    "description": "Configuration for trade fee calculations",
+                    "type": "object",
+                    "additionalProperties": {}
                 },
-                "created_at": {
-                    "type": "string"
-                },
-                "currency": {
-                    "type": "string"
-                },
-                "fee_settings": {},
-                "id": {
-                    "type": "string"
-                },
-                "tax_settings": {},
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.MappingRuleInput": {
-            "type": "object",
-            "properties": {
-                "kind": {
-                    "type": "string"
-                },
-                "mapped_id": {
-                    "type": "string"
-                },
-                "source_name": {
-                    "type": "string"
+                "tax_settings": {
+                    "description": "Configuration for trade tax calculations",
+                    "type": "object",
+                    "additionalProperties": {}
                 }
             }
         },
@@ -6567,15 +5887,19 @@
             "type": "object",
             "properties": {
                 "force": {
+                    "description": "Whether to force a fresh fetch",
                     "type": "string"
                 },
                 "full": {
+                    "description": "Whether to perform a full historical sync",
                     "type": "boolean"
                 },
                 "include_events": {
+                    "description": "Whether to sync event data for all securities",
                     "type": "boolean"
                 },
                 "include_prices": {
+                    "description": "Whether to sync price data for all securities",
                     "type": "boolean"
                 }
             }
@@ -6584,15 +5908,19 @@
             "type": "object",
             "properties": {
                 "key": {
+                    "description": "Unique storage key (e.g., S3 path)",
                     "type": "string"
                 },
                 "size": {
+                    "description": "File size in bytes",
                     "type": "integer"
                 },
                 "updated_at": {
+                    "description": "Last modified timestamp",
                     "type": "string"
                 },
                 "url": {
+                    "description": "Presigned or public access URL",
                     "type": "string"
                 }
             }
@@ -6600,60 +5928,61 @@
         "dto.PatchAccountRequest": {
             "type": "object",
             "properties": {
-                "color": {
+                "name": {
+                    "description": "New name for the account",
                     "type": "string"
                 },
-                "name": {
-                    "type": "string"
+                "settings": {
+                    "description": "Updated specialized settings",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.AccountSettingsRequest"
+                        }
+                    ]
                 },
                 "status": {
+                    "description": "New status (e.g., \"active\", \"closed\")",
                     "type": "string"
                 }
-            }
-        },
-        "dto.PatchImportedRequest": {
-            "type": "object",
-            "properties": {
-                "mapped_account_id": {
-                    "type": "string"
-                },
-                "mapped_category_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.PatchInvestmentAccountRequest": {
-            "type": "object",
-            "properties": {
-                "fee_settings": {},
-                "tax_settings": {}
             }
         },
         "dto.PatchSavingsRequest": {
             "type": "object",
             "properties": {
                 "auto_renew": {
+                    "description": "New auto-renew setting",
                     "type": "boolean"
                 },
                 "interest_rate": {
+                    "description": "New interest rate",
                     "type": "string"
                 },
                 "maturity_date": {
+                    "description": "New maturity date",
                     "type": "string"
                 },
                 "name": {
+                    "description": "New goal name",
                     "type": "string"
                 },
                 "principal": {
+                    "description": "New principal amount",
                     "type": "string"
                 },
                 "savings_account_id": {
+                    "description": "New savings account ID",
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/entity.SavingsStatus"
+                    "description": "New status (active/matured/closed)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.AccountStatus"
+                        }
+                    ]
                 },
                 "term_months": {
+                    "description": "New duration",
                     "type": "integer"
                 }
             }
@@ -6662,15 +5991,18 @@
             "type": "object",
             "properties": {
                 "items": {
+                    "description": "PnL breakdown per security",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.RealizedPNLReportItem"
                     }
                 },
                 "total_gross": {
+                    "description": "Overall gross profit/loss",
                     "type": "string"
                 },
                 "total_net": {
+                    "description": "Overall net profit/loss",
                     "type": "string"
                 }
             }
@@ -6679,33 +6011,43 @@
             "type": "object",
             "properties": {
                 "cost_basis": {
+                    "description": "Original cost of sold shares",
                     "type": "string"
                 },
                 "dividend_gain": {
+                    "description": "Gain from dividends",
                     "type": "string"
                 },
                 "fees": {
+                    "description": "Total fees associated with the sales",
                     "type": "string"
                 },
                 "gross_realized_gain": {
+                    "description": "Total gain before fees and taxes",
                     "type": "string"
                 },
                 "net_pnl": {
+                    "description": "Final profit/loss after fees and taxes",
                     "type": "string"
                 },
                 "proceeds": {
+                    "description": "Total sale proceeds",
                     "type": "string"
                 },
                 "security_id": {
+                    "description": "ID of the security",
                     "type": "string"
                 },
                 "symbol": {
+                    "description": "Security ticker",
                     "type": "string"
                 },
                 "taxes": {
+                    "description": "Total taxes associated with the sales",
                     "type": "string"
                 },
                 "trade_gain": {
+                    "description": "Gain from price appreciation",
                     "type": "string"
                 }
             }
@@ -6714,9 +6056,11 @@
             "type": "object",
             "properties": {
                 "force": {
+                    "description": "Whether to force a fresh fetch",
                     "type": "string"
                 },
                 "security_id": {
+                    "description": "ID of the security to refresh",
                     "type": "string"
                 }
             }
@@ -6725,18 +6069,23 @@
             "type": "object",
             "properties": {
                 "force": {
+                    "description": "Whether to ignore existing data and force a fresh fetch",
                     "type": "string"
                 },
                 "from": {
+                    "description": "Start date for the refresh (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "full": {
+                    "description": "Whether to perform a full historical backfill",
                     "type": "string"
                 },
                 "security_id": {
+                    "description": "ID of the security to refresh",
                     "type": "string"
                 },
                 "to": {
+                    "description": "End date for the refresh (YYYY-MM-DD)",
                     "type": "string"
                 }
             }
@@ -6748,6 +6097,7 @@
             ],
             "properties": {
                 "refresh_token": {
+                    "description": "The valid refresh token",
                     "type": "string"
                 }
             }
@@ -6756,15 +6106,19 @@
             "type": "object",
             "properties": {
                 "force": {
+                    "description": "Whether to force a fresh fetch",
                     "type": "string"
                 },
                 "include_events": {
+                    "description": "Whether to include event data in the refresh",
                     "type": "boolean"
                 },
                 "include_prices": {
+                    "description": "Whether to include price data in the refresh",
                     "type": "boolean"
                 },
                 "symbols": {
+                    "description": "List of ticker symbols to refresh",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -6776,22 +6130,32 @@
             "type": "object",
             "properties": {
                 "action": {
-                    "$ref": "#/definitions/entity.RotatingSavingsAuditAction"
+                    "description": "Type of action performed",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.RotatingSavingsAuditAction"
+                        }
+                    ]
                 },
                 "created_at": {
+                    "description": "Event timestamp",
                     "type": "string"
                 },
                 "details": {
+                    "description": "Detailed event data (old/new values)",
                     "type": "object",
                     "additionalProperties": {}
                 },
                 "group_id": {
+                    "description": "ID of the affected group",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique audit event identifier",
                     "type": "string"
                 },
                 "user_id": {
+                    "description": "ID of the user who performed the action",
                     "type": "string"
                 }
             }
@@ -6800,22 +6164,27 @@
             "type": "object",
             "properties": {
                 "account_id": {
+                    "description": "ID of the account used for this payment",
                     "type": "string"
                 },
                 "amount": {
+                    "description": "Payment amount (decimal string)",
                     "type": "string"
                 },
                 "collected_fee_per_slot": {
+                    "description": "Fee per slot (if applicable)",
                     "type": "number"
                 },
                 "cycle_no": {
+                    "description": "Cycle number this payment belongs to",
                     "type": "integer"
                 },
                 "due_date": {
+                    "description": "Scheduled due date (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "kind": {
-                    "description": "contribution, payout, collected",
+                    "description": "Type of payment (contribution/payout/fee)",
                     "allOf": [
                         {
                             "$ref": "#/definitions/entity.RotatingSavingsContributionKind"
@@ -6823,15 +6192,19 @@
                     ]
                 },
                 "note": {
+                    "description": "Optional payment memo",
                     "type": "string"
                 },
                 "occurred_date": {
+                    "description": "Date of the payment (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "occurred_time": {
+                    "description": "Time of the payment (HH:MM:SS)",
                     "type": "string"
                 },
                 "slots_taken": {
+                    "description": "Number of slots this payment covers",
                     "type": "integer"
                 }
             }
@@ -6840,33 +6213,47 @@
             "type": "object",
             "properties": {
                 "amount": {
+                    "description": "Payment amount",
                     "type": "number"
                 },
                 "collected_fee_per_slot": {
+                    "description": "Fee per slot",
                     "type": "number"
                 },
                 "cycle_no": {
+                    "description": "Associated cycle number",
                     "type": "integer"
                 },
                 "due_date": {
+                    "description": "Scheduled due date",
                     "type": "string"
                 },
                 "group_id": {
+                    "description": "ID of the parent group",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique payment identifier",
                     "type": "string"
                 },
                 "kind": {
-                    "$ref": "#/definitions/entity.RotatingSavingsContributionKind"
+                    "description": "Payment type",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.RotatingSavingsContributionKind"
+                        }
+                    ]
                 },
                 "note": {
+                    "description": "Payment memo",
                     "type": "string"
                 },
                 "slots_taken": {
+                    "description": "Slots covered",
                     "type": "integer"
                 },
                 "transaction_id": {
+                    "description": "ID of the linked financial transaction",
                     "type": "string"
                 }
             }
@@ -6875,45 +6262,60 @@
             "type": "object",
             "properties": {
                 "audit_logs": {
+                    "description": "Change history of the group",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.RotatingSavingsAuditLogResponse"
                     }
                 },
                 "collected_slots_count": {
+                    "description": "Total slots user has paid for across all cycles",
                     "type": "integer"
                 },
                 "contributions": {
+                    "description": "List of all individual payments",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.RotatingSavingsContributionResponse"
                     }
                 },
                 "current_accrued_interest": {
+                    "description": "Total interest accrued so far",
                     "type": "number"
                 },
                 "current_payout_value": {
+                    "description": "Theoretical payout value if taken now",
                     "type": "number"
                 },
                 "group": {
-                    "$ref": "#/definitions/dto.RotatingSavingsGroupResponse"
+                    "description": "Basic group information",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.RotatingSavingsGroupResponse"
+                        }
+                    ]
                 },
                 "next_payment": {
+                    "description": "Amount due for the next cycle",
                     "type": "number"
                 },
                 "remaining_amount": {
+                    "description": "Total remaining liability",
                     "type": "number"
                 },
                 "schedule": {
+                    "description": "Full group lifecycle schedule",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.RotatingSavingsScheduleCycle"
                     }
                 },
                 "total_paid": {
+                    "description": "Sum of all contributions",
                     "type": "number"
                 },
                 "total_received": {
+                    "description": "Sum of all payouts received",
                     "type": "number"
                 }
             }
@@ -6922,42 +6324,63 @@
             "type": "object",
             "properties": {
                 "account_id": {
+                    "description": "ID of the linked funding account",
                     "type": "string"
                 },
                 "contribution_amount": {
+                    "description": "Amount per slot",
                     "type": "number"
                 },
                 "currency": {
+                    "description": "Currency used (enriched)",
                     "type": "string"
                 },
                 "cycle_frequency": {
-                    "$ref": "#/definitions/entity.RotatingSavingsCycleFrequency"
+                    "description": "Weekly or Monthly",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.RotatingSavingsCycleFrequency"
+                        }
+                    ]
                 },
                 "fixed_interest_amount": {
+                    "description": "Fixed interest amount",
                     "type": "number"
                 },
                 "id": {
+                    "description": "Unique group identifier",
                     "type": "string"
                 },
                 "member_count": {
+                    "description": "Total members",
                     "type": "integer"
                 },
                 "name": {
+                    "description": "Group name",
                     "type": "string"
                 },
                 "payout_cycle_no": {
+                    "description": "User's payout cycle",
                     "type": "integer"
                 },
                 "start_date": {
+                    "description": "Group start date",
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/entity.RotatingSavingsStatus"
+                    "description": "Current group status",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.RotatingSavingsStatus"
+                        }
+                    ]
                 },
                 "user_id": {
+                    "description": "ID of the user who owns the group record",
                     "type": "string"
                 },
                 "user_slots": {
+                    "description": "Slots held by user",
                     "type": "integer"
                 }
             }
@@ -6966,24 +6389,35 @@
             "type": "object",
             "properties": {
                 "completed_cycles": {
+                    "description": "Number of cycles already finished",
                     "type": "integer"
                 },
                 "group": {
-                    "$ref": "#/definitions/dto.RotatingSavingsGroupResponse"
+                    "description": "Basic group information",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.RotatingSavingsGroupResponse"
+                        }
+                    ]
                 },
                 "next_due_date": {
+                    "description": "Date of the upcoming contribution (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "remaining_amount": {
+                    "description": "Total amount yet to be paid (excluding payout)",
                     "type": "number"
                 },
                 "total_cycles": {
+                    "description": "Total cycles in the group life",
                     "type": "integer"
                 },
                 "total_paid": {
+                    "description": "Total amount user has contributed so far",
                     "type": "number"
                 },
                 "total_received": {
+                    "description": "Total payout user has received",
                     "type": "number"
                 }
             }
@@ -6992,40 +6426,51 @@
             "type": "object",
             "properties": {
                 "accrued_interest": {
+                    "description": "Interest earned up to this cycle",
                     "type": "number"
                 },
                 "contribution_id": {
+                    "description": "ID of the payment record if paid",
                     "type": "string"
                 },
                 "cycle_no": {
+                    "description": "Cycle ordinal number",
                     "type": "integer"
                 },
                 "due_date": {
+                    "description": "Scheduled date for the cycle",
                     "type": "string"
                 },
                 "expected_amount": {
+                    "description": "Amount user is expected to pay/receive",
                     "type": "number"
                 },
                 "is_paid": {
+                    "description": "Whether the contribution for this cycle is done",
                     "type": "boolean"
                 },
                 "is_payout": {
+                    "description": "Whether the user receives a payout in this cycle",
                     "type": "boolean"
                 },
                 "kind": {
-                    "description": "uncollected, partial_collected, collected",
+                    "description": "Planned status (e.g., \"collected\")",
                     "type": "string"
                 },
                 "payout_amount": {
+                    "description": "Expected payout value",
                     "type": "number"
                 },
                 "payout_id": {
+                    "description": "ID of the payout record if received",
                     "type": "string"
                 },
                 "payout_slots": {
+                    "description": "Number of slots receiving payout",
                     "type": "integer"
                 },
                 "user_collected_slots": {
+                    "description": "Number of user slots already paid for this cycle",
                     "type": "integer"
                 }
             }
@@ -7034,36 +6479,113 @@
             "type": "object",
             "properties": {
                 "accrued_interest": {
+                    "description": "Total interest earned so far",
                     "type": "string"
                 },
                 "auto_renew": {
+                    "description": "Auto-renew setting",
                     "type": "boolean"
                 },
                 "id": {
+                    "description": "Unique savings identifier",
                     "type": "string"
                 },
                 "interest_rate": {
+                    "description": "Annual interest rate",
                     "type": "string"
                 },
                 "maturity_date": {
+                    "description": "Maturity date",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name of the savings goal",
                     "type": "string"
                 },
                 "parent_account_id": {
+                    "description": "ID of the source account",
                     "type": "string"
                 },
                 "principal": {
+                    "description": "Initial deposit amount",
                     "type": "string"
                 },
                 "savings_account_id": {
+                    "description": "ID of the dedicated account",
                     "type": "string"
                 },
                 "start_date": {
+                    "description": "Start date",
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/entity.SavingsStatus"
+                    "description": "Current state of the savings goal",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.AccountStatus"
+                        }
+                    ]
                 },
                 "term_months": {
+                    "description": "Duration in months",
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.SavingsSettingsRequest": {
+            "type": "object",
+            "properties": {
+                "auto_renew": {
+                    "description": "Whether to auto-renew on maturity",
+                    "type": "boolean"
+                },
+                "interest_rate": {
+                    "description": "Annual interest rate (decimal string)",
+                    "type": "string"
+                },
+                "maturity_date": {
+                    "description": "Expected maturity date (YYYY-MM-DD)",
+                    "type": "string"
+                },
+                "principal": {
+                    "description": "Initial deposit amount (decimal string)",
+                    "type": "string"
+                },
+                "start_date": {
+                    "description": "Start date (YYYY-MM-DD)",
+                    "type": "string"
+                },
+                "term_months": {
+                    "description": "Duration in months",
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.SavingsSettingsResponse": {
+            "type": "object",
+            "properties": {
+                "auto_renew": {
+                    "description": "Whether to auto-renew on maturity",
+                    "type": "boolean"
+                },
+                "interest_rate": {
+                    "description": "Annual interest rate (decimal string)",
+                    "type": "string"
+                },
+                "maturity_date": {
+                    "description": "Expected maturity date (YYYY-MM-DD)",
+                    "type": "string"
+                },
+                "principal": {
+                    "description": "Initial deposit amount (decimal string)",
+                    "type": "string"
+                },
+                "start_date": {
+                    "description": "Start date (YYYY-MM-DD)",
+                    "type": "string"
+                },
+                "term_months": {
+                    "description": "Duration in months",
                     "type": "integer"
                 }
             }
@@ -7072,42 +6594,59 @@
             "type": "object",
             "properties": {
                 "cash_amount_per_share": {
+                    "description": "Cash dividend per share",
                     "type": "string"
                 },
                 "currency": {
+                    "description": "Currency of cash amount",
                     "type": "string"
                 },
                 "effective_date": {
+                    "description": "Effective date (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "event_type": {
-                    "$ref": "#/definitions/entity.SecurityEventType"
+                    "description": "Type of action (Dividend, Split, etc.)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.SecurityEventType"
+                        }
+                    ]
                 },
                 "ex_date": {
+                    "description": "Ex-event date (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique event identifier",
                     "type": "string"
                 },
                 "note": {
+                    "description": "Optional note",
                     "type": "string"
                 },
                 "pay_date": {
+                    "description": "Payment date (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "ratio_denominator": {
+                    "description": "Split ratio denominator",
                     "type": "string"
                 },
                 "ratio_numerator": {
+                    "description": "Split ratio numerator",
                     "type": "string"
                 },
                 "record_date": {
+                    "description": "Eligibility date (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "security_id": {
+                    "description": "ID of the security",
                     "type": "string"
                 },
                 "subscription_price": {
+                    "description": "Rights offering price",
                     "type": "string"
                 }
             }
@@ -7116,27 +6655,35 @@
             "type": "object",
             "properties": {
                 "close": {
+                    "description": "Closing price",
                     "type": "string"
                 },
                 "high": {
+                    "description": "Highest price of day",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique price record identifier",
                     "type": "string"
                 },
                 "low": {
+                    "description": "Lowest price of day",
                     "type": "string"
                 },
                 "open": {
+                    "description": "Opening price",
                     "type": "string"
                 },
                 "price_date": {
+                    "description": "Date of the price (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "security_id": {
+                    "description": "ID of the security",
                     "type": "string"
                 },
                 "volume": {
+                    "description": "Trading volume",
                     "type": "string"
                 }
             }
@@ -7145,18 +6692,23 @@
             "type": "object",
             "properties": {
                 "asset_class": {
+                    "description": "Asset class (e.g., Equity)",
                     "type": "string"
                 },
                 "currency": {
+                    "description": "Trading currency",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique security identifier",
                     "type": "string"
                 },
                 "name": {
+                    "description": "Full name of the security",
                     "type": "string"
                 },
                 "symbol": {
+                    "description": "Ticker symbol",
                     "type": "string"
                 }
             }
@@ -7169,9 +6721,11 @@
             ],
             "properties": {
                 "login": {
+                    "description": "Username or email",
                     "type": "string"
                 },
                 "password": {
+                    "description": "User's password",
                     "type": "string"
                 }
             }
@@ -7180,56 +6734,23 @@
             "type": "object",
             "properties": {
                 "display_name": {
+                    "description": "User's name shown in UI",
                     "type": "string"
                 },
                 "email": {
+                    "description": "User's email address",
                     "type": "string"
                 },
                 "password": {
+                    "description": "Plain text password (hashed before storage)",
                     "type": "string"
                 },
                 "phone": {
+                    "description": "User's phone number",
                     "type": "string"
                 },
                 "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.StageImportRequest": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dto.StageImportedItem"
-                    }
-                }
-            }
-        },
-        "dto.StageImportedItem": {
-            "type": "object",
-            "properties": {
-                "account_name": {
-                    "type": "string"
-                },
-                "amount": {
-                    "type": "string"
-                },
-                "category_name": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "raw": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "transaction_date": {
-                    "type": "string"
-                },
-                "transaction_type": {
+                    "description": "Unique login ID",
                     "type": "string"
                 }
             }
@@ -7238,18 +6759,23 @@
             "type": "object",
             "properties": {
                 "color": {
+                    "description": "UI color in hex",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique tag identifier",
                     "type": "string"
                 },
                 "name_en": {
+                    "description": "Name in English",
                     "type": "string"
                 },
                 "name_vi": {
+                    "description": "Name in Vietnamese",
                     "type": "string"
                 },
                 "user_id": {
+                    "description": "ID of the user who owns this tag",
                     "type": "string"
                 }
             }
@@ -7257,40 +6783,56 @@
         "dto.TradeResponse": {
             "type": "object",
             "properties": {
-                "broker_account_id": {
+                "account_id": {
+                    "description": "ID of the account",
                     "type": "string"
                 },
                 "fee_transaction_id": {
+                    "description": "ID of the linked fee transaction",
                     "type": "string"
                 },
                 "fees": {
+                    "description": "Total fees paid",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique trade identifier",
                     "type": "string"
                 },
                 "note": {
+                    "description": "Trade memo",
                     "type": "string"
                 },
                 "occurred_at": {
+                    "description": "Time of the trade",
                     "type": "string"
                 },
                 "price": {
+                    "description": "Execution price",
                     "type": "string"
                 },
                 "quantity": {
+                    "description": "Shares traded",
                     "type": "string"
                 },
                 "security_id": {
+                    "description": "ID of the traded security",
                     "type": "string"
                 },
                 "side": {
-                    "$ref": "#/definitions/entity.TradeSide"
+                    "description": "Buy or Sell",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.TradeSide"
+                        }
+                    ]
                 },
                 "tax_transaction_id": {
+                    "description": "ID of the linked tax transaction",
                     "type": "string"
                 },
                 "taxes": {
+                    "description": "Total taxes paid",
                     "type": "string"
                 }
             }
@@ -7299,18 +6841,23 @@
             "type": "object",
             "properties": {
                 "amount": {
+                    "description": "Allocated amount",
                     "type": "string"
                 },
                 "category_id": {
+                    "description": "ID of the assigned category",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique line item identifier",
                     "type": "string"
                 },
                 "note": {
+                    "description": "Line item memo",
                     "type": "string"
                 },
                 "tag_ids": {
+                    "description": "IDs of assigned tags",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -7322,39 +6869,45 @@
             "type": "object",
             "properties": {
                 "amount": {
+                    "description": "New total amount",
                     "type": "string"
                 },
                 "category_ids": {
+                    "description": "New set of category IDs",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "description": {
+                    "description": "Updated description",
                     "type": "string"
                 },
-                "group_participants": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dto.GroupParticipantInput"
-                    }
-                },
                 "lang": {
+                    "description": "Language for enriched data",
                     "type": "string"
                 },
                 "line_items": {
+                    "description": "Complete replacement of line items",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.CreateLineItemRequest"
                     }
                 },
                 "occurred_at": {
+                    "description": "Updated occurrence timestamp",
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/entity.TransactionStatus"
+                    "description": "New status (posted/cancelled)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.TransactionStatus"
+                        }
+                    ]
                 },
                 "tag_ids": {
+                    "description": "New set of tag IDs",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -7366,97 +6919,129 @@
             "type": "object",
             "properties": {
                 "account_currency": {
+                    "description": "Currency of the primary account",
                     "type": "string"
                 },
                 "account_id": {
+                    "description": "Primary account (income/expense)",
                     "type": "string"
                 },
                 "amount": {
+                    "description": "Transaction amount",
                     "type": "string"
                 },
                 "category_colors": {
+                    "description": "Enriched category UI colors",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "category_ids": {
+                    "description": "List of all category IDs involved",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "category_names": {
+                    "description": "Enriched category names",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "description": {
+                    "description": "Transaction description",
                     "type": "string"
                 },
                 "exchange_rate": {
+                    "description": "Used exchange rate",
                     "type": "string"
                 },
                 "external_ref": {
+                    "description": "External system reference",
                     "type": "string"
                 },
                 "from_account_id": {
+                    "description": "Source account (transfer)",
                     "type": "string"
                 },
                 "from_amount": {
+                    "description": "Source amount (for transfers)",
                     "type": "string"
                 },
                 "from_currency": {
+                    "description": "Currency of source account",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique transaction identifier",
                     "type": "string"
                 },
                 "line_items": {
+                    "description": "Detailed breakdown",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.TransactionLineItemResponse"
                     }
                 },
                 "occurred_at": {
+                    "description": "Exact time of occurrence",
                     "type": "string"
                 },
                 "occurred_date": {
+                    "description": "Date (YYYY-MM-DD)",
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/entity.TransactionStatus"
+                    "description": "Current status",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.TransactionStatus"
+                        }
+                    ]
                 },
                 "tag_colors": {
+                    "description": "Enriched tag UI colors",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "tag_ids": {
+                    "description": "List of all tag IDs involved",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "tag_names": {
+                    "description": "Enriched tag names",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "to_account_id": {
+                    "description": "Destination account (transfer)",
                     "type": "string"
                 },
                 "to_amount": {
+                    "description": "Destination amount (for transfers)",
                     "type": "string"
                 },
                 "to_currency": {
+                    "description": "Currency of destination account",
                     "type": "string"
                 },
                 "type": {
-                    "$ref": "#/definitions/entity.TransactionType"
+                    "description": "Income, Expense, or Transfer",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.TransactionType"
+                        }
+                    ]
                 }
             }
         },
@@ -7464,16 +7049,24 @@
             "type": "object",
             "properties": {
                 "alert_threshold_percent": {
+                    "description": "New alert threshold percentage",
                     "type": "integer"
                 },
                 "amount": {
+                    "description": "New budget amount (decimal string)",
                     "type": "string"
                 },
                 "name": {
+                    "description": "New descriptive name",
                     "type": "string"
                 },
                 "rollover_mode": {
-                    "$ref": "#/definitions/entity.BudgetRolloverMode"
+                    "description": "New rollover behavior",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.BudgetRolloverMode"
+                        }
+                    ]
                 }
             }
         },
@@ -7481,18 +7074,23 @@
             "type": "object",
             "properties": {
                 "avatar_url": {
+                    "description": "New avatar URL",
                     "type": "string"
                 },
                 "email": {
+                    "description": "New email address",
                     "type": "string"
                 },
                 "name": {
+                    "description": "New name for the contact",
                     "type": "string"
                 },
                 "notes": {
+                    "description": "New private notes",
                     "type": "string"
                 },
                 "phone": {
+                    "description": "New phone number",
                     "type": "string"
                 }
             }
@@ -7501,16 +7099,28 @@
             "type": "object",
             "properties": {
                 "due_date": {
+                    "description": "New repayment due date",
                     "type": "string"
                 },
                 "interest_rate": {
+                    "description": "New annual interest rate",
                     "type": "string"
                 },
                 "name": {
+                    "description": "New name or purpose",
+                    "type": "string"
+                },
+                "originating_transaction_id": {
+                    "description": "New ID of the transaction that created this debt",
                     "type": "string"
                 },
                 "status": {
-                    "$ref": "#/definitions/entity.DebtStatus"
+                    "description": "New debt status (active/paid/etc.)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.DebtStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -7518,33 +7128,32 @@
             "type": "object",
             "properties": {
                 "account_id": {
+                    "description": "New account ID",
                     "type": "string"
                 },
                 "contribution_amount": {
+                    "description": "New contribution amount",
                     "type": "number"
                 },
                 "fixed_interest_amount": {
+                    "description": "New fixed interest amount",
                     "type": "number"
                 },
                 "name": {
+                    "description": "New group name",
                     "type": "string"
                 },
                 "payout_cycle_no": {
+                    "description": "New payout cycle for the user",
                     "type": "integer"
                 },
                 "status": {
-                    "$ref": "#/definitions/entity.RotatingSavingsStatus"
-                }
-            }
-        },
-        "dto.UpsertMappingRulesRequest": {
-            "type": "object",
-            "properties": {
-                "rules": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dto.MappingRuleInput"
-                    }
+                    "description": "New group status",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.RotatingSavingsStatus"
+                        }
+                    ]
                 }
             }
         },
@@ -7552,9 +7161,11 @@
             "type": "object",
             "properties": {
                 "login": {
+                    "description": "Email or username of the user to share with",
                     "type": "string"
                 },
                 "permission": {
+                    "description": "Permission level (e.g., \"read\", \"write\", \"admin\")",
                     "type": "string"
                 }
             }
@@ -7563,28 +7174,38 @@
             "type": "object",
             "properties": {
                 "avatar_url": {
+                    "description": "User's profile picture URL",
                     "type": "string"
                 },
                 "display_name": {
+                    "description": "User's full name or nickname",
                     "type": "string"
                 },
                 "email": {
+                    "description": "User's email address",
                     "type": "string"
                 },
                 "id": {
+                    "description": "Unique user identity",
                     "type": "string"
                 },
                 "phone": {
+                    "description": "User's phone number",
                     "type": "string"
                 },
                 "public_share_url": {
+                    "description": "URL for user's public profile share",
                     "type": "string"
                 },
-                "settings": {},
+                "settings": {
+                    "description": "User-specific configuration (JSON)"
+                },
                 "status": {
+                    "description": "Current account status (active/inactive)",
                     "type": "string"
                 },
                 "username": {
+                    "description": "User's unique handle",
                     "type": "string"
                 }
             }
@@ -7595,6 +7216,16 @@
                 "owner",
                 "viewer",
                 "editor"
+            ],
+            "x-enum-comments": {
+                "AccountSharePermissionEditor": "Read and write access",
+                "AccountSharePermissionOwner": "Full control (only for the creator)",
+                "AccountSharePermissionViewer": "Read-only access"
+            },
+            "x-enum-descriptions": [
+                "Full control (only for the creator)",
+                "Read-only access",
+                "Read and write access"
             ],
             "x-enum-varnames": [
                 "AccountSharePermissionOwner",
@@ -7617,11 +7248,15 @@
             "type": "string",
             "enum": [
                 "active",
-                "closed"
+                "matured",
+                "archived",
+                "deleted"
             ],
             "x-enum-varnames": [
                 "AccountStatusActive",
-                "AccountStatusClosed"
+                "AccountStatusMatured",
+                "AccountStatusArchived",
+                "AccountStatusDeleted"
             ]
         },
         "entity.AccountType": {
@@ -7633,6 +7268,22 @@
                 "broker",
                 "card",
                 "savings"
+            ],
+            "x-enum-comments": {
+                "AccountTypeBank": "Regular bank account",
+                "AccountTypeBroker": "Investment/Stock brokerage account",
+                "AccountTypeCard": "Credit or debit card",
+                "AccountTypeCash": "Physical cash on hand",
+                "AccountTypeSavings": "Dedicated savings account or goal",
+                "AccountTypeWallet": "Digital wallet (e.g. MoMo, Zalopay)"
+            },
+            "x-enum-descriptions": [
+                "Regular bank account",
+                "Digital wallet (e.g. MoMo, Zalopay)",
+                "Physical cash on hand",
+                "Investment/Stock brokerage account",
+                "Credit or debit card",
+                "Dedicated savings account or goal"
             ],
             "x-enum-varnames": [
                 "AccountTypeBank",
@@ -7663,6 +7314,16 @@
                 "add_positive",
                 "add_all"
             ],
+            "x-enum-comments": {
+                "BudgetRolloverModeAddAll": "Add both remaining positive and negative balances",
+                "BudgetRolloverModeAddPositive": "Only add remaining positive amounts to next period",
+                "BudgetRolloverModeNone": "No rollover"
+            },
+            "x-enum-descriptions": [
+                "No rollover",
+                "Only add remaining positive amounts to next period",
+                "Add both remaining positive and negative balances"
+            ],
             "x-enum-varnames": [
                 "BudgetRolloverModeNone",
                 "BudgetRolloverModeAddPositive",
@@ -7686,6 +7347,14 @@
                 "lent",
                 "borrowed"
             ],
+            "x-enum-comments": {
+                "DebtDirectionBorrowed": "User borrowed money from someone else",
+                "DebtDirectionLent": "User lent money to someone else"
+            },
+            "x-enum-descriptions": [
+                "User lent money to someone else",
+                "User borrowed money from someone else"
+            ],
             "x-enum-varnames": [
                 "DebtDirectionLent",
                 "DebtDirectionBorrowed"
@@ -7702,17 +7371,6 @@
                 "DebtStatusActive",
                 "DebtStatusPaid",
                 "DebtStatusCancelled"
-            ]
-        },
-        "entity.ImportMappingRuleKind": {
-            "type": "string",
-            "enum": [
-                "account",
-                "category"
-            ],
-            "x-enum-varnames": [
-                "ImportMappingRuleKindAccount",
-                "ImportMappingRuleKindCategory"
             ]
         },
         "entity.RotatingSavingsAuditAction": {
@@ -7734,6 +7392,16 @@
                 "contribution",
                 "payout",
                 "collected"
+            ],
+            "x-enum-comments": {
+                "RotatingSavingsContributionKindCollected": "Pot already received by someone else",
+                "RotatingSavingsContributionKindContribution": "Regular member payment",
+                "RotatingSavingsContributionKindPayout": "Member receiving the cycle's total pot"
+            },
+            "x-enum-descriptions": [
+                "Regular member payment",
+                "Member receiving the cycle's total pot",
+                "Pot already received by someone else"
             ],
             "x-enum-varnames": [
                 "RotatingSavingsContributionKindContribution",
@@ -7763,19 +7431,6 @@
                 "RotatingSavingsStatusActive",
                 "RotatingSavingsStatusCompleted",
                 "RotatingSavingsStatusClosed"
-            ]
-        },
-        "entity.SavingsStatus": {
-            "type": "string",
-            "enum": [
-                "active",
-                "matured",
-                "closed"
-            ],
-            "x-enum-varnames": [
-                "SavingsStatusActive",
-                "SavingsStatusMatured",
-                "SavingsStatusClosed"
             ]
         },
         "entity.SecurityEventType": {
@@ -7810,6 +7465,16 @@
                 "pending",
                 "posted",
                 "cancelled"
+            ],
+            "x-enum-comments": {
+                "TransactionStatusCancelled": "Transaction was voided",
+                "TransactionStatusPending": "Transaction is planned but hasn't occurred yet",
+                "TransactionStatusPosted": "Transaction has been finalized and recorded"
+            },
+            "x-enum-descriptions": [
+                "Transaction is planned but hasn't occurred yet",
+                "Transaction has been finalized and recorded",
+                "Transaction was voided"
             ],
             "x-enum-varnames": [
                 "TransactionStatusPending",

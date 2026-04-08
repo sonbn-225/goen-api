@@ -88,9 +88,39 @@ func (r *CategoryRepo) ListCategories(ctx context.Context, userID uuid.UUID) ([]
 		}
 		out = append(out, c)
 	}
-	if err := rows.Err(); err != nil {
+	return out, nil
+}
+
+func (r *CategoryRepo) GetCategoryByKey(ctx context.Context, key string) (*entity.Category, error) {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
 		return nil, err
 	}
 
-	return out, nil
+	row := pool.QueryRow(ctx, `
+		SELECT c.id, c.key, c.parent_category_id, p.key AS parent_key, c.type, c.sort_order, c.is_active, c.icon, c.color
+		FROM categories c
+		LEFT JOIN categories p ON p.id = c.parent_category_id
+		WHERE c.key = $1
+	`, key)
+
+	var c entity.Category
+	if err := row.Scan(
+		&c.ID,
+		&c.Key,
+		&c.ParentCategoryID,
+		&c.ParentKey,
+		&c.Type,
+		&c.SortOrder,
+		&c.IsActive,
+		&c.Icon,
+		&c.Color,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("category not found")
+		}
+		return nil, err
+	}
+
+	return &c, nil
 }

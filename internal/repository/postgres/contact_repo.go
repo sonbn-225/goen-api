@@ -18,20 +18,9 @@ func NewContactRepo(db *database.Postgres) *ContactRepo {
 	return &ContactRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-func (r *ContactRepo) CreateContact(ctx context.Context, c entity.Contact) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
+// --- Nhóm 1: Truy vấn danh bạ (Read-only Optimized) ---
 
-	_, err = pool.Exec(ctx, `
-		INSERT INTO contacts (id, user_id, name, email, phone, avatar_url, linked_user_id, notes, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-	`, c.ID, c.UserID, c.Name, c.Email, c.Phone, c.AvatarURL, c.LinkedUserID, c.Notes, c.CreatedAt, c.UpdatedAt)
-	return err
-}
-
-func (r *ContactRepo) GetContact(ctx context.Context, userID uuid.UUID, contactID uuid.UUID) (*entity.Contact, error) {
+func (r *ContactRepo) GetContact(ctx context.Context, userID, contactID uuid.UUID) (*entity.Contact, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
 		return nil, err
@@ -93,24 +82,6 @@ func (r *ContactRepo) ListContacts(ctx context.Context, userID uuid.UUID) ([]ent
 	return results, nil
 }
 
-func (r *ContactRepo) UpdateContact(ctx context.Context, userID uuid.UUID, c entity.Contact) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = pool.Exec(ctx, `
-		UPDATE contacts
-		SET name = $1, email = $2, phone = $3, avatar_url = $4, linked_user_id = $5, notes = $6, updated_at = $7
-		WHERE id = $8 AND user_id = $9 AND deleted_at IS NULL
-	`, c.Name, c.Email, c.Phone, c.AvatarURL, c.LinkedUserID, c.Notes, c.UpdatedAt, c.ID, userID)
-	return err
-}
-
-func (r *ContactRepo) DeleteContact(ctx context.Context, userID uuid.UUID, contactID uuid.UUID) error {
-	return r.SoftDeleteByField(ctx, "contacts", "id", contactID, &userID)
-}
-
 func (r *ContactRepo) FindUserByEmail(ctx context.Context, email string) (*entity.User, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -147,3 +118,53 @@ func (r *ContactRepo) FindUserByPhone(ctx context.Context, phone string) (*entit
 	return &u, nil
 }
 
+// --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
+
+func (r *ContactRepo) CreateContactTx(ctx context.Context, tx pgx.Tx, c entity.Contact) error {
+	var q database.Queryer = tx
+	if tx == nil {
+		pool, err := r.db.Pool(ctx)
+		if err != nil {
+			return err
+		}
+		q = pool
+	}
+
+	_, err := q.Exec(ctx, `
+		INSERT INTO contacts (id, user_id, name, email, phone, avatar_url, linked_user_id, notes, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`, c.ID, c.UserID, c.Name, c.Email, c.Phone, c.AvatarURL, c.LinkedUserID, c.Notes, c.CreatedAt, c.UpdatedAt)
+	return err
+}
+
+func (r *ContactRepo) UpdateContactTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, c entity.Contact) error {
+	var q database.Queryer = tx
+	if tx == nil {
+		pool, err := r.db.Pool(ctx)
+		if err != nil {
+			return err
+		}
+		q = pool
+	}
+
+	_, err := q.Exec(ctx, `
+		UPDATE contacts
+		SET name = $1, email = $2, phone = $3, avatar_url = $4, linked_user_id = $5, notes = $6, updated_at = $7
+		WHERE id = $8 AND user_id = $9 AND deleted_at IS NULL
+	`, c.Name, c.Email, c.Phone, c.AvatarURL, c.LinkedUserID, c.Notes, c.UpdatedAt, c.ID, userID)
+	return err
+}
+
+func (r *ContactRepo) DeleteContactTx(ctx context.Context, tx pgx.Tx, userID, contactID uuid.UUID) error {
+	var q database.Queryer = tx
+	if tx == nil {
+		pool, err := r.db.Pool(ctx)
+		if err != nil {
+			return err
+		}
+		q = pool
+	}
+
+	_, err := q.Exec(ctx, `UPDATE contacts SET deleted_at = NOW() WHERE id = $1 AND user_id = $2`, contactID, userID)
+	return err
+}

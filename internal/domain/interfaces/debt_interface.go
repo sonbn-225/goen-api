@@ -12,37 +12,40 @@ import (
 
 // DebtRepository định nghĩa lớp truy cập dữ liệu cho các khoản nợ, khoản cho vay và liên kết thanh toán.
 type DebtRepository interface {
-	// CreateDebtTx là phiên bản transactional để lưu một khoản nợ mới.
+	// --- Nhóm 1: Truy vấn Nợ & Thanh toán (Flexible Tx) ---
+
+	// GetDebtTx lấy thông tin một khoản nợ cụ thể.
+	GetDebtTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID) (*entity.Debt, error)
+	// ListDebtsTx trả về toàn bộ danh sách nợ của một người dùng.
+	ListDebtsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.Debt, error)
+	// ListPaymentLinksTx trả về lịch sử các lần thanh toán của một khoản nợ.
+	ListPaymentLinksTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtPaymentLink, error)
+	// ListPaymentLinksByTransactionTx trả về các khoản nợ được thanh toán bởi một giao dịch cụ thể.
+	ListPaymentLinksByTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) ([]entity.DebtPaymentLink, error)
+	// ListInstallmentsTx trả về lịch thanh toán của một khoản nợ.
+	ListInstallmentsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtInstallment, error)
+	// ListPublicParticipantsTx trả về danh sách tên người tham gia cho các hồ sơ công khai.
+	ListPublicParticipantsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]string, error)
+	// ListPublicDebtsByParticipantTx trả về các khoản nợ liên quan đến một người tham gia để xem công khai.
+	ListPublicDebtsByParticipantTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, participantName string) ([]entity.PublicDebt, error)
+
+	// --- Nhóm 2: Thao tác ghi (Transactional) ---
+
+	// CreateDebtTx lưu một khoản nợ mới.
 	CreateDebtTx(ctx context.Context, tx pgx.Tx, debt entity.Debt) error
-	// GetDebt lấy thông tin một khoản nợ cụ thể.
-	GetDebt(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) (*entity.Debt, error)
-	// ListDebts trả về toàn bộ danh sách nợ của một người dùng.
-	ListDebts(ctx context.Context, userID uuid.UUID) ([]entity.Debt, error)
-	// UpdateDebtTx là phiên bản transactional để cập nhật thông tin khoản nợ.
+	// UpdateDebtTx cập nhật thông tin khoản nợ.
 	UpdateDebtTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debt entity.Debt) error
-	// DeleteDebt xóa mềm một bản ghi nợ.
-	DeleteDebt(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) error
-	// DeleteDebtsByOriginatingTransactionTx xóa toàn bộ nợ bắt nguồn từ một giao dịch cụ thể (sử dụng khi hoàn tác giao dịch).
+	// DeleteDebtTx xóa mềm một bản ghi nợ.
+	DeleteDebtTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID) error
+	// DeleteDebtsByOriginatingTransactionTx xóa toàn bộ nợ bắt nguồn từ một giao dịch cụ thể.
 	DeleteDebtsByOriginatingTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error
 
-	// CreatePaymentLinkTx là phiên bản transactional để ghi nhận một lần thanh toán nợ, đồng thời cập nhật số dư gốc/lãi.
+	// CreatePaymentLinkTx ghi nhận một lần thanh toán nợ, đồng thời cập nhật số dư gốc/lãi.
 	CreatePaymentLinkTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, link entity.DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus entity.DebtStatus, closedAt *time.Time) error
-	// ListPaymentLinks trả về lịch sử các lần thanh toán của một khoản nợ.
-	ListPaymentLinks(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtPaymentLink, error)
-	// ListPaymentLinksByTransaction trả về các khoản nợ được thanh toán bởi một giao dịch cụ thể.
-	ListPaymentLinksByTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID) ([]entity.DebtPaymentLink, error)
-	// DeletePaymentLinksByTransactionTx xóa các liên kết thanh toán liên quan đến một giao dịch (dùng khi xóa giao dịch thanh toán).
+	// DeletePaymentLinksByTransactionTx xóa các liên kết thanh toán liên quan đến một giao dịch.
 	DeletePaymentLinksByTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error
-
-	// CreateInstallment tạo một lịch thanh toán cho khoản nợ.
-	CreateInstallment(ctx context.Context, userID uuid.UUID, inst entity.DebtInstallment) error
-	// ListInstallments trả về lịch thanh toán của một khoản nợ.
-	ListInstallments(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtInstallment, error)
-
-	// ListPublicParticipants trả về danh sách tên người tham gia cho các hồ sơ công khai.
-	ListPublicParticipants(ctx context.Context, userID uuid.UUID) ([]string, error)
-	// ListPublicDebtsByParticipant trả về các khoản nợ liên quan đến một người tham gia để xem công khai.
-	ListPublicDebtsByParticipant(ctx context.Context, userID uuid.UUID, participantName string) ([]entity.PublicDebt, error)
+	// CreateInstallmentTx tạo một lịch thanh toán cho khoản nợ.
+	CreateInstallmentTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, inst entity.DebtInstallment) error
 }
 
 // DebtService định nghĩa các nghiệp vụ quản lý nợ, cho vay và chi phí dùng chung.
@@ -69,4 +72,3 @@ type DebtService interface {
 	// CleanupTransactionLinksTx reverts debt states when an originating transaction is deleted.
 	CleanupTransactionLinksTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error
 }
-

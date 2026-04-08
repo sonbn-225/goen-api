@@ -236,7 +236,7 @@ func (s *DebtService) Update(ctx context.Context, userID uuid.UUID, debtID uuid.
 
 // Delete xóa một khoản nợ.
 func (s *DebtService) Delete(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) error {
-	return s.repo.DeleteDebt(ctx, userID, debtID)
+	return s.repo.DeleteDebtTx(ctx, nil, userID, debtID)
 }
 
 // AddPayment liên kết một giao dịch hiện có như một khoản thanh toán cho khoản nợ.

@@ -78,7 +78,7 @@ func (s *AuthService) Signup(ctx context.Context, req dto.SignupRequest) (*dto.A
 	}
 
 	refreshTokenEntity, refreshToken := s.newRefreshToken(u.ID)
-	if err := s.userRepo.CreateUserWithRefreshToken(ctx, u, *refreshTokenEntity); err != nil {
+	if err := s.userRepo.CreateUserWithRefreshTokenTx(ctx, nil, u, *refreshTokenEntity); err != nil {
 		return nil, err
 	}
 
@@ -141,7 +141,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*dto.Au
 
 	// 2. Check expiry
 	if utils.Now().After(rt.ExpiresAt) {
-		_ = s.refreshRepo.DeleteByToken(ctx, refreshToken)
+		_ = s.refreshRepo.DeleteByTokenTx(ctx, nil, refreshToken)
 		return nil, apperr.Unauthorized("refresh token expired")
 	}
 
@@ -152,7 +152,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*dto.Au
 	}
 
 	// 4. Generate new pair (Rotation)
-	_ = s.refreshRepo.DeleteByToken(ctx, refreshToken)
+	_ = s.refreshRepo.DeleteByTokenTx(ctx, nil, refreshToken)
 
 	newAccessToken, expiresIn, err := s.generateAccessToken(*u)
 	if err != nil {
@@ -174,7 +174,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*dto.Au
 }
 
 func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
-	return s.refreshRepo.DeleteByToken(ctx, refreshToken)
+	return s.refreshRepo.DeleteByTokenTx(ctx, nil, refreshToken)
 }
 
 func (s *AuthService) GetMe(ctx context.Context, userID uuid.UUID) (*dto.UserResponse, error) {
@@ -187,7 +187,7 @@ func (s *AuthService) GetMe(ctx context.Context, userID uuid.UUID) (*dto.UserRes
 }
 
 func (s *AuthService) UpdateMySettings(ctx context.Context, userID uuid.UUID, patch map[string]any) (*dto.UserResponse, error) {
-	u, err := s.userRepo.UpdateUserSettings(ctx, userID, patch)
+	u, err := s.userRepo.UpdateUserSettingsTx(ctx, nil, userID, patch)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (s *AuthService) UploadAvatar(ctx context.Context, userID uuid.UUID, file *
 	}
 
 	url := s.s3.AvatarURL(s.cfg.PublicBaseURL, key)
-	u, err := s.userRepo.UpdateUserProfile(ctx, userID, entity.UpdateUserParams{
+	u, err := s.userRepo.UpdateUserProfileTx(ctx, nil, userID, entity.UpdateUserParams{
 		AvatarURL: &url,
 	})
 	if err != nil {
@@ -259,7 +259,7 @@ func (s *AuthService) UpdateMyProfile(ctx context.Context, userID uuid.UUID, dis
 		params.Username = &v
 	}
 
-	u, err := s.userRepo.UpdateUserProfile(ctx, userID, params)
+	u, err := s.userRepo.UpdateUserProfileTx(ctx, nil, userID, params)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +296,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 	}
 
 	hashStr := string(newHash)
-	_, err = s.userRepo.UpdateUserProfile(ctx, userID, entity.UpdateUserParams{
+	_, err = s.userRepo.UpdateUserProfileTx(ctx, nil, userID, entity.UpdateUserParams{
 		PasswordHash: &hashStr,
 	})
 	return err
@@ -337,7 +337,7 @@ func (s *AuthService) mapToUserResponse(user entity.User) dto.UserResponse {
 func (s *AuthService) generateAndSaveRefreshToken(ctx context.Context, userID uuid.UUID) (string, error) {
 	rt, token := s.newRefreshToken(userID)
 
-	if err := s.refreshRepo.Create(ctx, rt); err != nil {
+	if err := s.refreshRepo.CreateTx(ctx, nil, rt); err != nil {
 		return "", err
 	}
 

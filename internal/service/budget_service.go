@@ -73,7 +73,7 @@ func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, req dto.Cr
 		CategoryID:            &categoryID,
 	}
 
-	if err := s.repo.CreateBudget(ctx, userID, b); err != nil {
+	if err := s.repo.CreateBudgetTx(ctx, nil, userID, b); err != nil {
 		return nil, err
 	}
 
@@ -123,14 +123,14 @@ func (s *BudgetService) Update(ctx context.Context, userID uuid.UUID, budgetID u
 		cur.RolloverMode = req.RolloverMode
 	}
 
-	if err := s.repo.UpdateBudget(ctx, userID, *cur); err != nil {
+	if err := s.repo.UpdateBudgetTx(ctx, nil, userID, *cur); err != nil {
 		return nil, err
 	}
 	return s.Get(ctx, userID, budgetID)
 }
 
 func (s *BudgetService) Delete(ctx context.Context, userID uuid.UUID, budgetID uuid.UUID) error {
-	return s.repo.DeleteBudget(ctx, userID, budgetID)
+	return s.repo.DeleteBudgetTx(ctx, nil, userID, budgetID)
 }
 
 func (s *BudgetService) normalizeBudgetPeriod(period string, startIn, endIn *string) (string, string, error) {

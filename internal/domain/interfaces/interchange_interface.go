@@ -4,32 +4,37 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
 // InterchangeRepository định nghĩa lớp lưu trữ cho các bản nhập dữ liệu tạm thời (staged imports), các quy tắc ánh xạ và các tác vụ xuất dữ liệu trong tương lai.
 type InterchangeRepository interface {
-	// Nhập dữ liệu (Imports)
-	// UpsertStagedImports tạo hoặc cập nhật hàng loạt dữ liệu thô đang chờ để được phê duyệt thành giao dịch/thực thể chính thức.
-	UpsertStagedImports(ctx context.Context, userID uuid.UUID, items []entity.StagedImportCreate) ([]entity.StagedImport, error)
-	// ListStagedImports trả về danh sách các bản nhập đang chờ xử lý, được lọc theo loại tài nguyên (ví dụ: giao dịch).
-	ListStagedImports(ctx context.Context, userID uuid.UUID, resourceType string) ([]entity.StagedImport, error)
-	// GetStagedImport lấy một bản ghi nhập dữ liệu thô duy nhất.
-	GetStagedImport(ctx context.Context, userID, id uuid.UUID) (*entity.StagedImport, error)
-	// PatchStagedImport cho phép chỉnh sửa thủ công dữ liệu đã nhập trước khi chính thức phê duyệt.
-	PatchStagedImport(ctx context.Context, userID, id uuid.UUID, patch entity.StagedImportPatch) (*entity.StagedImport, error)
-	// DeleteStagedImport xóa một bản ghi nhập dữ liệu đang chờ xử lý.
-	DeleteStagedImport(ctx context.Context, userID, id uuid.UUID) error
-	// DeleteAllStagedImports xóa sạch khu vực chờ cho một loại tài nguyên cụ thể.
-	DeleteAllStagedImports(ctx context.Context, userID uuid.UUID, resourceType string) (int64, error)
+	// --- Nhóm 1: Truy vấn dữ liệu chờ (Flexible Tx) ---
 
-	// UpsertImportRules lưu các quy tắc khớp mẫu để tự động phân loại trong quá trình nhập dữ liệu.
-	UpsertImportRules(ctx context.Context, userID uuid.UUID, rules []entity.StagedImportRuleUpsert) ([]entity.StagedImportRule, error)
-	// ListImportRules trả về các quy tắc giúp ánh xạ dữ liệu bên ngoài vào các danh mục/nhãn nội bộ.
-	ListImportRules(ctx context.Context, userID uuid.UUID, resourceType string) ([]entity.StagedImportRule, error)
-	// DeleteImportRule xóa một quy tắc ánh xạ.
-	DeleteImportRule(ctx context.Context, userID, id uuid.UUID) error
+	// ListStagedImportsTx trả về danh sách các bản nhập đang chờ xử lý (hỗ trợ transaction).
+	ListStagedImportsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, resourceType string) ([]entity.StagedImport, error)
+	// GetStagedImportTx lấy một bản ghi nhập dữ liệu thô duy nhất.
+	GetStagedImportTx(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) (*entity.StagedImport, error)
+	// ListImportRulesTx trả về các quy tắc giúp ánh xạ dữ liệu bên ngoài vào các danh mục/nhãn nội bộ.
+	ListImportRulesTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, resourceType string) ([]entity.StagedImportRule, error)
+
+	// --- Nhóm 2: Thao tác ghi (Transactional) ---
+
+	// UpsertStagedImportsTx tạo hoặc cập nhật hàng loạt dữ liệu thô.
+	UpsertStagedImportsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, items []entity.StagedImportCreate) ([]entity.StagedImport, error)
+	// PatchStagedImportTx chỉnh sửa thủ công dữ liệu đã nhập.
+	PatchStagedImportTx(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID, patch entity.StagedImportPatch) (*entity.StagedImport, error)
+	// DeleteStagedImportTx xóa một bản ghi nhập dữ liệu đang chờ.
+	DeleteStagedImportTx(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) error
+	// DeleteAllStagedImportsTx xóa sạch khu vực chờ cho một loại tài nguyên.
+	DeleteAllStagedImportsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, resourceType string) (int64, error)
+
+	// UpsertImportRulesTx lưu các quy tắc khớp mẫu.
+	UpsertImportRulesTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, rules []entity.StagedImportRuleUpsert) ([]entity.StagedImportRule, error)
+	// DeleteImportRuleTx xóa một quy tắc ánh xạ.
+	DeleteImportRuleTx(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) error
 }
 
 // InterchangeService định nghĩa nghiệp vụ cho trao đổi dữ liệu chung (Nhập & Xuất).

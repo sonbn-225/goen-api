@@ -10,11 +10,12 @@ import (
 
 // SecurityRepository định nghĩa lớp truy cập dữ liệu cho thông tin gốc về đầu tư (mã niêm yết, giá cả, sự kiện).
 type SecurityRepository interface {
+	// --- Nhóm 1: Truy vấn Metadata Toàn cầu (Read-only Optimized) ---
+
 	// GetSecurity lấy thông tin metadata của một mã chứng khoán (tên, mã niêm yết, loại).
 	GetSecurity(ctx context.Context, securityID uuid.UUID) (*entity.Security, error)
 	// ListSecurities trả về tất cả các mã chứng khoán được hỗ trợ bởi nền tảng.
 	ListSecurities(ctx context.Context) ([]entity.Security, error)
-
 	// ListSecurityPrices trả về dữ liệu giá hàng ngày lịch sử.
 	ListSecurityPrices(ctx context.Context, securityID uuid.UUID, from *string, to *string) ([]entity.SecurityPriceDaily, error)
 	// ListSecurityEvents trả về lịch sử các sự kiện doanh nghiệp (chia tách, cổ tức).

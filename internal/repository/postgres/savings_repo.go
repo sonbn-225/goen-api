@@ -19,6 +19,8 @@ func NewSavingsRepo(db *database.Postgres) *SavingsRepo {
 	return &SavingsRepo{db: db}
 }
 
+// --- Nhóm 1: Truy vấn Tiết kiệm (Read-only Optimized) ---
+
 func (r *SavingsRepo) GetSavings(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entity.Savings, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -93,7 +95,14 @@ func (r *SavingsRepo) ListSavings(ctx context.Context, userID uuid.UUID) ([]enti
 	return out, nil
 }
 
+// --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
+
 func (r *SavingsRepo) UpdateSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, s entity.Savings) error {
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
+	}
+
 	settings := entity.AccountSettings{
 		Savings: &entity.SavingsSettings{
 			Principal:    s.Principal,
@@ -106,7 +115,7 @@ func (r *SavingsRepo) UpdateSavingsTx(ctx context.Context, tx pgx.Tx, userID uui
 	}
 	settingsJSON, _ := json.Marshal(settings)
 
-	_, err := tx.Exec(ctx, `
+	_, err = q.Exec(ctx, `
 		UPDATE accounts a
 		SET name = $3, status = $4, parent_account_id = $5, settings = $6, updated_at = NOW()
 		FROM user_accounts ua
@@ -116,7 +125,12 @@ func (r *SavingsRepo) UpdateSavingsTx(ctx context.Context, tx pgx.Tx, userID uui
 }
 
 func (r *SavingsRepo) DeleteSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, id uuid.UUID) error {
-	_, err := tx.Exec(ctx, `
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	_, err = q.Exec(ctx, `
 		UPDATE accounts a
 		SET deleted_at = NOW(), status = $3, updated_at = NOW()
 		FROM user_accounts ua

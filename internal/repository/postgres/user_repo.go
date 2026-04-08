@@ -22,69 +22,7 @@ func NewUserRepo(db *database.Postgres) *UserRepo {
 	return &UserRepo{db: db}
 }
 
-func (r *UserRepo) CreateUserWithRefreshToken(ctx context.Context, u entity.UserWithPassword, refreshToken entity.RefreshToken) error {
-	settingsJSON, err := json.Marshal(u.Settings)
-	if err != nil {
-		return fmt.Errorf("failed to marshal settings: %w", err)
-	}
-
-	defaultCurrency := "VND"
-	if settings, ok := u.Settings.(map[string]any); ok {
-		if raw, ok := settings["default_currency"]; ok {
-			if cur, ok := raw.(string); ok {
-				normalized := strings.ToUpper(strings.TrimSpace(cur))
-				if len(normalized) == 3 {
-					defaultCurrency = normalized
-				}
-			}
-		}
-	}
-
-	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
-		// 1. Insert user
-		_, err := tx.Exec(ctx, `
-			INSERT INTO users (id, email, phone, display_name, avatar_url, username, settings, status, password_hash, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		`, u.ID, u.Email, u.Phone, u.DisplayName, u.AvatarURL, u.Username, settingsJSON, u.Status, u.PasswordHash, u.CreatedAt, u.UpdatedAt)
-		if err != nil {
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				return errors.New("user already exists")
-			}
-			return fmt.Errorf("failed to insert user: %w", err)
-		}
-
-		// 2. Create initial cash account
-		cashAccountID := uuid.New()
-		_, err = tx.Exec(ctx, `
-			INSERT INTO accounts (id, name, account_type, currency, status, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-		`, cashAccountID, "cash_account_name", "cash", defaultCurrency, "active", u.CreatedAt, u.UpdatedAt)
-		if err != nil {
-			return fmt.Errorf("failed to create cash account: %w", err)
-		}
-
-		// 3. Link user to account
-		_, err = tx.Exec(ctx, `
-			INSERT INTO user_accounts (id, account_id, user_id, permission, status, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-		`, uuid.New(), cashAccountID, u.ID, "owner", "active", u.CreatedAt, u.UpdatedAt)
-		if err != nil {
-			return fmt.Errorf("failed to link user to account: %w", err)
-		}
-
-		// 4. Create bootstrap refresh token in the same transaction.
-		_, err = tx.Exec(ctx, `
-			INSERT INTO refresh_tokens (id, user_id, token, expires_at, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6)
-		`, refreshToken.ID, u.ID, refreshToken.Token, refreshToken.ExpiresAt, refreshToken.CreatedAt, refreshToken.UpdatedAt)
-		if err != nil {
-			return fmt.Errorf("failed to insert refresh token: %w", err)
-		}
-
-		return nil
-	})
-}
+// --- Nhóm 1: Truy vấn Người dùng (Read-only Optimized) ---
 
 func (r *UserRepo) FindUserByEmail(ctx context.Context, email string) (*entity.UserWithPassword, error) {
 	return r.findOneUser(ctx, "email = $1", email)
@@ -125,8 +63,76 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id uuid.UUID) (*entity.User
 	return &u, nil
 }
 
-func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID uuid.UUID, patch map[string]any) (*entity.User, error) {
-	pool, err := r.db.Pool(ctx)
+// --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
+
+func (r *UserRepo) CreateUserWithRefreshTokenTx(ctx context.Context, tx pgx.Tx, u entity.UserWithPassword, refreshToken entity.RefreshToken) error {
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	settingsJSON, err := json.Marshal(u.Settings)
+	if err != nil {
+		return fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	defaultCurrency := "VND"
+	if settings, ok := u.Settings.(map[string]any); ok {
+		if raw, ok := settings["default_currency"]; ok {
+			if cur, ok := raw.(string); ok {
+				normalized := strings.ToUpper(strings.TrimSpace(cur))
+				if len(normalized) == 3 {
+					defaultCurrency = normalized
+				}
+			}
+		}
+	}
+
+	// 1. Insert user
+	_, err = q.Exec(ctx, `
+		INSERT INTO users (id, email, phone, display_name, avatar_url, username, settings, status, password_hash, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`, u.ID, u.Email, u.Phone, u.DisplayName, u.AvatarURL, u.Username, settingsJSON, u.Status, u.PasswordHash, u.CreatedAt, u.UpdatedAt)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return errors.New("user already exists")
+		}
+		return fmt.Errorf("failed to insert user: %w", err)
+	}
+
+	// 2. Create initial cash account
+	cashAccountID := uuid.New()
+	_, err = q.Exec(ctx, `
+		INSERT INTO accounts (id, name, account_type, currency, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, cashAccountID, "cash_account_name", "cash", defaultCurrency, "active", u.CreatedAt, u.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to create cash account: %w", err)
+	}
+
+	// 3. Link user to account
+	_, err = q.Exec(ctx, `
+		INSERT INTO user_accounts (id, account_id, user_id, permission, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, uuid.New(), cashAccountID, u.ID, "owner", "active", u.CreatedAt, u.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to link user to account: %w", err)
+	}
+
+	// 4. Create bootstrap refresh token
+	_, err = q.Exec(ctx, `
+		INSERT INTO refresh_tokens (id, user_id, token, expires_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, refreshToken.ID, u.ID, refreshToken.Token, refreshToken.ExpiresAt, refreshToken.CreatedAt, refreshToken.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to insert refresh token: %w", err)
+	}
+	return nil
+}
+
+func (r *UserRepo) UpdateUserSettingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, patch map[string]any) (*entity.User, error) {
+	q, err := r.db.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +142,7 @@ func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID uuid.UUID, pat
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		UPDATE users
 		SET settings = COALESCE(settings, '{}'::jsonb) || $1::jsonb,
 		    updated_at = NOW()
@@ -160,13 +166,13 @@ func (r *UserRepo) UpdateUserSettings(ctx context.Context, userID uuid.UUID, pat
 	return &u, nil
 }
 
-func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID uuid.UUID, params entity.UpdateUserParams) (*entity.User, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *UserRepo) UpdateUserProfileTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, params entity.UpdateUserParams) (*entity.User, error) {
+	q, err := r.db.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		UPDATE users
 		SET display_name  = COALESCE($1, display_name),
 		    avatar_url    = COALESCE($2, avatar_url),
@@ -181,8 +187,7 @@ func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID uuid.UUID, para
 
 	var u entity.User
 	var settingsJSON []byte
-	err = row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &u.AvatarURL, &u.Username, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt)
-	if err != nil {
+	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &u.AvatarURL, &u.Username, &settingsJSON, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("user not found")
 		}
@@ -199,6 +204,7 @@ func (r *UserRepo) UpdateUserProfile(ctx context.Context, userID uuid.UUID, para
 	return &u, nil
 }
 
+// Internal Helper
 func (r *UserRepo) findOneUser(ctx context.Context, where string, args ...any) (*entity.UserWithPassword, error) {
 	pool, err := r.db.Pool(ctx)
 	if err != nil {
@@ -214,8 +220,7 @@ func (r *UserRepo) findOneUser(ctx context.Context, where string, args ...any) (
 
 	var u entity.UserWithPassword
 	var settingsJSON []byte
-	err = row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &u.AvatarURL, &u.Username, &settingsJSON, &u.Status, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt)
-	if err != nil {
+	if err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.DisplayName, &u.AvatarURL, &u.Username, &settingsJSON, &u.Status, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("user not found")
 		}

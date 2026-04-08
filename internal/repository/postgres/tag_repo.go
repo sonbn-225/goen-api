@@ -19,18 +19,7 @@ func NewTagRepo(db *database.Postgres) *TagRepo {
 	return &TagRepo{db: db}
 }
 
-func (r *TagRepo) CreateTag(ctx context.Context, userID uuid.UUID, t entity.Tag) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
-
-	_, err = pool.Exec(ctx, `
-		INSERT INTO tags (id, user_id, name_vi, name_en, color, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, t.ID, userID, t.NameVI, t.NameEN, t.Color, t.CreatedAt, t.UpdatedAt)
-	return err
-}
+// --- Nhóm 1: Truy vấn Nhãn (Read-only Optimized) ---
 
 func (r *TagRepo) GetTag(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) (*entity.Tag, error) {
 	pool, err := r.db.Pool(ctx)
@@ -104,4 +93,19 @@ func (r *TagRepo) ListTags(ctx context.Context, userID uuid.UUID) ([]entity.Tag,
 	}
 
 	return out, nil
+}
+
+// --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
+
+func (r *TagRepo) CreateTagTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, t entity.Tag) error {
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	_, err = q.Exec(ctx, `
+		INSERT INTO tags (id, user_id, name_vi, name_en, color, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, t.ID, userID, t.NameVI, t.NameEN, t.Color, t.CreatedAt, t.UpdatedAt)
+	return err
 }

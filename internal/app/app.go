@@ -88,12 +88,13 @@ func New(cfg *config.Config) (*App, error) {
 	investmentSvc := service.NewInvestmentService(investmentRepo, accountRepo, transactionSvc, securitySvc, db)
 	marketDataSvc := service.NewMarketDataService(cfg, marketDataRepo, rds, securitySvc)
 	savingsSvc := service.NewSavingsService(savingsRepo, accountRepo, transactionRepo, transactionSvc, db)
-	rotatingSavingsSvc := service.NewRotatingSavingsService(rotatingSavingsRepo, accountSvc, transactionSvc, db)
-	interchangeSvc := service.NewInterchangeService(interchangeRepo, transactionSvc)
+	rotatingSavingsSvc := service.NewRotatingSavingsService(rotatingSavingsRepo, categoryRepo, accountSvc, transactionSvc, db)
+	interchangeSvc := service.NewInterchangeService(interchangeRepo, transactionSvc, db)
 	publicSvc := service.NewPublicService(userRepo, accountRepo, debtRepo)
 
 	// Cross-inject
 	transactionSvc.SetDebtService(debtSvc)
+	transactionSvc.SetRotatingSavingsService(rotatingSavingsSvc)
 
 	// Handlers
 	authHandler := v1.NewAuthHandler(authSvc)

@@ -26,18 +26,34 @@ func NewTransactionRepo(db *database.Postgres) *TransactionRepo {
 
 
 func (r *TransactionRepo) CreateTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, txEntity entity.Transaction, lineItems []entity.TransactionLineItem, tagIDs []uuid.UUID) error {
-	return CreateTransactionTx(ctx, tx, userID, txEntity, lineItems, tagIDs)
-}
-
-func (r *TransactionRepo) GetTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
 	var q database.Queryer = tx
 	if tx == nil {
 		pool, err := r.db.Pool(ctx)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		q = pool
 	}
+	return CreateTransactionTx(ctx, q, userID, txEntity, lineItems, tagIDs)
+}
+
+func (r *TransactionRepo) GetTransaction(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
+	pool, err := r.db.Pool(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return r.getTransaction(ctx, pool, userID, id)
+}
+
+func (r *TransactionRepo) GetTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	return r.getTransaction(ctx, q, userID, id)
+}
+
+func (r *TransactionRepo) getTransaction(ctx context.Context, q database.Queryer, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
 	row := q.QueryRow(ctx, `
 		SELECT
 			t.id, t.external_ref, t.type, t.occurred_at,
@@ -261,24 +277,19 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID uuid.UUID
 	return results, nextCursor, total, nil
 }
 
-func (r *TransactionRepo) PatchTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID, patch entity.TransactionPatch) (*entity.Transaction, error) {
-	var it *entity.Transaction
-	err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {
-		var err error
-		it, err = r.patchTransactionTx(ctx, txConn, userID, transactionID, patch)
-		return err
-	})
+func (r *TransactionRepo) PatchTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID, patch entity.TransactionPatch) (*entity.Transaction, error) {
+	q, err := r.db.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	return it, nil
+	return r.patchTransactionTx(ctx, q, userID, transactionID, patch)
 }
 
-func (r *TransactionRepo) patchTransactionTx(ctx context.Context, txConn pgx.Tx, userID uuid.UUID, transactionID uuid.UUID, patch entity.TransactionPatch) (*entity.Transaction, error) {
+func (r *TransactionRepo) patchTransactionTx(ctx context.Context, q database.Queryer, userID uuid.UUID, transactionID uuid.UUID, patch entity.TransactionPatch) (*entity.Transaction, error) {
 	now := utils.Now()
 
 	// Verify ownership/permission
-	if _, err := r.GetTransactionTx(ctx, txConn, userID, transactionID); err != nil {
+	if _, err := r.getTransaction(ctx, q, userID, transactionID); err != nil {
 		return nil, err
 	}
 
@@ -302,7 +313,7 @@ func (r *TransactionRepo) patchTransactionTx(ctx context.Context, txConn pgx.Tx,
 	if len(set) > 1 {
 		args = append(args, transactionID)
 		query := fmt.Sprintf("UPDATE transactions SET %s WHERE id = $%d", strings.Join(set, ", "), len(args))
-		if _, err := txConn.Exec(ctx, query, args...); err != nil {
+		if _, err := q.Exec(ctx, query, args...); err != nil {
 			return nil, err
 		}
 	}
@@ -311,7 +322,7 @@ func (r *TransactionRepo) patchTransactionTx(ctx context.Context, txConn pgx.Tx,
 	if patch.Description != nil || patch.CategoryIDs != nil {
 		// Identify the first line item
 		var firstID uuid.UUID
-		err := txConn.QueryRow(ctx, "SELECT id FROM transaction_line_items WHERE transaction_id = $1 ORDER BY id LIMIT 1", transactionID).Scan(&firstID)
+		err := q.QueryRow(ctx, "SELECT id FROM transaction_line_items WHERE transaction_id = $1 ORDER BY id LIMIT 1", transactionID).Scan(&firstID)
 		if err == nil {
 			liSet := []string{}
 			liArgs := []any{}
@@ -328,7 +339,7 @@ func (r *TransactionRepo) patchTransactionTx(ctx context.Context, txConn pgx.Tx,
 			if len(liSet) > 0 {
 				liArgs = append(liArgs, firstID)
 				liQuery := fmt.Sprintf("UPDATE transaction_line_items SET %s WHERE id = $%d", strings.Join(liSet, ", "), len(liArgs))
-				if _, err := txConn.Exec(ctx, liQuery, liArgs...); err != nil {
+				if _, err := q.Exec(ctx, liQuery, liArgs...); err != nil {
 					return nil, err
 				}
 			}
@@ -337,7 +348,7 @@ func (r *TransactionRepo) patchTransactionTx(ctx context.Context, txConn pgx.Tx,
 
 	// 3. Handle LineItems: replace all
 	if patch.LineItems != nil {
-		_, err := txConn.Exec(ctx, "DELETE FROM transaction_line_items WHERE transaction_id = $1", transactionID)
+		_, err := q.Exec(ctx, "DELETE FROM transaction_line_items WHERE transaction_id = $1", transactionID)
 		if err != nil {
 			return nil, err
 		}
@@ -346,14 +357,14 @@ func (r *TransactionRepo) patchTransactionTx(ctx context.Context, txConn pgx.Tx,
 			if liID == uuid.Nil {
 				liID = uuid.New()
 			}
-			_, err = txConn.Exec(ctx, "INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note) VALUES ($1,$2,$3,$4,$5)",
+			_, err = q.Exec(ctx, "INSERT INTO transaction_line_items (id, transaction_id, category_id, amount, note) VALUES ($1,$2,$3,$4,$5)",
 				liID, transactionID, li.CategoryID, li.Amount, li.Note)
 			if err != nil {
 				return nil, err
 			}
 			if len(li.TagIDs) > 0 {
 				for _, tid := range li.TagIDs {
-					_, err = txConn.Exec(ctx, "INSERT INTO transaction_line_item_tags (line_item_id, tag_id, created_at, updated_at) VALUES ($1, $2, $3, $4)", liID, tid, now, now)
+					_, err = q.Exec(ctx, "INSERT INTO transaction_line_item_tags (line_item_id, tag_id, created_at, updated_at) VALUES ($1, $2, $3, $4)", liID, tid, now, now)
 					if err != nil {
 						return nil, err
 					}
@@ -364,12 +375,12 @@ func (r *TransactionRepo) patchTransactionTx(ctx context.Context, txConn pgx.Tx,
 
 	// 4. Handle Tags
 	if patch.TagIDs != nil {
-		_, err := txConn.Exec(ctx, "DELETE FROM transaction_tags WHERE transaction_id = $1", transactionID)
+		_, err := q.Exec(ctx, "DELETE FROM transaction_tags WHERE transaction_id = $1", transactionID)
 		if err != nil {
 			return nil, err
 		}
 		for _, tid := range patch.TagIDs {
-			_, err = txConn.Exec(ctx, "INSERT INTO transaction_tags (transaction_id, tag_id, created_at, updated_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", transactionID, tid, now, now)
+			_, err = q.Exec(ctx, "INSERT INTO transaction_tags (transaction_id, tag_id, created_at, updated_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", transactionID, tid, now, now)
 			if err != nil {
 				return nil, err
 			}
@@ -377,15 +388,30 @@ func (r *TransactionRepo) patchTransactionTx(ctx context.Context, txConn pgx.Tx,
 	}
 
 	// Return enriched transaction
-	return r.GetTransactionTx(ctx, txConn, userID, transactionID)
+	return r.getTransaction(ctx, q, userID, transactionID)
 }
 
-func (r *TransactionRepo) BatchPatchTransactions(ctx context.Context, userID uuid.UUID, transactionIDs []uuid.UUID, patches map[uuid.UUID]entity.TransactionPatch, mode string) ([]uuid.UUID, []uuid.UUID, error) {
+func (r *TransactionRepo) BatchPatchTransactionsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionIDs []uuid.UUID, patches map[uuid.UUID]entity.TransactionPatch, mode string) ([]uuid.UUID, []uuid.UUID, error) {
 	// Simple implementation: iterate and patch.
 	// In "atomic" mode, use one big transaction. In "partial", individual transactions.
 
 	if mode == "atomic" {
 		var updated []uuid.UUID
+		if tx != nil {
+			for _, id := range transactionIDs {
+				p, ok := patches[id]
+				if !ok {
+					continue
+				}
+				_, err := r.patchTransactionTx(ctx, tx, userID, id, p)
+				if err != nil {
+					return nil, transactionIDs, err
+				}
+				updated = append(updated, id)
+			}
+			return updated, []uuid.UUID{}, nil
+		}
+
 		err := r.db.WithTx(ctx, func(txConn pgx.Tx) error {
 			for _, id := range transactionIDs {
 				p, ok := patches[id]
@@ -414,7 +440,7 @@ func (r *TransactionRepo) BatchPatchTransactions(ctx context.Context, userID uui
 		if !ok {
 			continue
 		}
-		_, err := r.PatchTransaction(ctx, userID, id, p)
+		_, err := r.PatchTransactionTx(ctx, nil, userID, id, p)
 		if err != nil {
 			failed = append(failed, id)
 		} else {
@@ -426,20 +452,30 @@ func (r *TransactionRepo) BatchPatchTransactions(ctx context.Context, userID uui
 
 
 func (r *TransactionRepo) DeleteTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error {
-	now := utils.Now()
-	// Verify owner using the transaction
-	_, err := r.GetTransactionTx(ctx, tx, userID, transactionID)
+	q, err := r.db.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.Exec(ctx, "UPDATE transactions SET deleted_at = $1, updated_at = $1 WHERE id = $2", now, transactionID)
+	now := utils.Now()
+	// Verify owner using the transaction
+	_, err = r.getTransaction(ctx, q, userID, transactionID)
+	if err != nil {
+		return err
+	}
+
+	_, err = q.Exec(ctx, "UPDATE transactions SET deleted_at = $1, updated_at = $1 WHERE id = $2", now, transactionID)
 	return err
 }
 
 func (r *TransactionRepo) DeleteTransactionsByAccountTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) error {
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
+	}
+
 	now := utils.Now()
-	_, err := tx.Exec(ctx, `
+	_, err = q.Exec(ctx, `
 		UPDATE transactions
 		SET deleted_at = $1, updated_at = $1
 		WHERE (from_account_id = $2 OR to_account_id = $2)
@@ -489,7 +525,11 @@ func (r *TransactionRepo) ListTransactionsByIDs(ctx context.Context, userID uuid
 
 // Helper: requireAccountPermission
 func (r *TransactionRepo) requireAccountPermission(ctx context.Context, tx pgx.Tx, userID, accountID uuid.UUID) error {
-	return requireAccountPermission(ctx, tx, userID, accountID)
+	q, err := r.db.Queryer(ctx, tx)
+	if err != nil {
+		return err
+	}
+	return requireAccountPermission(ctx, q, userID, accountID)
 }
 
 // Cursor Encoding/Decoding

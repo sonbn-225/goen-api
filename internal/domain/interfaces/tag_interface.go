@@ -4,18 +4,24 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
 // TagRepository định nghĩa lớp truy cập dữ liệu cho các nhãn phân loại giao dịch (tags).
 type TagRepository interface {
-	// CreateTag lưu một nhãn mới.
-	CreateTag(ctx context.Context, userID uuid.UUID, tag entity.Tag) error
-	// GetTag lấy chi tiết một nhãn cụ thể theo ID.
-	GetTag(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) (*entity.Tag, error)
-	// ListTags trả về tất cả các nhãn do người dùng tạo.
-	ListTags(ctx context.Context, userID uuid.UUID) ([]entity.Tag, error)
+	// --- Nhóm 1: Truy vấn Nhãn (Flexible Tx) ---
+
+	// GetTagTx lấy chi tiết một nhãn cụ thể theo ID.
+	GetTagTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, tagID uuid.UUID) (*entity.Tag, error)
+	// ListTagsTx trả về tất cả các nhãn do người dùng tạo.
+	ListTagsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.Tag, error)
+
+	// --- Nhóm 2: Thao tác ghi (Transactional) ---
+
+	// CreateTagTx lưu một nhãn mới.
+	CreateTagTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, tag entity.Tag) error
 }
 
 // TagService định nghĩa nghiệp vụ cho việc gắn nhãn linh hoạt các giao dịch.
@@ -29,4 +35,3 @@ type TagService interface {
 	// GetOrCreateByName là công cụ hỗ trợ cho các luồng nhập dữ liệu để phân giải nhãn theo chuỗi tên.
 	GetOrCreateByName(ctx context.Context, userID uuid.UUID, name, langHint string) (uuid.UUID, error)
 }
-
