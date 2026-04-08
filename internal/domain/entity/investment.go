@@ -6,147 +6,78 @@ import (
 	"github.com/google/uuid"
 )
 
-type InvestmentAccount struct {
-	AuditEntity
-	AccountID   uuid.UUID `json:"account_id"`
-	Currency    string    `json:"currency"`
-	FeeSettings any       `json:"fee_settings,omitempty"`
-	TaxSettings any       `json:"tax_settings,omitempty"`
-}
 
-type Security struct {
-	AuditEntity
-	Symbol     string  `json:"symbol"`
-	Name       *string `json:"name,omitempty"`
-	AssetClass *string `json:"asset_class,omitempty"`
-	Currency   *string `json:"currency,omitempty"`
-}
-
-type SecurityPriceDaily struct {
-	AuditEntity
-	SecurityID uuid.UUID `json:"security_id"`
-	PriceDate  string    `json:"price_date"`
-	Open       *string   `json:"open,omitempty"`
-	High       *string   `json:"high,omitempty"`
-	Low        *string   `json:"low,omitempty"`
-	Close      string    `json:"close"`
-	Volume     *string   `json:"volume,omitempty"`
-}
-
-type SecurityEventType string
-
-const (
-	SecurityEventTypeCashDividend  SecurityEventType = "cash_dividend"
-	SecurityEventTypeStockDividend SecurityEventType = "stock_dividend"
-	SecurityEventTypeSplit         SecurityEventType = "split"
-	SecurityEventTypeMerger        SecurityEventType = "merger"
-)
-
-type SecurityEvent struct {
-	AuditEntity
-	SecurityID         uuid.UUID         `json:"security_id"`
-	EventType          SecurityEventType `json:"event_type"`
-	ExDate             *string           `json:"ex_date,omitempty"`
-	RecordDate         *string           `json:"record_date,omitempty"`
-	PayDate            *string           `json:"pay_date,omitempty"`
-	EffectiveDate      *string           `json:"effective_date,omitempty"`
-	CashAmountPerShare *string           `json:"cash_amount_per_share,omitempty"`
-	RatioNumerator     *string           `json:"ratio_numerator,omitempty"`
-	RatioDenominator   *string           `json:"ratio_denominator,omitempty"`
-	SubscriptionPrice  *string           `json:"subscription_price,omitempty"`
-	Currency           *string           `json:"currency,omitempty"`
-	Note               *string           `json:"note,omitempty"`
-}
-
-type SecurityEventElectionStatus string
-
-const (
-	SecurityEventElectionStatusEligible  SecurityEventElectionStatus = "eligible"
-	SecurityEventElectionStatusClaimed   SecurityEventElectionStatus = "claimed"
-	SecurityEventElectionStatusDismissed SecurityEventElectionStatus = "dismissed"
-)
-
+// SecurityEventElection tracks a user's participation or entitlement to a corporate action.
 type SecurityEventElection struct {
 	AuditEntity
-	UserID                       uuid.UUID                   `json:"user_id"`
-	BrokerAccountID              uuid.UUID                   `json:"broker_account_id"`
-	SecurityEventID              uuid.UUID                   `json:"security_event_id"`
-	SecurityID                   uuid.UUID                   `json:"security_id"`
-	EntitlementDate              string                      `json:"entitlement_date"`
-	HoldingQuantityAtEntitlement string                      `json:"holding_quantity_at_entitlement_date"`
-	EntitledQuantity             string                      `json:"entitled_quantity"`
-	ElectedQuantity              string                      `json:"elected_quantity"`
-	Status                       SecurityEventElectionStatus `json:"status"`
-	ConfirmedAt                  *time.Time                  `json:"confirmed_at,omitempty"`
-	Note                         *string                     `json:"note,omitempty"`
+	UserID                       uuid.UUID                   `json:"user_id"`                              // ID of the user
+	AccountID                    uuid.UUID                   `json:"account_id"`                           // ID of the account
+	SecurityEventID              uuid.UUID                   `json:"security_event_id"`                    // ID of the corporate action
+	SecurityID                   uuid.UUID                   `json:"security_id"`                          // ID of the security
+	EntitlementDate              string                      `json:"entitlement_date"`                     // Date used for eligibility
+	HoldingQuantityAtEntitlement string                      `json:"holding_quantity_at_entitlement_date"` // Shares held on entitlement date
+	EntitledQuantity             string                      `json:"entitled_quantity"`                    // Calculated entitlement amount
+	ElectedQuantity              string                      `json:"elected_quantity"`                     // Quantity user chose to claim
+	Status                       SecurityEventElectionStatus `json:"status"`                               // Status of the claim (eligible/claimed/etc.)
+	ConfirmedAt                  *time.Time                  `json:"confirmed_at,omitempty"`               // Timestamp of confirmation
+	Note                         *string                     `json:"note,omitempty"`                       // User notes
 }
 
-type TradeSide string
-
-const (
-	TradeSideBuy  TradeSide = "buy"
-	TradeSideSell TradeSide = "sell"
-)
-
+// Trade represents a single buy or sell transaction of a security.
 type Trade struct {
 	AuditEntity
-	BrokerAccountID  uuid.UUID  `json:"broker_account_id"`
-	SecurityID       uuid.UUID  `json:"security_id"`
-	FeeTransactionID *uuid.UUID `json:"fee_transaction_id,omitempty"`
-	TaxTransactionID *uuid.UUID `json:"tax_transaction_id,omitempty"`
-	Side             TradeSide  `json:"side"`
-	Quantity         string     `json:"quantity"`
-	Price            string     `json:"price"`
-	Fees             string     `json:"fees"`
-	Taxes            string     `json:"taxes"`
-	OccurredAt       time.Time  `json:"occurred_at"`
-	Note             *string    `json:"note,omitempty"`
+	AccountID        uuid.UUID  `json:"account_id"`                   // ID of the account
+	SecurityID       uuid.UUID  `json:"security_id"`                  // ID of the security traded
+	FeeTransactionID *uuid.UUID `json:"fee_transaction_id,omitempty"` // Linked fee expense transaction
+	TaxTransactionID *uuid.UUID `json:"tax_transaction_id,omitempty"` // Linked tax expense transaction
+	Side             TradeSide  `json:"side"`                         // Buy or Sell
+	Quantity         string     `json:"quantity"`                     // Number of shares (decimal string)
+	Price            string     `json:"price"`                        // Execution price per share (decimal string)
+	Fees             string     `json:"fees"`                         // Total trading fees (decimal string)
+	Taxes            string     `json:"taxes"`                        // Total trading taxes (decimal string)
+	OccurredAt       time.Time  `json:"occurred_at"`                  // Timestamp of the trade
+	Note             *string    `json:"note,omitempty"`               // Optional trade memo
 }
 
+// Holding represents the current quantity and value of a security held in a specific account.
 type Holding struct {
 	AuditEntity
-	BrokerAccountID uuid.UUID  `json:"broker_account_id"`
-	SecurityID      uuid.UUID  `json:"security_id"`
-	Quantity        string     `json:"quantity"`
-	CostBasisTotal  *string    `json:"cost_basis_total,omitempty"`
-	AvgCost         *string    `json:"avg_cost,omitempty"`
-	MarketPrice     *string    `json:"market_price,omitempty"`
-	MarketValue     *string    `json:"market_value,omitempty"`
-	UnrealizedPnL   *string    `json:"unrealized_pnl,omitempty"`
-	AsOf            *time.Time `json:"as_of,omitempty"`
+	AccountID       uuid.UUID  `json:"account_id"`                 // ID of the account
+	SecurityID      uuid.UUID  `json:"security_id"`                // ID of the security
+	Quantity        string     `json:"quantity"`                   // Total shares held (decimal string)
+	CostBasisTotal  *string    `json:"cost_basis_total,omitempty"` // Total cost paid for the holding
+	AvgCost         *string    `json:"avg_cost,omitempty"`         // Average cost per share
+	MarketPrice     *string    `json:"market_price,omitempty"`     // Last known market price
+	MarketValue     *string    `json:"market_value,omitempty"`     // Total market value of the holding
+	UnrealizedPnL   *string    `json:"unrealized_pnl,omitempty"`   // Total paper profit/loss
+	AsOf            *time.Time `json:"as_of,omitempty"`            // Timestamp of the market valuation
 }
 
-type ShareLotStatus string
-
-const (
-	ShareLotStatusActive ShareLotStatus = "active"
-	ShareLotStatusClosed ShareLotStatus = "closed"
-)
-
+// ShareLot represents a specific batch of shares acquired at the same time and price.
 type ShareLot struct {
 	AuditEntity
-	BrokerAccountID uuid.UUID      `json:"broker_account_id"`
-	SecurityID      uuid.UUID      `json:"security_id"`
-	Quantity        string         `json:"quantity"`
-	AcquisitionDate string         `json:"acquisition_date"`
-	CostBasisPer    string         `json:"cost_basis_per_share"`
-	Provenance      string         `json:"provenance"` // regular_buy, stock_dividend, rights_offering
-	Status          ShareLotStatus `json:"status"`
-	BuyTradeID      *uuid.UUID     `json:"buy_trade_id,omitempty"`
+	AccountID       uuid.UUID      `json:"account_id"`             // ID of the account
+	SecurityID      uuid.UUID      `json:"security_id"`            // ID of the security
+	Quantity        string         `json:"quantity"`               // Remaining shares in this lot (decimal string)
+	AcquisitionDate string         `json:"acquisition_date"`       // Date shares were acquired (YYYY-MM-DD)
+	CostBasisPer    string         `json:"cost_basis_per_share"`   // Cost per share in this lot
+	Provenance      string         `json:"provenance"`             // Origin of shares (regular_buy, dividend, etc.)
+	Status          ShareLotStatus `json:"status"`                 // active or closed
+	BuyTradeID      *uuid.UUID     `json:"buy_trade_id,omitempty"` // ID of the trade that created this lot
 }
 
+// RealizedTradeLog records the profit or loss from selling shares from a specific lot.
 type RealizedTradeLog struct {
 	AuditEntity
-	BrokerAccountID uuid.UUID `json:"broker_account_id"`
-	SecurityID      uuid.UUID `json:"security_id"`
-	SellTradeID     uuid.UUID `json:"sell_trade_id"`
-	SourceShareLot  uuid.UUID `json:"source_share_lot_id"`
-	Quantity        string    `json:"quantity"`
-	AcquisitionDate string    `json:"acquisition_date"`
-	CostBasisTotal  string    `json:"cost_basis_total"`
-	SellPrice       string    `json:"sell_price"`
-	Proceeds        string    `json:"proceeds"`
-	RealizedPnL     string    `json:"realized_pnl"`
-	Provenance      string    `json:"provenance"`
+	AccountID       uuid.UUID `json:"account_id"`          // ID of the account
+	SecurityID      uuid.UUID `json:"security_id"`         // ID of the security
+	SellTradeID     uuid.UUID `json:"sell_trade_id"`       // ID of the selling trade
+	SourceShareLot  uuid.UUID `json:"source_share_lot_id"` // ID of the original share lot
+	Quantity        string    `json:"quantity"`            // Shares sold from this lot (decimal string)
+	AcquisitionDate string    `json:"acquisition_date"`    // Date original shares were acquired
+	CostBasisTotal  string    `json:"cost_basis_total"`    // Initial cost of the sold shares
+	SellPrice       string    `json:"sell_price"`          // Executed sale price per share
+	Proceeds        string    `json:"proceeds"`            // Total proceeds from this sale lot
+	RealizedPnL     string    `json:"realized_pnl"`        // Actual profit or loss from this sale
+	Provenance      string    `json:"provenance"`          // Origin of the original lot
 }
-

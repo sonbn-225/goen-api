@@ -1,82 +1,48 @@
 package dto
 
 import (
-	"math/big"
-
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
-	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
 
+// CreateBudgetRequest is used when creating a new budget.
+// Used in: BudgetHandler, BudgetService, BudgetInterface
+// CreateBudgetRequest is used when creating a new budget.
+// Used in: BudgetHandler, BudgetService, BudgetInterface
 type CreateBudgetRequest struct {
-	Name                  *string `json:"name,omitempty"`
-	Period                entity.BudgetPeriod `json:"period" binding:"required"`
-	PeriodStart           *string `json:"period_start,omitempty"`
-	PeriodEnd             *string `json:"period_end,omitempty"`
-	Amount                string  `json:"amount" binding:"required"`
-	AlertThresholdPercent *int    `json:"alert_threshold_percent,omitempty"`
-	RolloverMode          *entity.BudgetRolloverMode `json:"rollover_mode,omitempty"`
-	CategoryID            *string `json:"category_id,omitempty"`
+	Name                  *string                    `json:"name,omitempty"`                  // Optional descriptive name for the budget
+	Period                entity.BudgetPeriod        `json:"period" binding:"required"`       // Recurrence period (monthly, weekly, etc.)
+	PeriodStart           *string                    `json:"period_start,omitempty"`          // Start date of the first period (YYYY-MM-DD)
+	PeriodEnd             *string                    `json:"period_end,omitempty"`            // Optional fixed end date for the budget
+	Amount                string                     `json:"amount" binding:"required"`       // Total amount allowed for the period (decimal string)
+	AlertThresholdPercent *int                       `json:"alert_threshold_percent,omitempty"` // Percentage of spending that triggers an alert
+	RolloverMode          *entity.BudgetRolloverMode `json:"rollover_mode,omitempty"`          // How to handle unused funds in the next period
+	CategoryID            *string                    `json:"category_id,omitempty"`          // ID of the category this budget tracks
 }
 
+// UpdateBudgetRequest is used when updating an existing budget.
+// Used in: BudgetHandler, BudgetService, BudgetInterface
 type UpdateBudgetRequest struct {
-	Name                  *string `json:"name,omitempty"`
-	Amount                *string `json:"amount,omitempty"`
-	AlertThresholdPercent *int    `json:"alert_threshold_percent,omitempty"`
-	RolloverMode          *entity.BudgetRolloverMode `json:"rollover_mode,omitempty"`
+	Name                  *string                    `json:"name,omitempty"`                  // New descriptive name
+	Amount                *string                    `json:"amount,omitempty"`                // New budget amount (decimal string)
+	AlertThresholdPercent *int                       `json:"alert_threshold_percent,omitempty"` // New alert threshold percentage
+	RolloverMode          *entity.BudgetRolloverMode `json:"rollover_mode,omitempty"`          // New rollover behavior
 }
 
+// BudgetWithStatsResponse represents a budget with current spending statistics.
+// Used in: BudgetHandler, BudgetService, BudgetInterface
 type BudgetWithStatsResponse struct {
-	ID                    uuid.UUID  `json:"id"`
-	UserID                uuid.UUID  `json:"user_id"`
-	Name                  *string    `json:"name,omitempty"`
-	Period                entity.BudgetPeriod `json:"period"`
-	PeriodStart           *string    `json:"period_start,omitempty"`
-	PeriodEnd             *string    `json:"period_end,omitempty"`
-	Amount                string     `json:"amount"`
-	AlertThresholdPercent *int       `json:"alert_threshold_percent,omitempty"`
-	RolloverMode          *entity.BudgetRolloverMode `json:"rollover_mode,omitempty"`
-	CategoryID            *uuid.UUID `json:"category_id,omitempty"`
-	Spent                 string     `json:"spent"`
-	Remaining             string     `json:"remaining"`
-	PercentUsed           int        `json:"percent_used"`
+	ID                    uuid.UUID                  `json:"id"`                             // Unique budget identifier
+	UserID                uuid.UUID                  `json:"user_id"`                        // ID of the user who owns the budget
+	Name                  *string                    `json:"name,omitempty"`                  // Budget name
+	Period                entity.BudgetPeriod        `json:"period"`                         // Budget period type
+	PeriodStart           *string                    `json:"period_start,omitempty"`          // Current period start date
+	PeriodEnd             *string                    `json:"period_end,omitempty"`            // Current period end date
+	Amount                string                     `json:"amount"`                         // Total budget amount
+	AlertThresholdPercent *int                       `json:"alert_threshold_percent,omitempty"` // Alert threshold percentage
+	RolloverMode          *entity.BudgetRolloverMode `json:"rollover_mode,omitempty"`          // Rollover configuration
+	CategoryID            *uuid.UUID                 `json:"category_id,omitempty"`          // ID of the tracked category
+	Spent                 string                     `json:"spent"`                          // Total amount spent in the current period
+	Remaining             string                     `json:"remaining"`                      // Amount left in the budget
+	PercentUsed           int                        `json:"percent_used"`                   // Percentage of budget already spent
 }
-
-func NewBudgetWithStatsResponse(b entity.Budget) BudgetWithStatsResponse {
-	percentUsed := 0
-	if utils.IsValidDecimal(b.Amount) && utils.IsValidDecimal(b.Spent) {
-		amt, _ := new(big.Rat).SetString(b.Amount)
-		spent, _ := new(big.Rat).SetString(b.Spent)
-		if amt != nil && amt.Sign() > 0 {
-			res := new(big.Rat).Quo(spent, amt)
-			res.Mul(res, big.NewRat(100, 1))
-			f, _ := res.Float64()
-			percentUsed = int(f)
-		}
-	}
-
-	return BudgetWithStatsResponse{
-		ID:                    b.ID,
-		UserID:                b.UserID,
-		Name:                  b.Name,
-		Period:                b.Period,
-		PeriodStart:           b.PeriodStart,
-		PeriodEnd:             b.PeriodEnd,
-		Amount:                b.Amount,
-		AlertThresholdPercent: b.AlertThresholdPercent,
-		RolloverMode:          b.RolloverMode,
-		CategoryID:            b.CategoryID,
-		Spent:                 b.Spent,
-		Remaining:             b.Remaining,
-		PercentUsed:           percentUsed,
-	}
-}
-
-func NewBudgetWithStatsResponses(items []entity.Budget) []BudgetWithStatsResponse {
-	out := make([]BudgetWithStatsResponse, len(items))
-	for i, it := range items {
-		out[i] = NewBudgetWithStatsResponse(it)
-	}
-	return out
-}
-

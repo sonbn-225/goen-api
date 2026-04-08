@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
@@ -16,10 +17,12 @@ type RotatingSavingsRepository interface {
 	DeleteRotatingGroup(ctx context.Context, userID, groupID uuid.UUID) error
 
 	CreateContribution(ctx context.Context, c entity.RotatingSavingsContribution) error
+	CreateContributionTx(ctx context.Context, tx pgx.Tx, c entity.RotatingSavingsContribution) error
 	GetContributions(ctx context.Context, groupID uuid.UUID) ([]entity.RotatingSavingsContribution, error)
 	DeleteContribution(ctx context.Context, contributionID uuid.UUID) error
 
 	AddAuditLog(ctx context.Context, log entity.RotatingSavingsAuditLog) error
+	AddAuditLogTx(ctx context.Context, tx pgx.Tx, log entity.RotatingSavingsAuditLog) error
 	GetAuditLogs(ctx context.Context, groupID uuid.UUID) ([]entity.RotatingSavingsAuditLog, error)
 }
 

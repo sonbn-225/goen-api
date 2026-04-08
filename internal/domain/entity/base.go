@@ -11,6 +11,7 @@ type BaseEntity struct {
 	ID uuid.UUID `json:"id"`
 }
 
+// AuditEntity extends BaseEntity with common auditing timestamps for record tracking.
 type AuditEntity struct {
 	BaseEntity
 	CreatedAt time.Time  `json:"created_at"`

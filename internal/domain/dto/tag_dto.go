@@ -2,37 +2,22 @@ package dto
  
 import (
 	"github.com/google/uuid"
-	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
  
+// CreateTagRequest is the payload for creating a new tag.
+// Used in: TagHandler, TagService, TagInterface
 type CreateTagRequest struct {
-	NameVI *string `json:"name_vi,omitempty"`
-	NameEN *string `json:"name_en,omitempty"`
-	Color  *string `json:"color,omitempty"`
+	NameVI *string `json:"name_vi,omitempty"` // Name of the tag in Vietnamese
+	NameEN *string `json:"name_en,omitempty"` // Name of the tag in English
+	Color  *string `json:"color,omitempty"`   // UI color representation in hex
 }
  
+// TagResponse represents a tag's information.
+// Used in: TagHandler, TagService, TagInterface
 type TagResponse struct {
-	ID     uuid.UUID `json:"id"`
-	UserID uuid.UUID `json:"user_id"`
-	NameVI *string   `json:"name_vi,omitempty"`
-	NameEN *string   `json:"name_en,omitempty"`
-	Color  *string   `json:"color,omitempty"`
-}
- 
-func NewTagResponse(it entity.Tag) TagResponse {
-	return TagResponse{
-		ID:     it.ID,
-		UserID: it.UserID,
-		NameVI: it.NameVI,
-		NameEN: it.NameEN,
-		Color:  it.Color,
-	}
-}
- 
-func NewTagResponses(items []entity.Tag) []TagResponse {
-	out := make([]TagResponse, len(items))
-	for i, it := range items {
-		out[i] = NewTagResponse(it)
-	}
-	return out
+	ID     uuid.UUID `json:"id"`             // Unique tag identifier
+	UserID uuid.UUID `json:"user_id"`        // ID of the user who owns this tag
+	NameVI *string   `json:"name_vi,omitempty"` // Name in Vietnamese
+	NameEN *string   `json:"name_en,omitempty"` // Name in English
+	Color  *string   `json:"color,omitempty"`   // UI color in hex
 }

@@ -6,27 +6,19 @@ import (
 	"github.com/google/uuid"
 )
 
-type SavingsStatus string
-
-const (
-	SavingsStatusActive  SavingsStatus = "active"
-	SavingsStatusMatured SavingsStatus = "matured"
-	SavingsStatusClosed  SavingsStatus = "closed"
-)
-
-// Savings represents a simple savings product like a Term Deposit or Goal.
+// Savings represents a fixed-term deposit or a specific savings goal.
 type Savings struct {
 	AuditEntity
-	SavingsAccountID uuid.UUID     `json:"savings_account_id"`
-	ParentAccountID  uuid.UUID     `json:"parent_account_id"`
-	Principal        string        `json:"principal"`
-	InterestRate     *string       `json:"interest_rate,omitempty"`
-	TermMonths       *int          `json:"term_months,omitempty"`
-	StartDate        *string       `json:"start_date,omitempty"`
-	MaturityDate     *string       `json:"maturity_date,omitempty"`
-	AutoRenew        bool          `json:"auto_renew"`
-	AccruedInterest  string        `json:"accrued_interest"`
-	Status           SavingsStatus `json:"status"`
-	ClosedAt         *time.Time    `json:"closed_at,omitempty"`
+	SavingsAccountID uuid.UUID     `json:"savings_account_id"` // ID of the dedicated savings account
+	ParentAccountID  uuid.UUID     `json:"parent_account_id"`  // ID of the source account for funding
+	Principal        string        `json:"principal"`          // Initial deposit amount (decimal string)
+	InterestRate     *string       `json:"interest_rate,omitempty"` // Annual interest rate (decimal string)
+	TermMonths       *int          `json:"term_months,omitempty"`   // Duration of the savings term in months
+	StartDate        *string       `json:"start_date,omitempty"`    // Start date of the savings term (YYYY-MM-DD)
+	MaturityDate     *string       `json:"maturity_date,omitempty"` // Expected maturity date (YYYY-MM-DD)
+	AutoRenew        bool          `json:"auto_renew"`              // Whether to automatically renew the term on maturity
+	AccruedInterest  string        `json:"accrued_interest"`       // Current accumulated interest (decimal string)
+	Status           SavingsStatus `json:"status"`                 // Current state (active/matured/closed)
+	ClosedAt         *time.Time    `json:"closed_at,omitempty"`     // Timestamp when the savings goal was reached or closed
 }
 

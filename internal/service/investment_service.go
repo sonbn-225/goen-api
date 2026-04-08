@@ -8,184 +8,167 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
+	"github.com/sonbn-225/goen-api/internal/repository/postgres"
 )
 
+// InvestmentService manages trading and holdings of securities (stocks, crypto, etc.).
+// It integrates with TransactionService to record the cash flow of trades, including
+// principal amounts, brokerage fees, and relevant taxes.
 type InvestmentService struct {
-	repo  interfaces.InvestmentRepository
-	txSvc interfaces.TransactionService
+	repo    interfaces.InvestmentRepository
+	accRepo interfaces.AccountRepository
+	txSvc   interfaces.TransactionService
+	secSvc  interfaces.SecurityService
+	db      *database.Postgres
 }
 
+// NewInvestmentService creates a new investment management service.
 func NewInvestmentService(
 	repo interfaces.InvestmentRepository,
+	accRepo interfaces.AccountRepository,
 	txSvc interfaces.TransactionService,
+	secSvc interfaces.SecurityService,
+	db *database.Postgres,
 ) *InvestmentService {
 	return &InvestmentService{
-		repo:  repo,
-		txSvc: txSvc,
+		repo:    repo,
+		accRepo: accRepo,
+		txSvc:   txSvc,
+		secSvc:  secSvc,
+		db:      db,
 	}
 }
 
-func (s *InvestmentService) GetInvestmentAccount(ctx context.Context, userID, investmentAccountID uuid.UUID) (*dto.InvestmentAccountResponse, error) {
-	it, err := s.repo.GetInvestmentAccount(ctx, userID, investmentAccountID)
-	if err != nil {
-		return nil, err
-	}
-	if it == nil {
-		return nil, nil
-	}
-	resp := dto.NewInvestmentAccountResponse(*it)
-	return &resp, nil
-}
+// Investment account specific management has been merged into AccountService
 
-func (s *InvestmentService) ListInvestmentAccounts(ctx context.Context, userID uuid.UUID) ([]dto.InvestmentAccountResponse, error) {
-	items, err := s.repo.ListInvestmentAccounts(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	return dto.NewInvestmentAccountResponses(items), nil
-}
-
-func (s *InvestmentService) GetSecurity(ctx context.Context, securityID uuid.UUID) (*dto.SecurityResponse, error) {
-	it, err := s.repo.GetSecurity(ctx, securityID)
-	if err != nil {
-		return nil, err
-	}
-	if it == nil {
-		return nil, nil
-	}
-	resp := dto.NewSecurityResponse(*it)
-	return &resp, nil
-}
-
-func (s *InvestmentService) ListSecurities(ctx context.Context) ([]dto.SecurityResponse, error) {
-	items, err := s.repo.ListSecurities(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return dto.NewSecurityResponses(items), nil
-}
-
-func (s *InvestmentService) ListTrades(ctx context.Context, userID, brokerAccountID uuid.UUID) ([]dto.TradeResponse, error) {
-	items, err := s.repo.ListTrades(ctx, userID, brokerAccountID)
+func (s *InvestmentService) ListTrades(ctx context.Context, userID, accountID uuid.UUID) ([]dto.TradeResponse, error) {
+	items, err := s.repo.ListTrades(ctx, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
 	return dto.NewTradeResponses(items), nil
 }
 
-func (s *InvestmentService) ListHoldings(ctx context.Context, userID, brokerAccountID uuid.UUID) ([]dto.HoldingResponse, error) {
-	items, err := s.repo.ListHoldings(ctx, userID, brokerAccountID)
+func (s *InvestmentService) ListHoldings(ctx context.Context, userID, accountID uuid.UUID) ([]dto.HoldingResponse, error) {
+	items, err := s.repo.ListHoldings(ctx, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
 	return dto.NewHoldingResponses(items), nil
 }
 
-func (s *InvestmentService) ListSecurityPrices(ctx context.Context, securityID uuid.UUID, from, to *string) ([]dto.SecurityPriceDailyResponse, error) {
-	items, err := s.repo.ListSecurityPrices(ctx, securityID, from, to)
-	if err != nil {
-		return nil, err
-	}
-	return dto.NewSecurityPriceDailyResponses(items), nil
-}
-
-func (s *InvestmentService) ListSecurityEvents(ctx context.Context, securityID uuid.UUID, from, to *string) ([]dto.SecurityEventResponse, error) {
-	items, err := s.repo.ListSecurityEvents(ctx, securityID, from, to)
-	if err != nil {
-		return nil, err
-	}
-	return dto.NewSecurityEventResponses(items), nil
-}
-
-func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, investmentAccountID, tradeID uuid.UUID) error {
+// DeleteTrade removes a trade record and its associated ledger transactions.
+// It reverses the FIFO impact on share lots before deletion.
+func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, accountID, tradeID uuid.UUID) error {
 	tr, err := s.repo.GetTrade(ctx, userID, tradeID)
 	if err != nil {
 		return err
 	}
-	if tr.BrokerAccountID != investmentAccountID {
+	if tr == nil {
+		return errors.New("trade not found")
+	}
+	if tr.AccountID != accountID {
 		return errors.New("forbidden: trade does not belong to this account")
 	}
 
-	// 1. Logic FIFO Reversal
-	if tr.Side == entity.TradeSideBuy {
-		lots, err := s.repo.ListShareLots(ctx, userID, investmentAccountID, tr.SecurityID)
-		if err != nil {
-			return err
-		}
-		for _, l := range lots {
-			if l.BuyTradeID != nil && *l.BuyTradeID == tr.ID {
-				if l.Status != entity.ShareLotStatusActive || l.Quantity != tr.Quantity {
-					return errors.New("cannot delete buy trade because some shares are already sold or modified")
-				}
-			}
-		}
-		if err := s.repo.DeleteShareLotsByTradeID(ctx, userID, tr.ID); err != nil {
-			return err
-		}
-	} else {
-		logs, err := s.repo.ListRealizedLogsByTradeID(ctx, userID, tr.ID)
-		if err != nil {
-			return err
-		}
-		for _, l := range logs {
-			lots, err := s.repo.ListShareLots(ctx, userID, investmentAccountID, tr.SecurityID)
+	return s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		// 1. Logic FIFO Reversal
+		if tr.Side == entity.TradeSideBuy {
+			lots, err := s.repo.ListShareLots(ctx, userID, accountID, tr.SecurityID)
 			if err != nil {
 				return err
 			}
-			var targetLot *entity.ShareLot
-			for _, lot := range lots {
-				if lot.ID == l.SourceShareLot {
-					targetLot = &lot
-					break
+			for _, l := range lots {
+				if l.BuyTradeID != nil && *l.BuyTradeID == tr.ID {
+					if l.Status != entity.ShareLotStatusActive || l.Quantity != tr.Quantity {
+						return errors.New("cannot delete buy trade because some shares are already sold or modified")
+					}
 				}
 			}
-			if targetLot == nil {
-				return errors.New("source lot not found for restoration")
+			if err := s.repo.DeleteShareLotsByTradeID(ctx, userID, tr.ID); err != nil {
+				return err
 			}
-			oldQ, _ := new(big.Rat).SetString(targetLot.Quantity)
-			soldQ, _ := new(big.Rat).SetString(l.Quantity)
-			newQ := new(big.Rat).Add(oldQ, soldQ)
-			if err := s.repo.UpdateShareLotQuantity(ctx, userID, targetLot.ID, newQ.FloatString(8)); err != nil {
+		} else {
+			logs, err := s.repo.ListRealizedLogsByTradeID(ctx, userID, tr.ID)
+			if err != nil {
+				return err
+			}
+			for _, l := range logs {
+				lots, err := s.repo.ListShareLots(ctx, userID, accountID, tr.SecurityID)
+				if err != nil {
+					return err
+				}
+				var targetLot *entity.ShareLot
+				for _, lot := range lots {
+					if lot.ID == l.SourceShareLot {
+						targetLot = &lot
+						break
+					}
+				}
+				if targetLot == nil {
+					return errors.New("source lot not found for restoration")
+				}
+				oldQ, _ := new(big.Rat).SetString(targetLot.Quantity)
+				soldQ, _ := new(big.Rat).SetString(l.Quantity)
+				newQ := new(big.Rat).Add(oldQ, soldQ)
+				if err := s.repo.UpdateShareLotQuantity(ctx, userID, targetLot.ID, newQ.FloatString(8)); err != nil {
+					return err
+				}
+			}
+			if err := s.repo.DeleteRealizedLogsByTradeID(ctx, userID, tr.ID); err != nil {
 				return err
 			}
 		}
-		if err := s.repo.DeleteRealizedLogsByTradeID(ctx, userID, tr.ID); err != nil {
+
+		// 2. Delete Ledger Transactions
+		if tr.FeeTransactionID != nil && *tr.FeeTransactionID != uuid.Nil {
+			if err := s.repo.DeleteTransactionTx(ctx, tx, userID, *tr.FeeTransactionID); err != nil {
+				return err
+			}
+		}
+		if tr.TaxTransactionID != nil && *tr.TaxTransactionID != uuid.Nil {
+			if err := s.repo.DeleteTransactionTx(ctx, tx, userID, *tr.TaxTransactionID); err != nil {
+				return err
+			}
+		}
+
+		// 3. Delete Trade Record
+		if err := s.repo.DeleteTrade(ctx, userID, tr.ID); err != nil {
 			return err
 		}
-	}
 
-	// 2. Delete Transactions
-	if tr.FeeTransactionID != nil && *tr.FeeTransactionID != uuid.Nil {
-		_ = s.txSvc.Delete(ctx, userID, *tr.FeeTransactionID)
-	}
-	if tr.TaxTransactionID != nil && *tr.TaxTransactionID != uuid.Nil {
-		_ = s.txSvc.Delete(ctx, userID, *tr.TaxTransactionID)
-	}
-
-	// 3. Delete Trade
-	if err := s.repo.DeleteTrade(ctx, userID, tr.ID); err != nil {
-		return err
-	}
-
-	// 4. Update Holding
-	return s.upsertHoldingFromLots(ctx, userID, investmentAccountID, tr.SecurityID)
+		// 4. Update Holding Summary
+		return s.upsertHoldingFromLots(ctx, userID, accountID, tr.SecurityID)
+	})
 }
 
-func (s *InvestmentService) UpdateTrade(ctx context.Context, userID, brokerAccountID, tradeID uuid.UUID, req dto.CreateTradeRequest) (*dto.TradeResponse, error) {
-	if err := s.DeleteTrade(ctx, userID, brokerAccountID, tradeID); err != nil {
+func (s *InvestmentService) UpdateTrade(ctx context.Context, userID, accountID, tradeID uuid.UUID, req dto.CreateTradeRequest) (*dto.TradeResponse, error) {
+	if err := s.DeleteTrade(ctx, userID, accountID, tradeID); err != nil {
 		return nil, err
 	}
-	return s.CreateTrade(ctx, userID, brokerAccountID, req)
+	return s.CreateTrade(ctx, userID, accountID, req)
 }
 
-func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccountID uuid.UUID, req dto.CreateTradeRequest) (*dto.TradeResponse, error) {
-	ia, err := s.repo.GetInvestmentAccount(ctx, userID, brokerAccountID)
+// CreateTrade records a new purchase or sale of a security.
+// It performs several atomic steps:
+// 1. Calculates FIFO sell plan if it's a 'sell' trade.
+// 2. Records Principal, Fee, and Tax transactions in the central ledger.
+// 3. Creates the Trade record.
+// 4. Updates or creates ShareLots (for acquisition tracking).
+// 5. Updates the overall Holding summary for the security.
+func (s *InvestmentService) CreateTrade(ctx context.Context, userID, accountID uuid.UUID, req dto.CreateTradeRequest) (*dto.TradeResponse, error) {
+	acc, err := s.accRepo.GetAccountForUser(ctx, userID, accountID)
 	if err != nil {
 		return nil, err
+	}
+	if acc == nil {
+		return nil, errors.New("account not found")
 	}
 
 	sid := req.SecurityID
@@ -202,10 +185,10 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 
 	side := strings.ToLower(strings.TrimSpace(string(req.Side)))
 
-	// Sell logic FIFO
+	// 1. Sell logic FIFO
 	var sellPlan []lotConsumptionPlan
 	if side == string(entity.TradeSideSell) {
-		lots, err := s.repo.ListShareLots(ctx, userID, brokerAccountID, sid)
+		lots, err := s.repo.ListShareLots(ctx, userID, accountID, sid)
 		if err != nil {
 			return nil, err
 		}
@@ -216,7 +199,6 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 		sellPlan = plan
 	}
 
-	// Fees & Taxes (legacy logic simplification for migration)
 	fees := "0"
 	if req.Fees != nil {
 		fees = *req.Fees
@@ -227,151 +209,192 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, brokerAccou
 	}
 
 	tradeID := utils.NewID()
+	var resp *dto.TradeResponse
 
-	// Principal Transaction
-	if !(side == string(entity.TradeSideBuy) && provenance == "stock_dividend") {
-		qRat, _ := new(big.Rat).SetString(req.Quantity)
-		pRat, _ := new(big.Rat).SetString(req.Price)
-		notional := new(big.Rat).Mul(qRat, pRat)
-		if notional.Sign() > 0 {
-			amt := notional.FloatString(2)
-			kind := "expense"
-			if side == string(entity.TradeSideSell) {
-				kind = "income"
-			}
-			desc := "Trade " + side + " " + req.SecurityID.String()
-			if req.PrincipalDescription != nil {
-				desc = *req.PrincipalDescription
-			}
+	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
+		// A. Principal Transaction
+		if !(side == string(entity.TradeSideBuy) && provenance == "stock_dividend") {
+			qRat, _ := new(big.Rat).SetString(req.Quantity)
+			pRat, _ := new(big.Rat).SetString(req.Price)
+			notional := new(big.Rat).Mul(qRat, pRat)
+			if notional.Sign() > 0 {
+				amt := notional.FloatString(2)
+				kind := entity.TransactionTypeExpense
+				if side == string(entity.TradeSideSell) {
+					kind = entity.TransactionTypeIncome
+				}
+				desc := "Trade " + side + " " + req.SecurityID.String()
+				if req.PrincipalDescription != nil {
+					desc = *req.PrincipalDescription
+				}
 
-			extRef := "trade:" + tradeID.String() + ":principal"
-			var catID uuid.UUID
-			if side == string(entity.TradeSideSell) {
-				catID, _ = uuid.Parse("00000000-0000-0000-0000-000000000001") // TODO: System category
-			} else {
-				catID, _ = uuid.Parse("00000000-0000-0000-0000-000000000002") // TODO: System category
-			}
-			if req.PrincipalCategoryID != nil {
-				catID = *req.PrincipalCategoryID
-			}
+				extRef := "trade:" + tradeID.String() + ":principal"
+				var catID uuid.UUID
+				if side == string(entity.TradeSideSell) {
+					catID, _ = uuid.Parse("00000000-0000-0000-0000-000000000001") // TODO: System category
+				} else {
+					catID, _ = uuid.Parse("00000000-0000-0000-0000-000000000002") // TODO: System category
+				}
+				if req.PrincipalCategoryID != nil {
+					catID = *req.PrincipalCategoryID
+				}
 
-			_, _ = s.txSvc.Create(ctx, userID, dto.CreateTransactionRequest{
-				Type:         entity.TransactionType(kind),
-				OccurredDate: &occDate,
-				Amount:       amt,
-				Description:  &desc,
-				AccountID:    &ia.AccountID,
-				ExternalRef:  &extRef,
-				CategoryID:   &catID,
-			})
+				pTx := entity.Transaction{
+					AuditEntity:  entity.AuditEntity{BaseEntity: entity.BaseEntity{ID: utils.NewID()}},
+					Type:         kind,
+					OccurredAt:   occAt,
+					OccurredDate: occDate,
+					Amount:       amt,
+					Description:  &desc,
+					AccountID:    &acc.ID,
+					ExternalRef:  &extRef,
+					Status:       entity.TransactionStatusPosted,
+				}
+				pLine := []entity.TransactionLineItem{
+					{BaseEntity: entity.BaseEntity{ID: utils.NewID()}, Amount: amt, CategoryID: &catID, Note: &desc},
+				}
+				if err := postgres.CreateTransactionTx(ctx, tx, userID, pTx, pLine, nil); err != nil {
+					return err
+				}
+			}
 		}
-	}
 
-	// Fee/Tax Transactions
-	var feeTxID, taxTxID *uuid.UUID
-	if fAmt, _ := new(big.Rat).SetString(fees); fAmt.Sign() > 0 {
-		fDesc := "Trade Fee " + req.SecurityID.String()
-		fExtRef := "trade:" + tradeID.String() + ":fee"
-		fCat, _ := uuid.Parse("00000000-0000-0000-0000-000000000003") // TODO: Use real system ID
-		tx, _ := s.txSvc.Create(ctx, userID, dto.CreateTransactionRequest{
-			Type: "expense", OccurredDate: &occDate, Amount: fees, Description: &fDesc, AccountID: &ia.AccountID, ExternalRef: &fExtRef, CategoryID: &fCat,
-		})
-		if tx != nil {
-			feeTxID = &tx.ID
+		// B. Fee/Tax Transactions
+		var feeTxID, taxTxID *uuid.UUID
+		if fAmt, _ := new(big.Rat).SetString(fees); fAmt.Sign() > 0 {
+			fDesc := "Trade Fee " + req.SecurityID.String()
+			fExtRef := "trade:" + tradeID.String() + ":fee"
+			fCat, _ := uuid.Parse("00000000-0000-0000-0000-000000000003") // TODO: Use real system ID
+			fTx := entity.Transaction{
+				AuditEntity:  entity.AuditEntity{BaseEntity: entity.BaseEntity{ID: utils.NewID()}},
+				Type:         entity.TransactionTypeExpense,
+				OccurredAt:   occAt,
+				OccurredDate: occDate,
+				Amount:       fees,
+				Description:  &fDesc,
+				AccountID:    &acc.ID,
+				ExternalRef:  &fExtRef,
+				Status:       entity.TransactionStatusPosted,
+			}
+			fLine := []entity.TransactionLineItem{
+				{BaseEntity: entity.BaseEntity{ID: utils.NewID()}, Amount: fees, CategoryID: &fCat, Note: &fDesc},
+			}
+			if err := postgres.CreateTransactionTx(ctx, tx, userID, fTx, fLine, nil); err != nil {
+				return err
+			}
+			feeTxID = &fTx.ID
 		}
-	}
-	if tAmt, _ := new(big.Rat).SetString(taxes); tAmt.Sign() > 0 {
-		tDesc := "Trade Tax " + req.SecurityID.String()
-		tExtRef := "trade:" + tradeID.String() + ":tax"
-		tCat, _ := uuid.Parse("00000000-0000-0000-0000-000000000004") // TODO: Use real system ID
-		tx, _ := s.txSvc.Create(ctx, userID, dto.CreateTransactionRequest{
-			Type: "expense", OccurredDate: &occDate, Amount: taxes, Description: &tDesc, AccountID: &ia.AccountID, ExternalRef: &tExtRef, CategoryID: &tCat,
-		})
-		if tx != nil {
-			taxTxID = &tx.ID
+		if tAmt, _ := new(big.Rat).SetString(taxes); tAmt.Sign() > 0 {
+			tDesc := "Trade Tax " + req.SecurityID.String()
+			tExtRef := "trade:" + tradeID.String() + ":tax"
+			tCat, _ := uuid.Parse("00000000-0000-0000-0000-000000000004") // TODO: Use real system ID
+			tTx := entity.Transaction{
+				AuditEntity:  entity.AuditEntity{BaseEntity: entity.BaseEntity{ID: utils.NewID()}},
+				Type:         entity.TransactionTypeExpense,
+				OccurredAt:   occAt,
+				OccurredDate: occDate,
+				Amount:       taxes,
+				Description:  &tDesc,
+				AccountID:    &acc.ID,
+				ExternalRef:  &tExtRef,
+				Status:       entity.TransactionStatusPosted,
+			}
+			tLine := []entity.TransactionLineItem{
+				{BaseEntity: entity.BaseEntity{ID: utils.NewID()}, Amount: taxes, CategoryID: &tCat, Note: &tDesc},
+			}
+			if err := postgres.CreateTransactionTx(ctx, tx, userID, tTx, tLine, nil); err != nil {
+				return err
+			}
+			taxTxID = &tTx.ID
 		}
-	}
 
-	trade := entity.Trade{
-		AuditEntity: entity.AuditEntity{
-			BaseEntity: entity.BaseEntity{
-				ID: tradeID,
-			},
-		},
-		BrokerAccountID:  brokerAccountID,
-		SecurityID:       sid,
-		FeeTransactionID: feeTxID,
-		TaxTransactionID: taxTxID,
-		Side:             entity.TradeSide(side),
-		Quantity:         req.Quantity,
-		Price:            req.Price,
-		Fees:             fees,
-		Taxes:            taxes,
-		OccurredAt:       occAt,
-		Note:             req.Note,
-	}
-
-	if err := s.repo.CreateTrade(ctx, userID, trade); err != nil {
-		return nil, err
-	}
-
-	if side == string(entity.TradeSideBuy) {
-		lot := entity.ShareLot{
+		// C. Create Trade Record
+		trade := entity.Trade{
 			AuditEntity: entity.AuditEntity{
 				BaseEntity: entity.BaseEntity{
-					ID: utils.NewID(),
+					ID: tradeID,
 				},
 			},
-			BrokerAccountID: brokerAccountID,
-			SecurityID:      sid,
-			Quantity:        req.Quantity,
-			AcquisitionDate: occDate,
-			CostBasisPer:    req.Price,
-			Provenance:      provenance,
-			Status:          entity.ShareLotStatusActive,
-			BuyTradeID:      &tradeID,
+			AccountID:        accountID,
+			SecurityID:       sid,
+			FeeTransactionID: feeTxID,
+			TaxTransactionID: taxTxID,
+			Side:             entity.TradeSide(side),
+			Quantity:         req.Quantity,
+			Price:            req.Price,
+			Fees:             fees,
+			Taxes:            taxes,
+			OccurredAt:       occAt,
+			Note:             req.Note,
 		}
-		_ = s.repo.CreateShareLot(ctx, userID, lot)
-	} else {
-		for _, c := range sellPlan {
-			_ = s.repo.UpdateShareLotQuantity(ctx, userID, c.LotID, c.NewQuantity)
-			_ = s.repo.CreateRealizedTradeLog(ctx, userID, entity.RealizedTradeLog{
+
+		if err := s.repo.CreateTrade(ctx, userID, trade); err != nil {
+			return err
+		}
+
+		// D. Updates ShareLots
+		if side == string(entity.TradeSideBuy) {
+			lot := entity.ShareLot{
 				AuditEntity: entity.AuditEntity{
 					BaseEntity: entity.BaseEntity{
 						ID: utils.NewID(),
 					},
 				},
-				BrokerAccountID: brokerAccountID,
+				AccountID:       accountID,
 				SecurityID:      sid,
-				SellTradeID:     tradeID,
-				SourceShareLot:  c.LotID,
-				Quantity:        c.SoldQuantity,
-				AcquisitionDate: c.AcquisitionDate,
-				CostBasisTotal:  c.CostBasisTotal,
-				SellPrice:       req.Price,
-				RealizedPnL:     c.RealizedPnL,
-				Provenance:      c.Provenance,
-			})
+				Quantity:        req.Quantity,
+				AcquisitionDate: occDate,
+				CostBasisPer:    req.Price,
+				Provenance:      provenance,
+				Status:          entity.ShareLotStatusActive,
+				BuyTradeID:      &tradeID,
+			}
+			if err := s.repo.CreateShareLot(ctx, userID, lot); err != nil {
+				return err
+			}
+		} else {
+			for _, c := range sellPlan {
+				if err := s.repo.UpdateShareLotQuantity(ctx, userID, c.LotID, c.NewQuantity); err != nil {
+					return err
+				}
+				if err := s.repo.CreateRealizedTradeLog(ctx, userID, entity.RealizedTradeLog{
+					AuditEntity: entity.AuditEntity{
+						BaseEntity: entity.BaseEntity{
+							ID: utils.NewID(),
+						},
+					},
+					AccountID:       accountID,
+					SecurityID:      sid,
+					SellTradeID:     tradeID,
+					SourceShareLot:  c.LotID,
+					Quantity:        c.SoldQuantity,
+					AcquisitionDate: c.AcquisitionDate,
+					CostBasisTotal:  c.CostBasisTotal,
+					SellPrice:       req.Price,
+					RealizedPnL:     c.RealizedPnL,
+					Provenance:      c.Provenance,
+				}); err != nil {
+					return err
+				}
+			}
 		}
-	}
 
-	_ = s.upsertHoldingFromLots(ctx, userID, brokerAccountID, sid)
+		// E. Finalize Response
+		tr := dto.NewTradeResponse(trade)
+		resp = &tr
+		return nil
+	})
 
-	resp := dto.NewTradeResponse(trade)
-	return &resp, nil
-}
-
-func (s *InvestmentService) UpdateInvestmentAccountSettings(ctx context.Context, userID, investmentAccountID uuid.UUID, req dto.PatchInvestmentAccountRequest) (*dto.InvestmentAccountResponse, error) {
-	it, err := s.repo.UpdateInvestmentAccountSettings(ctx, userID, investmentAccountID, req.FeeSettings, req.TaxSettings)
 	if err != nil {
 		return nil, err
 	}
-	if it == nil {
-		return nil, nil
-	}
-	resp := dto.NewInvestmentAccountResponse(*it)
-	return &resp, nil
+
+	// 5. Update Holding Summary
+	_ = s.upsertHoldingFromLots(ctx, userID, accountID, sid)
+
+	return resp, nil
 }
+
 
 func (s *InvestmentService) ListEligibleCorporateActions(ctx context.Context, userID, brokerAccountID uuid.UUID) ([]dto.EligibleAction, error) {
 	// Simple mock or minimal logic for migration
@@ -382,8 +405,8 @@ func (s *InvestmentService) ClaimCorporateAction(ctx context.Context, userID, br
 	return nil, errors.New("not implemented")
 }
 
-func (s *InvestmentService) GetRealizedPNLReport(ctx context.Context, userID, brokerAccountID uuid.UUID) (*dto.RealizedPNLReport, error) {
-	logs, err := s.repo.ListRealizedLogs(ctx, userID, brokerAccountID)
+func (s *InvestmentService) GetRealizedPNLReport(ctx context.Context, userID, accountID uuid.UUID) (*dto.RealizedPNLReport, error) {
+	logs, err := s.repo.ListRealizedLogs(ctx, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -488,8 +511,8 @@ func (s *InvestmentService) planFIFOSell(lots []entity.ShareLot, sellQty string)
 	return plan, "0", nil
 }
 
-func (s *InvestmentService) upsertHoldingFromLots(ctx context.Context, userID, brokerAccountID, securityID uuid.UUID) error {
-	lots, err := s.repo.ListShareLots(ctx, userID, brokerAccountID, securityID)
+func (s *InvestmentService) upsertHoldingFromLots(ctx context.Context, userID, accountID, securityID uuid.UUID) error {
+	lots, err := s.repo.ListShareLots(ctx, userID, accountID, securityID)
 	if err != nil {
 		return err
 	}
@@ -515,11 +538,11 @@ func (s *InvestmentService) upsertHoldingFromLots(ctx context.Context, userID, b
 				ID: utils.NewID(),
 			},
 		},
-		BrokerAccountID: brokerAccountID,
-		SecurityID:      securityID,
-		Quantity:        totalQ.FloatString(8),
-		CostBasisTotal:  strPtr(totalCost.FloatString(2)),
-		AvgCost:         strPtr(avg.FloatString(2)),
+		AccountID:      accountID,
+		SecurityID:     securityID,
+		Quantity:       totalQ.FloatString(8),
+		CostBasisTotal: strPtr(totalCost.FloatString(2)),
+		AvgCost:        strPtr(avg.FloatString(2)),
 	}
 	_, err = s.repo.UpsertHolding(ctx, userID, h)
 	return err

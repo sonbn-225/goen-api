@@ -13,18 +13,18 @@ import (
 type PublicService struct {
 	userRepo         interfaces.UserRepository
 	accountRepo      interfaces.AccountRepository
-	groupExpenseRepo interfaces.GroupExpenseRepository
+	debtRepo         interfaces.DebtRepository
 }
  
 func NewPublicService(
 	userRepo interfaces.UserRepository,
 	accountRepo interfaces.AccountRepository,
-	groupExpenseRepo interfaces.GroupExpenseRepository,
+	debtRepo interfaces.DebtRepository,
 ) *PublicService {
 	return &PublicService{
 		userRepo:         userRepo,
 		accountRepo:      accountRepo,
-		groupExpenseRepo: groupExpenseRepo,
+		debtRepo:         debtRepo,
 	}
 }
  
@@ -94,7 +94,7 @@ func (s *PublicService) GetParticipants(ctx context.Context, userRef string) ([]
 		return nil, err
 	}
  
-	return s.groupExpenseRepo.ListPublicParticipants(ctx, u.ID)
+	return s.debtRepo.ListPublicParticipants(ctx, u.ID)
 }
  
 func (s *PublicService) GetDebts(ctx context.Context, userRef string, participantName string) ([]entity.PublicDebt, error) {
@@ -103,7 +103,7 @@ func (s *PublicService) GetDebts(ctx context.Context, userRef string, participan
 		return nil, err
 	}
  
-	return s.groupExpenseRepo.ListPublicDebtsByParticipant(ctx, u.ID, participantName)
+	return s.debtRepo.ListPublicDebtsByParticipant(ctx, u.ID, participantName)
 }
  
 func (s *PublicService) resolvePublicUser(ctx context.Context, userRef string) (*entity.User, error) {

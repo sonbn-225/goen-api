@@ -1,6 +1,6 @@
 # Goen API (Clean Architecture)
 
-Goen API is the core financial engine for the Sunflower ecosystem, implemented using **Clean Architecture** principles in Go. It manages personal finances, investments, group expenses, and rotating savings.
+Goen API is the core financial engine for the Sunflower ecosystem, implemented using **Clean Architecture** principles in Go. It manages personal finances, investments, and rotating savings.
 
 ## Architecture
 
@@ -31,8 +31,7 @@ The project follows a strict separation of concerns to ensure maintainability an
 - **Accounts**: Multi-currency support for Bank, Cash, Savings, and Credit accounts.
 - **Transactions**: Double-entry ledger support with categories, tags, and line items.
 - **Budgets**: Category-based budget tracking with period analysis.
-- **Debt & Contacts**: Management of personal debts and contact synchronization.
-- **Group Expenses**: Advanced "Split Bill" logic with unsettled debt tracking.
+- **Debt & Contacts**: Management of personal debts, "Split Bill" logic, and contact synchronization.
 - **Investments**: Stock/Security portfolio management using FIFO cost-basis.
 - **Market Data**: Real-time and historical security price synchronization via Redis Streams.
 - **Savings (Instrument)**: Term deposits and savings goals management.
@@ -75,7 +74,6 @@ go run ./cmd/api
 
 - **Swagger UI**: `http://localhost:8080/swagger/`
 - **Health Check**: `GET /api/v1/health`
-- **Diagnostics**: `GET /api/v1/diagnostics`
 
 ### Core v1 Endpoints
 - `POST /api/v1/auth/login`

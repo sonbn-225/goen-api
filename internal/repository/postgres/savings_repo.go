@@ -19,12 +19,13 @@ func NewSavingsRepo(db *database.Postgres) *SavingsRepo {
 }
 
 func (r *SavingsRepo) CreateSavings(ctx context.Context, userID uuid.UUID, s entity.Savings) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
+	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
+		return r.CreateSavingsTx(ctx, tx, userID, s)
+	})
+}
 
-	_, err = pool.Exec(ctx, `
+func (r *SavingsRepo) CreateSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, s entity.Savings) error {
+	_, err := tx.Exec(ctx, `
 		INSERT INTO savings_instruments (
 			id, savings_account_id, parent_account_id, principal, interest_rate, term_months,
 			start_date, maturity_date, auto_renew, accrued_interest, status, closed_at,

@@ -57,7 +57,6 @@ func (s *AccountService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 		currency = s.defaultCurrencyForUser(ctx, userID)
 	}
 
-	color := utils.NormalizeOptionalString(req.Color)
 	var parentID *uuid.UUID
 	if req.ParentAccountID != nil && *req.ParentAccountID != "" {
 		parsed, err := uuid.Parse(*req.ParentAccountID)
@@ -82,11 +81,11 @@ func (s *AccountService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 		},
 		Name:            name,
 		AccountNumber:   utils.NormalizeOptionalString(req.AccountNumber),
-		Color:           color,
 		AccountType:     entity.AccountType(accountType),
 		Currency:        currency,
 		ParentAccountID: parentID,
 		Status:          entity.AccountStatusActive,
+		Settings:        mapAccountSettingsEntity(req.Settings),
 	}
 
 	if err := s.repo.CreateAccountWithOwner(ctx, account, userID); err != nil {
@@ -104,10 +103,16 @@ func (s *AccountService) Patch(ctx context.Context, userID, accountID uuid.UUID,
 		status = &s
 	}
 
+	var settings *entity.AccountSettings
+	if req.Settings != nil {
+		s := mapAccountSettingsEntity(req.Settings)
+		settings = &s
+	}
+
 	patch := entity.AccountPatch{
-		Name:   req.Name,
-		Color:  req.Color,
-		Status: status,
+		Name:     req.Name,
+		Status:   status,
+		Settings: settings,
 	}
 
 	it, err := s.repo.PatchAccount(ctx, userID, accountID, patch)
@@ -235,6 +240,37 @@ func isValidAccountType(t string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func mapAccountSettingsEntity(it *dto.AccountSettingsRequest) entity.AccountSettings {
+	if it == nil {
+		return entity.AccountSettings{}
+	}
+	return entity.AccountSettings{
+		Color:      it.Color,
+		Investment: mapInvestmentSettingsEntity(it.Investment),
+		Savings:    mapSavingsSettingsEntity(it.Savings),
+	}
+}
+
+func mapInvestmentSettingsEntity(it *dto.InvestmentSettingsRequest) *entity.InvestmentSettings {
+	if it == nil {
+		return nil
+	}
+	return &entity.InvestmentSettings{
+		FeeSettings: it.FeeSettings,
+		TaxSettings: it.TaxSettings,
+	}
+}
+
+func mapSavingsSettingsEntity(it *dto.SavingsSettingsRequest) *entity.SavingsSettings {
+	if it == nil {
+		return nil
+	}
+	return &entity.SavingsSettings{
+		TargetAmount: it.TargetAmount,
+		TargetDate:   it.TargetDate,
 	}
 }
 

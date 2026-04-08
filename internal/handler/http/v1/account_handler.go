@@ -53,18 +53,21 @@ func (h *AccountHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts [get]
 func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
+	// 1. Trích xuất ID của người dùng đang đăng nhập từ Context (được gài vào bởi AuthMiddleware)
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
+	// 2. Gọi Service để lấy danh sách tất cả các tài khoản thuộc sở hữu (hoặc được share) của người dùng
 	items, err := h.svc.List(r.Context(), userID)
 	if err != nil {
 		response.HandleError(w, err)
 		return
 	}
  
+	// 3. Trả về kết quả JSON với HTTP status 200 (OK)
 	response.WriteSuccess(w, http.StatusOK, items)
 }
  
@@ -80,24 +83,28 @@ func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts [post]
 func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
+	// 1. Xác thực người dùng đang request
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
+	// 2. Decode body của request (JSON) vào DTO CreateAccountRequest
 	var req dto.CreateAccountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json body", nil)
 		return
 	}
  
+	// 3. Gọi Service để thực hiện logic tạo tài khoản (kiểm tra type, khởi tạo số dư, lưu DB)
 	account, err := h.svc.Create(r.Context(), userID, req)
 	if err != nil {
 		response.HandleError(w, err)
 		return
 	}
  
+	// 4. Trả về thông tin tài khoản vừa tạo với status 201 (Created)
 	response.WriteSuccess(w, http.StatusCreated, account)
 }
  
@@ -113,18 +120,21 @@ func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId} [get]
 func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
+	// 1. Xác thực User
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
+	// 2. Lấy AccountID từ đường dẫn URL (ex: /accounts/12345) và parse sang UUID
 	accountID, err := uuid.Parse(chi.URLParam(r, "accountId"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
 		return
 	}
  
+	// 3. Query Service lấy chi tiết tài khoản (Service sẽ kiểm tra cả quyền truy cập - ownership/share)
 	acc, err := h.svc.Get(r.Context(), userID, accountID)
 	if err != nil {
 		response.HandleError(w, err)
@@ -153,24 +163,28 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId} [patch]
 func (h *AccountHandler) Patch(w http.ResponseWriter, r *http.Request) {
+	// 1. Xác định User đang request
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
+	// 2. Tìm ID của tài khoản cần update
 	accountID, err := uuid.Parse(chi.URLParam(r, "accountId"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
 		return
 	}
  
+	// 3. Bind JSON payload vào request dto. Những field nil sẽ bị bỏ qua khi update (Patch semantics)
 	var req dto.PatchAccountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "validation_error", "invalid json body", nil)
 		return
 	}
  
+	// 4. Áp dụng thay đổi và ghi nhận lịch sử thay đổi (Audit event) bên trong Service
 	acc, err := h.svc.Patch(r.Context(), userID, accountID, req)
 	if err != nil {
 		response.HandleError(w, err)
@@ -196,23 +210,27 @@ func (h *AccountHandler) Patch(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId} [delete]
 func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	// 1. Xác minh định danh user
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
+	// 2. Parse UUID tài khoản cần xóa
 	accountID, err := uuid.Parse(chi.URLParam(r, "accountId"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
 		return
 	}
  
+	// 3. Gọi hàm xóa của Service (sẽ là Soft Delete hoặc chặn lại nếu tài khoản đang có số dư/giao dịch)
 	if err := h.svc.Delete(r.Context(), userID, accountID); err != nil {
 		response.HandleError(w, err)
 		return
 	}
  
+	// 4. Trả về mã 204 tượng trưng cho trạng thái Delete thành công, không có Body.
 	w.WriteHeader(http.StatusNoContent)
 }
  
@@ -227,18 +245,21 @@ func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} response.ErrorEnvelope
 // @Router /accounts/{accountId}/shares [get]
 func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
+	// 1. Phân quyền API
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		response.HandleError(w, apperr.Unauthorized("user not found in context"))
 		return
 	}
  
+	// 2. Lấy Account ID từ URL Parameter
 	accountID, err := uuid.Parse(chi.URLParam(r, "accountId"))
 	if err != nil {
 		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
 		return
 	}
  
+	// 3. Danh sách những ai đang được chia sẻ quyền truy cập tài khoản này (chỉ chủ sở hữu mới xem được)
 	items, err := h.svc.ListShares(r.Context(), userID, accountID)
 	if err != nil {
 		response.HandleError(w, err)

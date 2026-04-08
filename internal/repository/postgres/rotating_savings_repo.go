@@ -143,12 +143,13 @@ func (r *RotatingSavingsRepo) DeleteRotatingGroup(ctx context.Context, userID, g
 }
 
 func (r *RotatingSavingsRepo) CreateContribution(ctx context.Context, c entity.RotatingSavingsContribution) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
+	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
+		return r.CreateContributionTx(ctx, tx, c)
+	})
+}
 
-	_, err = pool.Exec(ctx, `
+func (r *RotatingSavingsRepo) CreateContributionTx(ctx context.Context, tx pgx.Tx, c entity.RotatingSavingsContribution) error {
+	_, err := tx.Exec(ctx, `
 		INSERT INTO rotating_savings_contributions (
 			id, group_id, transaction_id, kind, cycle_no, due_date,
 			amount, slots_taken, collected_fee_per_slot, occurred_at, note, created_at
@@ -204,12 +205,13 @@ func (r *RotatingSavingsRepo) DeleteContribution(ctx context.Context, contributi
 }
 
 func (r *RotatingSavingsRepo) AddAuditLog(ctx context.Context, log entity.RotatingSavingsAuditLog) error {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return err
-	}
+	return r.db.WithTx(ctx, func(tx pgx.Tx) error {
+		return r.AddAuditLogTx(ctx, tx, log)
+	})
+}
 
-	_, err = pool.Exec(ctx, `
+func (r *RotatingSavingsRepo) AddAuditLogTx(ctx context.Context, tx pgx.Tx, log entity.RotatingSavingsAuditLog) error {
+	_, err := tx.Exec(ctx, `
 		INSERT INTO rotating_savings_audit_logs (id, user_id, group_id, action, details, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`, log.ID, log.UserID, log.GroupID, log.Action, log.Details, log.CreatedAt)
