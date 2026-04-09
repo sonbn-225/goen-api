@@ -23,7 +23,7 @@ func NewAccountRepo(db *database.Postgres) *AccountRepo {
 }
 
 func (r *AccountRepo) CreateAccountWithOwnerTx(ctx context.Context, tx pgx.Tx, account entity.Account, ownerUserID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -59,24 +59,14 @@ func (r *AccountRepo) CreateAccountWithOwnerTx(ctx context.Context, tx pgx.Tx, a
 	return nil
 }
 
-func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID uuid.UUID) ([]entity.Account, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *AccountRepo) ListAccountsForUserTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.Account, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
-		SELECT a.id, a.name, a.account_number, a.account_type, a.currency, a.parent_account_id, a.status, a.settings, a.closed_at,
-		       a.created_at, a.updated_at, a.deleted_at,
-		       COALESCE(SUM(
-		         CASE
-		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
-		           WHEN t.type = 'expense' AND t.account_id = a.id THEN -t.amount
-		           WHEN t.type = 'transfer' AND t.to_account_id = a.id THEN COALESCE(t.to_amount, t.amount)
-		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -COALESCE(t.from_amount, t.amount)
-		           ELSE 0
-		         END
-		       ), 0)::text AS balance
+	rows, err := q.Query(ctx, fmt.Sprintf(`
+		SELECT %s, %s
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
 		LEFT JOIN transactions t
@@ -85,7 +75,7 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID uuid.UUID)
 		WHERE ua.user_id = $1 AND ua.status = 'active' AND a.deleted_at IS NULL
 		GROUP BY a.id
 		ORDER BY a.created_at DESC
-	`, userID)
+	`, AccountColumnsSQL, AccountBalanceSQL), userID)
 	if err != nil {
 		return nil, err
 	}
@@ -93,42 +83,23 @@ func (r *AccountRepo) ListAccountsForUser(ctx context.Context, userID uuid.UUID)
 
 	var out []entity.Account
 	for rows.Next() {
-		var a entity.Account
-		var settingsJSON []byte
-		err := rows.Scan(
-			&a.ID, &a.Name, &a.AccountNumber, &a.AccountType, &a.Currency,
-			&a.ParentAccountID, &a.Status, &settingsJSON, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
-			&a.DeletedAt, &a.Balance,
-		)
+		a, err := ScanAccount(rows)
 		if err != nil {
 			return nil, err
 		}
-		if len(settingsJSON) > 0 {
-			_ = json.Unmarshal(settingsJSON, &a.Settings)
-		}
-		out = append(out, a)
+		out = append(out, *a)
 	}
 	return out, rows.Err()
 }
 
-func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *AccountRepo) GetAccountForUserTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
-		SELECT a.id, a.name, a.account_number, a.account_type, a.currency, a.parent_account_id, a.status, a.settings, a.closed_at,
-		       a.created_at, a.updated_at, a.deleted_at,
-		       COALESCE(SUM(
-		         CASE
-		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
-		           WHEN t.type = 'expense' AND t.account_id = a.id THEN -t.amount
-		           WHEN t.type = 'transfer' AND t.to_account_id = a.id THEN COALESCE(t.to_amount, t.amount)
-		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -COALESCE(t.from_amount, t.amount)
-		           ELSE 0
-		         END
-		       ), 0)::text AS balance
+	row := q.QueryRow(ctx, fmt.Sprintf(`
+		SELECT %s, %s
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
 		LEFT JOIN transactions t
@@ -136,29 +107,20 @@ func (r *AccountRepo) GetAccountForUser(ctx context.Context, userID uuid.UUID, a
 		 AND (t.account_id = a.id OR t.from_account_id = a.id OR t.to_account_id = a.id)
 		WHERE a.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
 		GROUP BY a.id
-	`, accountID, userID)
+	`, AccountColumnsSQL, AccountBalanceSQL), accountID, userID)
 
-	var a entity.Account
-	var settingsJSON []byte
-	err = row.Scan(
-		&a.ID, &a.Name, &a.AccountNumber, &a.AccountType, &a.Currency,
-		&a.ParentAccountID, &a.Status, &settingsJSON, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
-		&a.DeletedAt, &a.Balance,
-	)
+	a, err := ScanAccount(row)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.New("account not found")
-		}
 		return nil, err
 	}
-	if len(settingsJSON) > 0 {
-		_ = json.Unmarshal(settingsJSON, &a.Settings)
+	if a == nil {
+		return nil, errors.New("account not found")
 	}
-	return &a, nil
+	return a, nil
 }
 
 func (r *AccountRepo) PatchAccountTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID, patch entity.AccountPatch) (*entity.Account, error) {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +179,7 @@ func (r *AccountRepo) PatchAccountTx(ctx context.Context, tx pgx.Tx, actorUserID
 }
 
 func (r *AccountRepo) DeleteAccountTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -235,14 +197,14 @@ func (r *AccountRepo) DeleteAccountTx(ctx context.Context, tx pgx.Tx, actorUserI
 	return err
 }
 
-func (r *AccountRepo) HasRelatedTransferTransactionsForAccount(ctx context.Context, accountID uuid.UUID) (bool, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *AccountRepo) HasRelatedTransferTransactionsForAccountTx(ctx context.Context, tx pgx.Tx, accountID uuid.UUID) (bool, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return false, err
 	}
 
 	var exists bool
-	err = pool.QueryRow(ctx, `
+	err = q.QueryRow(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM transactions
 			WHERE deleted_at IS NULL AND type = 'transfer'
@@ -252,23 +214,14 @@ func (r *AccountRepo) HasRelatedTransferTransactionsForAccount(ctx context.Conte
 	return exists, err
 }
 
-func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID uuid.UUID) ([]entity.AccountBalance, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *AccountRepo) ListAccountBalancesForUserTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.AccountBalance, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
-		SELECT a.id AS account_id, a.currency,
-		       COALESCE(SUM(
-		         CASE
-		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
-		           WHEN t.type = 'expense' AND t.account_id = a.id THEN -t.amount
-		           WHEN t.type = 'transfer' AND t.to_account_id = a.id THEN COALESCE(t.to_amount, t.amount)
-		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -COALESCE(t.from_amount, t.amount)
-		           ELSE 0
-		         END
-		       ), 0)::text AS balance
+	rows, err := q.Query(ctx, fmt.Sprintf(`
+		SELECT a.id AS account_id, a.currency, %s
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
 		LEFT JOIN transactions t
@@ -277,7 +230,7 @@ func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID uui
 		WHERE ua.user_id = $1 AND ua.status = 'active' AND a.deleted_at IS NULL
 		GROUP BY a.id, a.currency
 		ORDER BY a.created_at DESC
-	`, userID)
+	`, AccountBalanceSQL), userID)
 	if err != nil {
 		return nil, err
 	}
@@ -294,13 +247,13 @@ func (r *AccountRepo) ListAccountBalancesForUser(ctx context.Context, userID uui
 	return out, rows.Err()
 }
 
-func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID) ([]entity.AccountShare, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *AccountRepo) ListAccountSharesTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID) ([]entity.AccountShare, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT ua.id, ua.account_id, ua.user_id, ua.permission, ua.status, ua.revoked_at,
 		       ua.created_at, ua.updated_at,
 		       u.email, u.phone, u.display_name
@@ -331,7 +284,7 @@ func (r *AccountRepo) ListAccountShares(ctx context.Context, actorUserID uuid.UU
 }
 
 func (r *AccountRepo) UpsertAccountShareTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID, targetUserID uuid.UUID, permission string) (*entity.AccountShare, error) {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -365,7 +318,7 @@ func (r *AccountRepo) UpsertAccountShareTx(ctx context.Context, tx pgx.Tx, actor
 }
 
 func (r *AccountRepo) RevokeAccountShareTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID, targetUserID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -383,13 +336,13 @@ func (r *AccountRepo) RevokeAccountShareTx(ctx context.Context, tx pgx.Tx, actor
 	return err
 }
 
-func (r *AccountRepo) ListAccountAuditEvents(ctx context.Context, actorUserID uuid.UUID, accountID uuid.UUID, limit int) ([]entity.AccountAuditEvent, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *AccountRepo) ListAccountAuditEventsTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID, limit int) ([]entity.AccountAuditEvent, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT id, account_id, actor_user_id, action, entity_type, entity_id, occurred_at, diff
 		FROM audit_events
 		WHERE account_id = $1
@@ -422,7 +375,7 @@ func (r *AccountRepo) ListAccountAuditEvents(ctx context.Context, actorUserID uu
 }
 
 func (r *AccountRepo) RecordAccountAuditEventTx(ctx context.Context, tx pgx.Tx, event entity.AccountAuditEvent) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -454,27 +407,9 @@ func (r *AccountRepo) requireAccountOwner(ctx context.Context, q database.Querye
 	return nil
 }
 
-func (r *AccountRepo) GetAccountForUserTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
-	q, err := r.db.Queryer(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	return r.getAccountQueryer(ctx, q, userID, accountID)
-}
-
 func (r *AccountRepo) getAccountQueryer(ctx context.Context, q database.Queryer, userID uuid.UUID, accountID uuid.UUID) (*entity.Account, error) {
-	row := q.QueryRow(ctx, `
-		SELECT a.id, a.name, a.account_number, a.account_type, a.currency, a.parent_account_id, a.status, a.settings, a.closed_at,
-		       a.created_at, a.updated_at, a.deleted_at,
-		       COALESCE(SUM(
-		         CASE
-		           WHEN t.type = 'income' AND t.account_id = a.id THEN t.amount
-		           WHEN t.type = 'expense' AND t.account_id = a.id THEN -t.amount
-		           WHEN t.type = 'transfer' AND t.to_account_id = a.id THEN COALESCE(t.to_amount, t.amount)
-		           WHEN t.type = 'transfer' AND t.from_account_id = a.id THEN -COALESCE(t.from_amount, t.amount)
-		           ELSE 0
-		         END
-		       ), 0)::text AS balance
+	row := q.QueryRow(ctx, fmt.Sprintf(`
+		SELECT %s, %s
 		FROM accounts a
 		JOIN user_accounts ua ON ua.account_id = a.id
 		LEFT JOIN transactions t
@@ -482,23 +417,7 @@ func (r *AccountRepo) getAccountQueryer(ctx context.Context, q database.Queryer,
 		 AND (t.account_id = a.id OR t.from_account_id = a.id OR t.to_account_id = a.id)
 		WHERE a.id = $1 AND ua.user_id = $2 AND ua.status = 'active' AND a.deleted_at IS NULL
 		GROUP BY a.id
-	`, accountID, userID)
+	`, AccountColumnsSQL, AccountBalanceSQL), accountID, userID)
 
-	var a entity.Account
-	var settingsJSON []byte
-	err := row.Scan(
-		&a.ID, &a.Name, &a.AccountNumber, &a.AccountType, &a.Currency,
-		&a.ParentAccountID, &a.Status, &settingsJSON, &a.ClosedAt, &a.CreatedAt, &a.UpdatedAt,
-		&a.DeletedAt, &a.Balance,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.New("account not found")
-		}
-		return nil, err
-	}
-	if len(settingsJSON) > 0 {
-		_ = json.Unmarshal(settingsJSON, &a.Settings)
-	}
-	return &a, nil
+	return ScanAccount(row)
 }

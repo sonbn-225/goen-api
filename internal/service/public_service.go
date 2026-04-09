@@ -72,7 +72,7 @@ func (s *PublicService) GetPaymentInfo(ctx context.Context, userRef string) (*en
 		return nil, errors.New("invalid default account id format")
 	}
  
-	acc, err := s.accountRepo.GetAccountForUser(ctx, u.ID, accID)
+	acc, err := s.accountRepo.GetAccountForUserTx(ctx, nil, u.ID, accID)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (s *PublicService) GetParticipants(ctx context.Context, userRef string) ([]
 		return nil, err
 	}
  
-	return s.debtRepo.ListPublicParticipants(ctx, u.ID)
+	return s.debtRepo.ListPublicParticipantsTx(ctx, nil, u.ID)
 }
  
 func (s *PublicService) GetDebts(ctx context.Context, userRef string, participantName string) ([]entity.PublicDebt, error) {
@@ -103,7 +103,7 @@ func (s *PublicService) GetDebts(ctx context.Context, userRef string, participan
 		return nil, err
 	}
  
-	return s.debtRepo.ListPublicDebtsByParticipant(ctx, u.ID, participantName)
+	return s.debtRepo.ListPublicDebtsByParticipantTx(ctx, nil, u.ID, participantName)
 }
  
 func (s *PublicService) resolvePublicUser(ctx context.Context, userRef string) (*entity.User, error) {
@@ -112,18 +112,18 @@ func (s *PublicService) resolvePublicUser(ctx context.Context, userRef string) (
 		return nil, errors.New("user reference is required")
 	}
  
-	// Try lookup by username first
-	byUsername, err := s.userRepo.FindUserByUsername(ctx, strings.ToLower(ref))
+	// Resolve user by username, email or phone
+	byRef, err := ResolveUserByLoginTx(ctx, nil, s.userRepo, ref)
 	var u *entity.User
-	if err == nil {
-		u = &byUsername.User
+	if err == nil && byRef != nil {
+		u = &byRef.User
 	} else {
-		// Then try lookup by ID
+		// Fallback to lookup by UUID string if direct resolution fails
 		uid, err := uuid.Parse(ref)
 		if err != nil {
 			return nil, errors.New("user not found")
 		}
-		u, err = s.userRepo.FindUserByID(ctx, uid)
+		u, err = s.userRepo.FindUserByIDTx(ctx, nil, uid)
 		if err != nil {
 			return nil, err
 		}

@@ -13,22 +13,22 @@ import (
 )
 
 type InterchangeRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewInterchangeRepo(db *database.Postgres) *InterchangeRepo {
-	return &InterchangeRepo{db: db}
+	return &InterchangeRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-// --- Nhóm 1: Truy vấn dữ liệu chờ (Read-only Optimized) ---
+// --- Nhóm 1: Truy vấn dữ liệu chờ (Flexible Tx) ---
 
-func (r *InterchangeRepo) ListStagedImports(ctx context.Context, userID uuid.UUID, resourceType string) ([]entity.StagedImport, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *InterchangeRepo) ListStagedImportsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, resourceType string) ([]entity.StagedImport, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT id, resource_type, source, external_id, data, metadata, status, created_at, updated_at
 		FROM staged_imports
 		WHERE user_id = $1 AND resource_type = $2
@@ -57,15 +57,15 @@ func (r *InterchangeRepo) ListStagedImports(ctx context.Context, userID uuid.UUI
 	return results, nil
 }
 
-func (r *InterchangeRepo) GetStagedImport(ctx context.Context, userID, id uuid.UUID) (*entity.StagedImport, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *InterchangeRepo) GetStagedImportTx(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) (*entity.StagedImport, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
 	var si entity.StagedImport
 	var dataB, metaB []byte
-	err = pool.QueryRow(ctx, `
+	err = q.QueryRow(ctx, `
 		SELECT id, resource_type, source, external_id, data, metadata, status, created_at, updated_at
 		FROM staged_imports
 		WHERE id = $1 AND user_id = $2
@@ -84,13 +84,13 @@ func (r *InterchangeRepo) GetStagedImport(ctx context.Context, userID, id uuid.U
 	return &si, nil
 }
 
-func (r *InterchangeRepo) ListImportRules(ctx context.Context, userID uuid.UUID, resourceType string) ([]entity.StagedImportRule, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *InterchangeRepo) ListImportRulesTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, resourceType string) ([]entity.StagedImportRule, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT id, resource_type, rule_type, match_key, match_value, mapped_id, created_at, updated_at
 		FROM staged_import_rules
 		WHERE user_id = $1 AND resource_type = $2
@@ -118,7 +118,7 @@ func (r *InterchangeRepo) ListImportRules(ctx context.Context, userID uuid.UUID,
 // --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
 
 func (r *InterchangeRepo) UpsertStagedImportsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, items []entity.StagedImportCreate) ([]entity.StagedImport, error) {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (r *InterchangeRepo) UpsertStagedImportsTx(ctx context.Context, tx pgx.Tx, 
 }
 
 func (r *InterchangeRepo) PatchStagedImportTx(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID, patch entity.StagedImportPatch) (*entity.StagedImport, error) {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func (r *InterchangeRepo) PatchStagedImportTx(ctx context.Context, tx pgx.Tx, us
 }
 
 func (r *InterchangeRepo) DeleteStagedImportTx(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func (r *InterchangeRepo) DeleteStagedImportTx(ctx context.Context, tx pgx.Tx, u
 }
 
 func (r *InterchangeRepo) DeleteAllStagedImportsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, resourceType string) (int64, error) {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return 0, err
 	}
@@ -236,7 +236,7 @@ func (r *InterchangeRepo) DeleteAllStagedImportsTx(ctx context.Context, tx pgx.T
 }
 
 func (r *InterchangeRepo) UpsertImportRulesTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, rules []entity.StagedImportRuleUpsert) ([]entity.StagedImportRule, error) {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +268,7 @@ func (r *InterchangeRepo) UpsertImportRulesTx(ctx context.Context, tx pgx.Tx, us
 }
 
 func (r *InterchangeRepo) DeleteImportRuleTx(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}

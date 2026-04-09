@@ -4,18 +4,19 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
 // MarketDataRepository định nghĩa lớp truy cập dữ liệu cho giá chứng khoán bên ngoài và các sự kiện doanh nghiệp.
 type MarketDataRepository interface {
-	// --- Nhóm 1: Truy vấn Dữ liệu Thị trường (Read-only Optimized) ---
+	// --- Nhóm 1: Truy vấn Dữ liệu Thị trường (Flexible Tx) ---
 
-	// LoadSecurityIDsBySymbols phân giải các UUID nội bộ từ các mã niêm yết (ticker symbols).
-	LoadSecurityIDsBySymbols(ctx context.Context, symbols []string) (map[string]uuid.UUID, error)
-	// LoadSyncState lấy thời điểm cuối cùng dữ liệu thị trường được đồng bộ hóa cho một khóa cụ thể.
-	LoadSyncState(ctx context.Context, syncKey string) (*entity.SyncState, error)
+	// LoadSecurityIDsBySymbolsTx phân giải các UUID nội bộ từ các mã niêm yết (ticker symbols).
+	LoadSecurityIDsBySymbolsTx(ctx context.Context, tx pgx.Tx, symbols []string) (map[string]uuid.UUID, error)
+	// LoadSyncStateTx lấy thời điểm cuối cùng dữ liệu thị trường được đồng bộ hóa cho một khóa cụ thể.
+	LoadSyncStateTx(ctx context.Context, tx pgx.Tx, syncKey string) (*entity.SyncState, error)
 }
 
 // MarketDataService định nghĩa nghiệp vụ cho việc đồng bộ hóa dữ liệu thị trường chạy ngầm.

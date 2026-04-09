@@ -12,22 +12,22 @@ import (
 )
 
 type TagRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewTagRepo(db *database.Postgres) *TagRepo {
-	return &TagRepo{db: db}
+	return &TagRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-// --- Nhóm 1: Truy vấn Nhãn (Read-only Optimized) ---
+// --- Nhóm 1: Truy vấn Nhãn (Flexible Tx) ---
 
-func (r *TagRepo) GetTag(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) (*entity.Tag, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *TagRepo) GetTagTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, tagID uuid.UUID) (*entity.Tag, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		SELECT id, user_id, name_vi, name_en, color, created_at, updated_at
 		FROM tags
 		WHERE id = $1 AND user_id = $2
@@ -53,13 +53,13 @@ func (r *TagRepo) GetTag(ctx context.Context, userID uuid.UUID, tagID uuid.UUID)
 	return &t, nil
 }
 
-func (r *TagRepo) ListTags(ctx context.Context, userID uuid.UUID) ([]entity.Tag, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *TagRepo) ListTagsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.Tag, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT id, user_id, name_vi, name_en, color, created_at, updated_at
 		FROM tags
 		WHERE user_id = $1
@@ -98,7 +98,7 @@ func (r *TagRepo) ListTags(ctx context.Context, userID uuid.UUID) ([]entity.Tag,
 // --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
 
 func (r *TagRepo) CreateTagTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, t entity.Tag) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}

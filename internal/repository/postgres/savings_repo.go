@@ -12,24 +12,24 @@ import (
 )
 
 type SavingsRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewSavingsRepo(db *database.Postgres) *SavingsRepo {
-	return &SavingsRepo{db: db}
+	return &SavingsRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-// --- Nhóm 1: Truy vấn Tiết kiệm (Read-only Optimized) ---
+// --- Nhóm 1: Truy vấn Tiết kiệm (Flexible Tx) ---
 
-func (r *SavingsRepo) GetSavings(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entity.Savings, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *SavingsRepo) GetSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, id uuid.UUID) (*entity.Savings, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
 	var s entity.Savings
 	var settingsJSON []byte
-	err = pool.QueryRow(ctx, `
+	err = q.QueryRow(ctx, `
 		SELECT
 			a.id, a.name, a.parent_account_id, a.status, a.settings, a.created_at, a.updated_at,
 			COALESCE((
@@ -51,17 +51,17 @@ func (r *SavingsRepo) GetSavings(ctx context.Context, userID uuid.UUID, id uuid.
 	}
 
 	r.mapSettingsToSavings(&s, settingsJSON)
-	s.SavingsAccountID = s.ID // In the new model, the Savings ID is the Account ID
+	s.SavingsAccountID = s.ID 
 	return &s, nil
 }
 
-func (r *SavingsRepo) ListSavings(ctx context.Context, userID uuid.UUID) ([]entity.Savings, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *SavingsRepo) ListSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.Savings, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT
 			a.id, a.name, a.parent_account_id, a.status, a.settings, a.created_at, a.updated_at,
 			COALESCE((
@@ -98,7 +98,7 @@ func (r *SavingsRepo) ListSavings(ctx context.Context, userID uuid.UUID) ([]enti
 // --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
 
 func (r *SavingsRepo) UpdateSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, s entity.Savings) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (r *SavingsRepo) UpdateSavingsTx(ctx context.Context, tx pgx.Tx, userID uui
 }
 
 func (r *SavingsRepo) DeleteSavingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, id uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}

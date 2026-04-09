@@ -92,20 +92,8 @@ func (s *AuthService) Signup(ctx context.Context, req dto.SignupRequest) (*dto.A
 }
 
 func (s *AuthService) Signin(ctx context.Context, req dto.SigninRequest) (*dto.AuthResponse, error) {
-	login := strings.ToLower(strings.TrimSpace(req.Login))
-
-	var u *entity.UserWithPassword
-	var err error
-
-	if strings.Contains(login, "@") {
-		u, err = s.userRepo.FindUserByEmail(ctx, login)
-	} else if len(login) > 0 && login[0] != '+' && !isNumeric(login) {
-		u, err = s.userRepo.FindUserByUsername(ctx, login)
-	} else {
-		u, err = s.userRepo.FindUserByPhone(ctx, login)
-	}
-
-	if err != nil {
+	u, err := ResolveUserByLoginTx(ctx, nil, s.userRepo, req.Login)
+	if err != nil || u == nil {
 		return nil, apperr.ErrInvalidCredentials
 	}
 
@@ -134,7 +122,7 @@ func (s *AuthService) Signin(ctx context.Context, req dto.SigninRequest) (*dto.A
 
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*dto.AuthResponse, error) {
 	// 1. Verify refresh token exists in DB
-	rt, err := s.refreshRepo.GetByToken(ctx, refreshToken)
+	rt, err := s.refreshRepo.GetByTokenTx(ctx, nil, refreshToken)
 	if err != nil {
 		return nil, apperr.Unauthorized("invalid refresh token")
 	}
@@ -146,7 +134,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*dto.Au
 	}
 
 	// 3. Get user
-	u, err := s.userRepo.FindUserByID(ctx, rt.UserID)
+	u, err := s.userRepo.FindUserByIDTx(ctx, nil, rt.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +166,7 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 }
 
 func (s *AuthService) GetMe(ctx context.Context, userID uuid.UUID) (*dto.UserResponse, error) {
-	u, err := s.userRepo.FindUserByID(ctx, userID)
+	u, err := s.userRepo.FindUserByIDTx(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -268,18 +256,18 @@ func (s *AuthService) UpdateMyProfile(ctx context.Context, userID uuid.UUID, dis
 }
 
 func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error {
-	u, err := s.userRepo.FindUserByID(ctx, userID)
+	u, err := s.userRepo.FindUserByIDTx(ctx, nil, userID)
 	if err != nil {
 		return err
 	}
 
 	var uWithPass *entity.UserWithPassword
 	if u.Email != nil {
-		uWithPass, err = s.userRepo.FindUserByEmail(ctx, *u.Email)
+		uWithPass, err = s.userRepo.FindUserByEmailTx(ctx, nil, *u.Email)
 	} else if u.Phone != nil {
-		uWithPass, err = s.userRepo.FindUserByPhone(ctx, *u.Phone)
+		uWithPass, err = s.userRepo.FindUserByPhoneTx(ctx, nil, *u.Phone)
 	} else {
-		uWithPass, err = s.userRepo.FindUserByUsername(ctx, u.Username)
+		uWithPass, err = s.userRepo.FindUserByUsernameTx(ctx, nil, u.Username)
 	}
 
 	if err != nil {
@@ -375,13 +363,4 @@ func (s *AuthService) defaultUserSettings(lang string) map[string]any {
 		"timezone":              "Asia/Ho_Chi_Minh",
 		"rotating_savings_term": "hui",
 	}
-}
-
-func isNumeric(s string) bool {
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	return true
 }

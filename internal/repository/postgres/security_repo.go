@@ -13,20 +13,20 @@ import (
 )
 
 type SecurityRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewSecurityRepo(db *database.Postgres) *SecurityRepo {
-	return &SecurityRepo{db: db}
+	return &SecurityRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-func (r *SecurityRepo) GetSecurity(ctx context.Context, securityID uuid.UUID) (*entity.Security, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *SecurityRepo) GetSecurityTx(ctx context.Context, tx pgx.Tx, securityID uuid.UUID) (*entity.Security, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		SELECT id, symbol, name, asset_class, currency, created_at, updated_at
 		FROM securities
 		WHERE id = $1
@@ -42,13 +42,13 @@ func (r *SecurityRepo) GetSecurity(ctx context.Context, securityID uuid.UUID) (*
 	return &s, nil
 }
 
-func (r *SecurityRepo) ListSecurities(ctx context.Context) ([]entity.Security, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *SecurityRepo) ListSecuritiesTx(ctx context.Context, tx pgx.Tx) ([]entity.Security, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT id, symbol, name, asset_class, currency, created_at, updated_at
 		FROM securities
 		ORDER BY symbol ASC
@@ -69,13 +69,13 @@ func (r *SecurityRepo) ListSecurities(ctx context.Context) ([]entity.Security, e
 	return results, nil
 }
 
-func (r *SecurityRepo) ListSecurityPrices(ctx context.Context, securityID uuid.UUID, from *string, to *string) ([]entity.SecurityPriceDaily, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *SecurityRepo) ListSecurityPricesTx(ctx context.Context, tx pgx.Tx, securityID uuid.UUID, from *string, to *string) ([]entity.SecurityPriceDaily, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT id, security_id, price_date,
 		       open * 1000, high * 1000, low * 1000, close * 1000,
 		       volume, created_at, updated_at
@@ -118,13 +118,13 @@ func (r *SecurityRepo) ListSecurityPrices(ctx context.Context, securityID uuid.U
 	return results, nil
 }
 
-func (r *SecurityRepo) ListSecurityEvents(ctx context.Context, securityID uuid.UUID, from *string, to *string) ([]entity.SecurityEvent, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *SecurityRepo) ListSecurityEventsTx(ctx context.Context, tx pgx.Tx, securityID uuid.UUID, from *string, to *string) ([]entity.SecurityEvent, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT id, security_id, event_type, ex_date, record_date, pay_date, effective_date,
 		       cash_amount_per_share, ratio_numerator, ratio_denominator, subscription_price,
 		       currency, note, created_at, updated_at
@@ -172,24 +172,24 @@ func (r *SecurityRepo) ListSecurityEvents(ctx context.Context, securityID uuid.U
 		if ratioNum.Valid {
 			e.RatioNumerator = &ratioNum.String
 		}
-		if ratioDen.Valid {
-			e.RatioDenominator = &ratioDen.String
+		if ratioDenominator := ratioDen.String; ratioDen.Valid {
+			e.RatioDenominator = &ratioDenominator
 		}
-		if subPrice.Valid {
-			e.SubscriptionPrice = &subPrice.String
+		if subscriptionPrice := subPrice.String; subPrice.Valid {
+			e.SubscriptionPrice = &subscriptionPrice
 		}
 		results = append(results, e)
 	}
 	return results, nil
 }
 
-func (r *SecurityRepo) GetSecurityEvent(ctx context.Context, securityEventID uuid.UUID) (*entity.SecurityEvent, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *SecurityRepo) GetSecurityEventTx(ctx context.Context, tx pgx.Tx, securityEventID uuid.UUID) (*entity.SecurityEvent, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		SELECT id, security_id, event_type, ex_date, record_date, pay_date, effective_date,
 		       cash_amount_per_share, ratio_numerator, ratio_denominator, subscription_price,
 		       currency, note, created_at, updated_at
@@ -231,11 +231,11 @@ func (r *SecurityRepo) GetSecurityEvent(ctx context.Context, securityEventID uui
 	if ratioNum.Valid {
 		e.RatioNumerator = &ratioNum.String
 	}
-	if ratioDen.Valid {
-		e.RatioDenominator = &ratioDen.String
+	if ratioDenominator := ratioDen.String; ratioDen.Valid {
+		e.RatioDenominator = &ratioDenominator
 	}
-	if subPrice.Valid {
-		e.SubscriptionPrice = &subPrice.String
+	if subscriptionPrice := subPrice.String; subPrice.Valid {
+		e.SubscriptionPrice = &subscriptionPrice
 	}
 	return &e, nil
 }

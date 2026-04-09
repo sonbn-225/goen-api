@@ -18,13 +18,13 @@ func NewCategoryRepo(db *database.Postgres) *CategoryRepo {
 	return &CategoryRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-func (r *CategoryRepo) GetCategory(ctx context.Context, userID uuid.UUID, categoryID uuid.UUID) (*entity.Category, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *CategoryRepo) GetCategoryTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, categoryID uuid.UUID) (*entity.Category, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		SELECT c.id, c.key, c.parent_category_id, p.key AS parent_key, c.type, c.sort_order, c.is_active, c.icon, c.color
 		FROM categories c
 		LEFT JOIN categories p ON p.id = c.parent_category_id
@@ -52,13 +52,13 @@ func (r *CategoryRepo) GetCategory(ctx context.Context, userID uuid.UUID, catego
 	return &c, nil
 }
 
-func (r *CategoryRepo) ListCategories(ctx context.Context, userID uuid.UUID) ([]entity.Category, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *CategoryRepo) ListCategoriesTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.Category, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT c.id, c.key, c.parent_category_id, p.key AS parent_key, c.type, c.sort_order, c.is_active, c.icon, c.color
 		FROM categories c
 		LEFT JOIN categories p ON p.id = c.parent_category_id
@@ -91,13 +91,13 @@ func (r *CategoryRepo) ListCategories(ctx context.Context, userID uuid.UUID) ([]
 	return out, nil
 }
 
-func (r *CategoryRepo) GetCategoryByKey(ctx context.Context, key string) (*entity.Category, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *CategoryRepo) GetCategoryByKeyTx(ctx context.Context, tx pgx.Tx, key string) (*entity.Category, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		SELECT c.id, c.key, c.parent_category_id, p.key AS parent_key, c.type, c.sort_order, c.is_active, c.icon, c.color
 		FROM categories c
 		LEFT JOIN categories p ON p.id = c.parent_category_id

@@ -11,23 +11,23 @@ import (
 )
 
 type RotatingSavingsRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewRotatingSavingsRepo(db *database.Postgres) *RotatingSavingsRepo {
-	return &RotatingSavingsRepo{db: db}
+	return &RotatingSavingsRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-// --- Nhóm 1: Quản lý Nhóm (Read-only Optimized) ---
+// --- Nhóm 1: Quản lý Nhóm (Flexible Tx) ---
 
-func (r *RotatingSavingsRepo) GetRotatingGroup(ctx context.Context, userID, groupID uuid.UUID) (*entity.RotatingSavingsGroup, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *RotatingSavingsRepo) GetRotatingGroupTx(ctx context.Context, tx pgx.Tx, userID, groupID uuid.UUID) (*entity.RotatingSavingsGroup, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
 	var g entity.RotatingSavingsGroup
-	err = pool.QueryRow(ctx, `
+	err = q.QueryRow(ctx, `
 		SELECT
 			rg.id, rg.user_id, rg.account_id, rg.name, a.currency, rg.member_count, rg.user_slots,
 			rg.contribution_amount, rg.payout_cycle_no, rg.fixed_interest_amount,
@@ -49,13 +49,13 @@ func (r *RotatingSavingsRepo) GetRotatingGroup(ctx context.Context, userID, grou
 	return &g, nil
 }
 
-func (r *RotatingSavingsRepo) ListRotatingGroups(ctx context.Context, userID uuid.UUID) ([]entity.RotatingSavingsGroup, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *RotatingSavingsRepo) ListRotatingGroupsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.RotatingSavingsGroup, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT
 			rg.id, rg.user_id, rg.account_id, rg.name, a.currency, rg.member_count, rg.user_slots,
 			rg.contribution_amount, rg.payout_cycle_no, rg.fixed_interest_amount,
@@ -88,7 +88,7 @@ func (r *RotatingSavingsRepo) ListRotatingGroups(ctx context.Context, userID uui
 // --- Nhóm 2: Thao tác Nhóm (Transactional) ---
 
 func (r *RotatingSavingsRepo) CreateRotatingGroupTx(ctx context.Context, tx pgx.Tx, g entity.RotatingSavingsGroup) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (r *RotatingSavingsRepo) CreateRotatingGroupTx(ctx context.Context, tx pgx.
 }
 
 func (r *RotatingSavingsRepo) UpdateRotatingGroupTx(ctx context.Context, tx pgx.Tx, g entity.RotatingSavingsGroup) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (r *RotatingSavingsRepo) UpdateRotatingGroupTx(ctx context.Context, tx pgx.
 }
 
 func (r *RotatingSavingsRepo) DeleteRotatingGroupTx(ctx context.Context, tx pgx.Tx, userID, groupID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -146,15 +146,15 @@ func (r *RotatingSavingsRepo) DeleteRotatingGroupTx(ctx context.Context, tx pgx.
 	return err
 }
 
-// --- Nhóm 3: Quản lý Đóng góp (Read-only) ---
+// --- Nhóm 3: Quản lý Đóng góp (Flexible Tx) ---
 
-func (r *RotatingSavingsRepo) ListContributions(ctx context.Context, groupID uuid.UUID) ([]entity.RotatingSavingsContribution, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *RotatingSavingsRepo) ListContributionsTx(ctx context.Context, tx pgx.Tx, groupID uuid.UUID) ([]entity.RotatingSavingsContribution, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT
 			id, group_id, transaction_id, kind, cycle_no, to_char(due_date, 'YYYY-MM-DD'),
 			amount, slots_taken, collected_fee_per_slot, occurred_at, note, created_at
@@ -184,7 +184,7 @@ func (r *RotatingSavingsRepo) ListContributions(ctx context.Context, groupID uui
 // --- Nhóm 4: Thao tác Đóng góp (Transactional) ---
 
 func (r *RotatingSavingsRepo) CreateContributionTx(ctx context.Context, tx pgx.Tx, c entity.RotatingSavingsContribution) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func (r *RotatingSavingsRepo) CreateContributionTx(ctx context.Context, tx pgx.T
 }
 
 func (r *RotatingSavingsRepo) DeleteContributionTx(ctx context.Context, tx pgx.Tx, contributionID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func (r *RotatingSavingsRepo) DeleteContributionTx(ctx context.Context, tx pgx.T
 }
 
 func (r *RotatingSavingsRepo) DeleteContributionByTransactionTx(ctx context.Context, tx pgx.Tx, transactionID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -225,15 +225,15 @@ func (r *RotatingSavingsRepo) DeleteContributionByTransactionTx(ctx context.Cont
 	return err
 }
 
-// --- Nhóm 5: Nhật ký & Kiểm toán (Read-only) ---
+// --- Nhóm 5: Nhật ký & Kiểm toán (Flexible Tx) ---
 
-func (r *RotatingSavingsRepo) ListAuditLogs(ctx context.Context, groupID uuid.UUID) ([]entity.RotatingSavingsAuditLog, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *RotatingSavingsRepo) ListAuditLogsTx(ctx context.Context, tx pgx.Tx, groupID uuid.UUID) ([]entity.RotatingSavingsAuditLog, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT id, user_id, group_id, action, details, created_at
 		FROM rotating_savings_audit_logs
 		WHERE group_id = $1
@@ -258,7 +258,7 @@ func (r *RotatingSavingsRepo) ListAuditLogs(ctx context.Context, groupID uuid.UU
 // --- Nhóm 6: Nhật ký & Kiểm toán (Transactional) ---
 
 func (r *RotatingSavingsRepo) AddAuditLogTx(ctx context.Context, tx pgx.Tx, log entity.RotatingSavingsAuditLog) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}

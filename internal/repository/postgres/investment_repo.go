@@ -12,22 +12,22 @@ import (
 )
 
 type InvestmentRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewInvestmentRepo(db *database.Postgres) *InvestmentRepo {
-	return &InvestmentRepo{db: db}
+	return &InvestmentRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-// --- Nhóm 1: Truy vấn đầu tư (Read-only Optimized) ---
+// --- Nhóm 1: Truy vấn đầu tư (Flexible Tx) ---
 
-func (r *InvestmentRepo) GetTrade(ctx context.Context, userID uuid.UUID, tradeID uuid.UUID) (*entity.Trade, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *InvestmentRepo) GetTradeTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, tradeID uuid.UUID) (*entity.Trade, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		SELECT t.id, t.account_id, t.security_id,
 		       t.fee_transaction_id, t.tax_transaction_id,
 		       t.side, t.quantity::text, t.price::text, t.fees::text, t.taxes::text,
@@ -51,13 +51,13 @@ func (r *InvestmentRepo) GetTrade(ctx context.Context, userID uuid.UUID, tradeID
 	return &t, nil
 }
 
-func (r *InvestmentRepo) ListTrades(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) ([]entity.Trade, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *InvestmentRepo) ListTradesTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) ([]entity.Trade, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT t.id, t.account_id, t.security_id, t.fee_transaction_id, t.tax_transaction_id,
 		       t.side, t.quantity::text, t.price::text, t.fees::text, t.taxes::text, t.occurred_at,
 		       t.note, t.created_at, t.updated_at
@@ -86,13 +86,13 @@ func (r *InvestmentRepo) ListTrades(ctx context.Context, userID uuid.UUID, accou
 	return results, nil
 }
 
-func (r *InvestmentRepo) ListHoldings(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) ([]entity.Holding, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *InvestmentRepo) ListHoldingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) ([]entity.Holding, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT 
 			h.id, h.account_id, h.security_id, h.quantity::text, 
 			h.cost_basis_total::text, h.avg_cost::text, h.market_price::text, 
@@ -122,13 +122,13 @@ func (r *InvestmentRepo) ListHoldings(ctx context.Context, userID uuid.UUID, acc
 	return results, nil
 }
 
-func (r *InvestmentRepo) GetHolding(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, securityID uuid.UUID) (*entity.Holding, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *InvestmentRepo) GetHoldingTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID, securityID uuid.UUID) (*entity.Holding, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		SELECT 
 			h.id, h.account_id, h.security_id, h.quantity::text, 
 			h.cost_basis_total::text, h.avg_cost::text, h.market_price::text, 
@@ -152,13 +152,13 @@ func (r *InvestmentRepo) GetHolding(ctx context.Context, userID uuid.UUID, accou
 	return &h, nil
 }
 
-func (r *InvestmentRepo) ListShareLots(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, securityID uuid.UUID) ([]entity.ShareLot, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *InvestmentRepo) ListShareLotsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID, securityID uuid.UUID) ([]entity.ShareLot, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT 
 			l.id, l.account_id, l.security_id, l.quantity::text, 
 			l.acquisition_date, l.cost_basis_per_share::text, l.provenance, 
@@ -190,13 +190,13 @@ func (r *InvestmentRepo) ListShareLots(ctx context.Context, userID uuid.UUID, ac
 	return results, nil
 }
 
-func (r *InvestmentRepo) ListRealizedLogsByTradeID(ctx context.Context, userID uuid.UUID, tradeID uuid.UUID) ([]entity.RealizedTradeLog, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *InvestmentRepo) ListRealizedLogsByTradeIDTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, tradeID uuid.UUID) ([]entity.RealizedTradeLog, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT 
 			id, account_id, security_id, sell_trade_id, source_share_lot_id, 
 			quantity::text, acquisition_date, cost_basis_total::text, sell_price::text, 
@@ -226,13 +226,13 @@ func (r *InvestmentRepo) ListRealizedLogsByTradeID(ctx context.Context, userID u
 	return results, nil
 }
 
-func (r *InvestmentRepo) ListRealizedLogs(ctx context.Context, userID uuid.UUID, accountID uuid.UUID) ([]entity.RealizedTradeLog, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *InvestmentRepo) ListRealizedLogsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) ([]entity.RealizedTradeLog, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT 
 			l.id, l.account_id, l.security_id, l.sell_trade_id, l.source_share_lot_id, 
 			l.quantity::text, l.acquisition_date, l.cost_basis_total::text, l.sell_price::text, 
@@ -265,13 +265,13 @@ func (r *InvestmentRepo) ListRealizedLogs(ctx context.Context, userID uuid.UUID,
 	return results, nil
 }
 
-func (r *InvestmentRepo) ListSecurityEventElections(ctx context.Context, userID uuid.UUID, accountID uuid.UUID, status *string) ([]entity.SecurityEventElection, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *InvestmentRepo) ListSecurityEventElectionsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID, status *string) ([]entity.SecurityEventElection, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT e.id, e.user_id, e.account_id, e.security_event_id, e.security_id,
 		       e.entitlement_date, e.holding_quantity_at_entitlement_date::text, e.entitled_quantity::text, e.elected_quantity::text,
 		       e.status, e.confirmed_at, e.note, e.created_at, e.updated_at
@@ -308,7 +308,7 @@ func (r *InvestmentRepo) ListSecurityEventElections(ctx context.Context, userID 
 // --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
 
 func (r *InvestmentRepo) UpsertSecurityEventElectionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, e entity.SecurityEventElection) (*entity.SecurityEventElection, error) {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +355,7 @@ func (r *InvestmentRepo) UpsertSecurityEventElectionTx(ctx context.Context, tx p
 }
 
 func (r *InvestmentRepo) CreateTradeTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, t entity.Trade) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -384,7 +384,7 @@ func (r *InvestmentRepo) CreateTradeTx(ctx context.Context, tx pgx.Tx, userID uu
 }
 
 func (r *InvestmentRepo) DeleteTradeTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, tradeID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -410,7 +410,7 @@ func (r *InvestmentRepo) DeleteTradeTx(ctx context.Context, tx pgx.Tx, userID uu
 }
 
 func (r *InvestmentRepo) UpsertHoldingTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, h entity.Holding) (*entity.Holding, error) {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +444,7 @@ func (r *InvestmentRepo) UpsertHoldingTx(ctx context.Context, tx pgx.Tx, userID 
 }
 
 func (r *InvestmentRepo) CreateShareLotTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, lot entity.ShareLot) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -459,7 +459,7 @@ func (r *InvestmentRepo) CreateShareLotTx(ctx context.Context, tx pgx.Tx, userID
 }
 
 func (r *InvestmentRepo) UpdateShareLotQuantityTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, lotID uuid.UUID, quantity string) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -478,7 +478,7 @@ func (r *InvestmentRepo) UpdateShareLotQuantityTx(ctx context.Context, tx pgx.Tx
 }
 
 func (r *InvestmentRepo) DeleteShareLotsByTradeIDTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, tradeID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -488,7 +488,7 @@ func (r *InvestmentRepo) DeleteShareLotsByTradeIDTx(ctx context.Context, tx pgx.
 }
 
 func (r *InvestmentRepo) CreateRealizedTradeLogTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, log entity.RealizedTradeLog) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -504,7 +504,7 @@ func (r *InvestmentRepo) CreateRealizedTradeLogTx(ctx context.Context, tx pgx.Tx
 }
 
 func (r *InvestmentRepo) DeleteRealizedLogsByTradeIDTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, tradeID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -514,7 +514,7 @@ func (r *InvestmentRepo) DeleteRealizedLogsByTradeIDTx(ctx context.Context, tx p
 }
 
 func (r *InvestmentRepo) DeleteTransactionTx(ctx context.Context, tx pgx.Tx, userID, transactionID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}

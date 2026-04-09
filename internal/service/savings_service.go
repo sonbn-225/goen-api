@@ -11,7 +11,6 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
-	"github.com/sonbn-225/goen-api/internal/repository/postgres"
 )
 
 // SavingsService quản lý các mục tiêu tiết kiệm và tiền gửi có kỳ hạn.
@@ -110,7 +109,7 @@ func (s *SavingsService) CreateSavings(ctx context.Context, userID uuid.UUID, re
 				Status:        entity.TransactionStatusPosted,
 			}
 
-			if err := postgres.CreateTransactionTx(ctx, tx, userID, ledgerTx, nil, nil); err != nil {
+			if err := s.transactionRepo.CreateTransactionTx(ctx, tx, userID, ledgerTx, nil, nil); err != nil {
 				return err
 			}
 		}
@@ -148,7 +147,7 @@ func (s *SavingsService) CreateSavings(ctx context.Context, userID uuid.UUID, re
 
 // GetSavings lấy thông tin về một bản ghi tiết kiệm cụ thể.
 func (s *SavingsService) GetSavings(ctx context.Context, userID, id uuid.UUID) (*dto.SavingsResponse, error) {
-	it, err := s.repo.GetSavings(ctx, userID, id)
+	it, err := s.repo.GetSavingsTx(ctx, nil, userID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +160,7 @@ func (s *SavingsService) GetSavings(ctx context.Context, userID, id uuid.UUID) (
 
 // ListSavings liệt kê tất cả các bản ghi tiết kiệm đang hoạt động và đã đóng của người dùng.
 func (s *SavingsService) ListSavings(ctx context.Context, userID uuid.UUID) ([]dto.SavingsResponse, error) {
-	items, err := s.repo.ListSavings(ctx, userID)
+	items, err := s.repo.ListSavingsTx(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +169,7 @@ func (s *SavingsService) ListSavings(ctx context.Context, userID uuid.UUID) ([]d
 
 // PatchSavings cập nhật thông tin tiết kiệm.
 func (s *SavingsService) PatchSavings(ctx context.Context, userID, id uuid.UUID, req dto.PatchSavingsRequest) (*dto.SavingsResponse, error) {
-	cur, err := s.repo.GetSavings(ctx, userID, id)
+	cur, err := s.repo.GetSavingsTx(ctx, nil, userID, id)
 	if err != nil {
 		return nil, err
 	}

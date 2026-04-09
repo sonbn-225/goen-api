@@ -4,29 +4,28 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 )
 
 type RefreshTokenRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewRefreshTokenRepo(db *database.Postgres) *RefreshTokenRepo {
-	return &RefreshTokenRepo{db: db}
+	return &RefreshTokenRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-// --- Nhóm 1: Truy vấn Token (Read-only) ---
+// --- Nhóm 1: Truy vấn Token (Flexible Tx) ---
 
-func (r *RefreshTokenRepo) GetByToken(ctx context.Context, token string) (*entity.RefreshToken, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *RefreshTokenRepo) GetByTokenTx(ctx context.Context, tx pgx.Tx, token string) (*entity.RefreshToken, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		SELECT id, user_id, token, expires_at, created_at, updated_at
 		FROM refresh_tokens WHERE token = $1
 	`, token)
@@ -43,7 +42,7 @@ func (r *RefreshTokenRepo) GetByToken(ctx context.Context, token string) (*entit
 // --- Nhóm 2: Thao tác Token (Transactional) ---
 
 func (r *RefreshTokenRepo) CreateTx(ctx context.Context, tx pgx.Tx, t *entity.RefreshToken) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -60,7 +59,7 @@ func (r *RefreshTokenRepo) CreateTx(ctx context.Context, tx pgx.Tx, t *entity.Re
 }
 
 func (r *RefreshTokenRepo) DeleteByTokenTx(ctx context.Context, tx pgx.Tx, token string) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -69,12 +68,3 @@ func (r *RefreshTokenRepo) DeleteByTokenTx(ctx context.Context, tx pgx.Tx, token
 	return err
 }
 
-func (r *RefreshTokenRepo) DeleteAllByUserIDTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
-	if err != nil {
-		return err
-	}
-
-	_, err = q.Exec(ctx, "DELETE FROM refresh_tokens WHERE user_id = $1", userID)
-	return err
-}
