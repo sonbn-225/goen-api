@@ -51,7 +51,7 @@ func (h *ProfileHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *ProfileHandler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -91,7 +91,7 @@ func isMissingUserError(err error) bool {
 func (h *ProfileHandler) PatchMyProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -130,7 +130,7 @@ func (h *ProfileHandler) PatchMyProfile(w http.ResponseWriter, r *http.Request) 
 func (h *ProfileHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *ProfileHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 func (h *ProfileHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -204,7 +204,7 @@ func (h *ProfileHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 func (h *ProfileHandler) GetMyAvatars(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 

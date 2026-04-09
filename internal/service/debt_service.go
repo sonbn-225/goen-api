@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 	"github.com/sonbn-225/goen-api/internal/repository/postgres"
@@ -79,12 +79,16 @@ func (s *DebtService) CreateTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID,
 
 	principal := strings.TrimSpace(req.Principal)
 	if !utils.IsValidDecimal(principal) {
-		return nil, errors.New("invalid principal amount")
+		return nil, apperr.BadRequest("invalid_principal", "invalid principal amount").
+			WithDetail("field", "principal").
+			WithDetail("value", principal)
 	}
 
 	accountID, err := uuid.Parse(req.AccountID)
 	if err != nil {
-		return nil, errors.New("invalid account ID")
+		return nil, apperr.BadRequest("invalid_account_id", "invalid account ID").
+			WithDetail("field", "account_id").
+			WithDetail("value", req.AccountID)
 	}
 
 	var originatingTxID *uuid.UUID
@@ -269,7 +273,7 @@ func (s *DebtService) AddPaymentTx(ctx context.Context, tx pgx.Tx, userID uuid.U
 		return nil, err
 	}
 	if debt == nil {
-		return nil, errors.New("debt not found")
+		return nil, apperr.NotFound("debt not found")
 	}
 
 	principalPaid := "0"
@@ -322,7 +326,9 @@ func (s *DebtService) AddPaymentTx(ctx context.Context, tx pgx.Tx, userID uuid.U
 
 	transactionID, err := uuid.Parse(req.TransactionID)
 	if err != nil {
-		return nil, errors.New("invalid transaction ID")
+		return nil, apperr.BadRequest("invalid_transaction_id", "invalid transaction ID").
+			WithDetail("field", "transaction_id").
+			WithDetail("value", req.TransactionID)
 	}
 
 	link := entity.DebtPaymentLink{
@@ -358,12 +364,12 @@ func (s *DebtService) Repay(ctx context.Context, userID uuid.UUID, debtID uuid.U
 			return err
 		}
 		if debt == nil {
-			return errors.New("debt not found")
+			return apperr.NotFound("debt not found")
 		}
 
 		accountID, err := uuid.Parse(req.AccountID)
 		if err != nil {
-			return errors.New("invalid account ID")
+			return apperr.BadRequest("invalid_account_id", "invalid account ID")
 		}
 
 		// 1. Create Transaction for repayment

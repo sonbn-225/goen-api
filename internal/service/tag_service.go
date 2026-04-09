@@ -2,7 +2,6 @@ package service
  
 import (
 	"context"
-	"errors"
 	"strings"
  
 	"github.com/google/uuid"
@@ -10,6 +9,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
  
 type TagService struct {
@@ -24,7 +24,7 @@ func (s *TagService) Create(ctx context.Context, userID uuid.UUID, req dto.Creat
 	nameVI := utils.NormalizeOptionalString(req.NameVI)
 	nameEN := utils.NormalizeOptionalString(req.NameEN)
 	if nameVI == nil && nameEN == nil {
-		return nil, errors.New("at least one name is required")
+		return nil, apperr.BadRequest("missing_names", "at least one name is required")
 	}
  
 	color := utils.NormalizeOptionalString(req.Color)
@@ -81,7 +81,7 @@ func (s *TagService) List(ctx context.Context, userID uuid.UUID) ([]dto.TagRespo
 func (s *TagService) GetOrCreateByName(ctx context.Context, userID uuid.UUID, name, langHint string) (uuid.UUID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return uuid.Nil, errors.New("tag name cannot be empty")
+		return uuid.Nil, apperr.BadRequest("empty_tag", "tag name cannot be empty")
 	}
  
 	tags, err := s.repo.ListTagsTx(ctx, nil, userID)

@@ -33,28 +33,30 @@ func NewWithDetails(status int, code, message string, details map[string]any) *A
 	}
 }
 
+func (e *AppError) WithDetail(key string, value any) *AppError {
+	if e.Details == nil {
+		e.Details = make(map[string]any)
+	}
+	e.Details[key] = value
+	return e
+}
+
+func (e *AppError) WithDetails(details map[string]any) *AppError {
+	if e.Details == nil {
+		e.Details = make(map[string]any)
+	}
+	for k, v := range details {
+		e.Details[k] = v
+	}
+	return e
+}
+
 // Common Error Factories
 func BadRequest(code, message string) *AppError {
 	if code == "" {
 		code = "bad_request"
 	}
 	return New(http.StatusBadRequest, code, message)
-}
-
-func Unauthorized(message string) *AppError {
-	return New(http.StatusUnauthorized, "unauthorized", message)
-}
-
-func Forbidden(message string) *AppError {
-	return New(http.StatusForbidden, "forbidden", message)
-}
-
-func NotFound(message string) *AppError {
-	return New(http.StatusNotFound, "not_found", message)
-}
-
-func Conflict(message string) *AppError {
-	return New(http.StatusConflict, "conflict", message)
 }
 
 func Internal(message string) *AppError {
@@ -64,13 +66,38 @@ func Internal(message string) *AppError {
 	return New(http.StatusInternalServerError, "internal_error", message)
 }
 
+func Unauthorized(code, message string) *AppError {
+	if code == "" {
+		code = "unauthorized"
+	}
+	return New(http.StatusUnauthorized, code, message)
+}
+
+func Forbidden(code, message string) *AppError {
+	if code == "" {
+		code = "forbidden"
+	}
+	return New(http.StatusForbidden, code, message)
+}
+
+func NotFound(message string) *AppError {
+	return New(http.StatusNotFound, "not_found", message)
+}
+
+func Conflict(code, message string) *AppError {
+	if code == "" {
+		code = "conflict"
+	}
+	return New(http.StatusConflict, code, message)
+}
+
 // Specific Error Presets
 var (
 	ErrInvalidID          = BadRequest("invalid_id", "The provided ID is invalid")
 	ErrInvalidRequest     = BadRequest("invalid_request", "The request is invalid or malformed")
-	ErrInvalidCredentials = Unauthorized("Invalid login credentials")
-	ErrTokenExpired       = Unauthorized("Session expired or invalid")
+	ErrInvalidCredentials = Unauthorized("invalid_credentials", "Invalid login credentials")
+	ErrTokenExpired       = Unauthorized("token_expired", "Session expired or invalid")
 	ErrNotFound           = NotFound("The requested resource was not found")
-	ErrConflict           = Conflict("A conflict occurred with the current state of the resource")
+	ErrConflict           = Conflict("conflict", "A conflict occurred with the current state of the resource")
 	ErrInternal           = Internal("An internal server error occurred")
 )

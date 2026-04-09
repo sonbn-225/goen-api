@@ -50,7 +50,7 @@ func (h *ContactHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *ContactHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	items, err := h.svc.List(r.Context(), userID)
@@ -76,7 +76,7 @@ func (h *ContactHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *ContactHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	var req dto.CreateContactRequest
@@ -106,7 +106,7 @@ func (h *ContactHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *ContactHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -143,7 +143,7 @@ func (h *ContactHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -181,7 +181,7 @@ func (h *ContactHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *ContactHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))

@@ -54,7 +54,7 @@ func (h *TransactionHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -126,7 +126,7 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -159,7 +159,7 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -199,7 +199,7 @@ func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -242,7 +242,7 @@ func (h *TransactionHandler) Patch(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -275,7 +275,7 @@ func (h *TransactionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *TransactionHandler) BatchPatch(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 

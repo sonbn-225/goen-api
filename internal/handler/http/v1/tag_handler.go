@@ -46,7 +46,7 @@ func (h *TagHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *TagHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -108,7 +108,7 @@ func (h *TagHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *TagHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 

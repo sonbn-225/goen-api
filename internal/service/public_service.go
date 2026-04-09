@@ -2,12 +2,12 @@ package service
  
 import (
 	"context"
-	"errors"
 	"strings"
  
 	"github.com/google/uuid"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
  
 type PublicService struct {
@@ -60,16 +60,16 @@ func (s *PublicService) GetPaymentInfo(ctx context.Context, userRef string) (*en
 	uSettings, _ := u.Settings.(map[string]any)
 	settings, _ := uSettings["public_payment"].(map[string]any)
 	if settings == nil {
-		return nil, errors.New("public payment settings not found")
+		return nil, apperr.NotFound("public payment settings not found")
 	}
 	accIDStr, ok := settings["default_account_id"].(string)
 	if !ok || accIDStr == "" {
-		return nil, errors.New("default payment account not configured")
+		return nil, apperr.BadRequest("missing_account", "default payment account not configured")
 	}
  
 	accID, err := uuid.Parse(accIDStr)
 	if err != nil {
-		return nil, errors.New("invalid default account id format")
+		return nil, apperr.BadRequest("invalid_account_id", "invalid default account id format")
 	}
  
 	acc, err := s.accountRepo.GetAccountForUserTx(ctx, nil, u.ID, accID)
@@ -109,7 +109,7 @@ func (s *PublicService) GetDebts(ctx context.Context, userRef string, participan
 func (s *PublicService) resolvePublicUser(ctx context.Context, userRef string) (*entity.User, error) {
 	ref := strings.TrimSpace(userRef)
 	if ref == "" {
-		return nil, errors.New("user reference is required")
+		return nil, apperr.BadRequest("missing_reference", "user reference is required")
 	}
  
 	// Resolve user by username, email or phone
@@ -121,7 +121,7 @@ func (s *PublicService) resolvePublicUser(ctx context.Context, userRef string) (
 		// Fallback to lookup by UUID string if direct resolution fails
 		uid, err := uuid.Parse(ref)
 		if err != nil {
-			return nil, errors.New("user not found")
+			return nil, apperr.NotFound("user not found")
 		}
 		u, err = s.userRepo.FindUserByIDTx(ctx, nil, uid)
 		if err != nil {
@@ -133,7 +133,7 @@ func (s *PublicService) resolvePublicUser(ctx context.Context, userRef string) (
 	settings, _ := u.Settings.(map[string]any)
 	enabled, _ := settings["public_sharing_enabled"].(bool)
 	if !enabled {
-		return nil, errors.New("user has disabled public sharing")
+		return nil, apperr.Forbidden("sharing_disabled", "user has disabled public sharing")
 	}
 
 	return u, nil

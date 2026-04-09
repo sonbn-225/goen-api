@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -13,6 +12,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 	"github.com/sonbn-225/goen-api/internal/pkg/validation"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
 
 type AccountService struct {
@@ -59,12 +59,14 @@ func (s *AccountService) Get(ctx context.Context, userID, accountID uuid.UUID) (
 func (s *AccountService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateAccountRequest) (*dto.AccountResponse, error) {
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		return nil, errors.New("account name is required")
+		return nil, apperr.BadRequest("missing_name", "account name is required").WithDetail("field", "name")
 	}
 
 	accountType := strings.TrimSpace(req.AccountType)
 	if !validation.IsValidAccountType(accountType) {
-		return nil, errors.New("invalid account type")
+		return nil, apperr.BadRequest("invalid_type", "invalid account type").
+			WithDetail("field", "account_type").
+			WithDetail("value", accountType)
 	}
 
 	currency := strings.ToUpper(strings.TrimSpace(req.Currency))
@@ -76,14 +78,18 @@ func (s *AccountService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 	if req.ParentAccountID != nil && *req.ParentAccountID != "" {
 		parsed, err := uuid.Parse(*req.ParentAccountID)
 		if err != nil {
-			return nil, errors.New("invalid parent account ID")
+			return nil, apperr.BadRequest("invalid_parent_id", "invalid parent account ID").
+				WithDetail("field", "parent_account_id").
+				WithDetail("value", *req.ParentAccountID)
 		}
 		parentID = &parsed
 	}
 
 	// Basic validation for sub-accounts
 	if (accountType == "card" || accountType == "savings") && parentID == nil {
-		return nil, errors.New("parent account ID is required for card or savings accounts")
+		return nil, apperr.BadRequest("missing_parent", "parent account ID is required for card or savings accounts").
+			WithDetail("field", "parent_account_id").
+			WithDetail("account_type", accountType)
 	}
 
 	id := utils.NewID()
@@ -128,7 +134,7 @@ func (s *AccountService) Patch(ctx context.Context, userID, accountID uuid.UUID,
 			return err
 		}
 		if cur == nil {
-			return errors.New("account not found")
+			return apperr.NotFound("account not found").WithDetail("account_id", accountID)
 		}
 
 		patch := entity.AccountPatch{
@@ -161,11 +167,11 @@ func (s *AccountService) Delete(ctx context.Context, userID, accountID uuid.UUID
 		return err
 	}
 	if acc == nil {
-		return errors.New("account not found")
+		return apperr.NotFound("account not found")
 	}
 
 	if acc.AccountType == entity.AccountTypeCash {
-		return errors.New("cash account cannot be deleted; should be closed instead")
+		return apperr.BadRequest("cannot_delete_cash", "cash account cannot be deleted; should be closed instead")
 	}
 
 	// Khi xóa hẳn tài khoản, chúng ta cũng thực hiện xóa mềm toàn bộ các giao dịch liên quan
@@ -206,10 +212,10 @@ func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID uuid
 			return err
 		}
 		if target == nil {
-			return errors.New("user not found")
+			return apperr.NotFound("user not found").WithDetail("login", login)
 		}
 		if target.ID == userID {
-			return errors.New("cannot share with yourself")
+			return apperr.BadRequest("cannot_share_with_self", "cannot share with yourself").WithDetail("user_id", userID)
 		}
 
 		it, err = s.repo.UpsertAccountShareTx(ctx, tx, userID, accountID, target.ID, permission)

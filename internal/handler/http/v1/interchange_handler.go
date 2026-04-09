@@ -55,7 +55,7 @@ func (h *InterchangeHandler) StageImport(w http.ResponseWriter, r *http.Request)
 	resourceType := chi.URLParam(r, "resourceType")
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -83,7 +83,7 @@ func (h *InterchangeHandler) ListStaged(w http.ResponseWriter, r *http.Request) 
 	resourceType := chi.URLParam(r, "resourceType")
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -100,7 +100,7 @@ func (h *InterchangeHandler) ListStaged(w http.ResponseWriter, r *http.Request) 
 func (h *InterchangeHandler) PatchStaged(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -129,7 +129,7 @@ func (h *InterchangeHandler) PatchStaged(w http.ResponseWriter, r *http.Request)
 func (h *InterchangeHandler) DeleteStaged(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -152,7 +152,7 @@ func (h *InterchangeHandler) ClearStaged(w http.ResponseWriter, r *http.Request)
 	resourceType := chi.URLParam(r, "resourceType")
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -169,7 +169,7 @@ func (h *InterchangeHandler) ListRules(w http.ResponseWriter, r *http.Request) {
 	resourceType := chi.URLParam(r, "resourceType")
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -187,7 +187,7 @@ func (h *InterchangeHandler) UpsertRules(w http.ResponseWriter, r *http.Request)
 	resourceType := chi.URLParam(r, "resourceType")
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -210,7 +210,7 @@ func (h *InterchangeHandler) UpsertRules(w http.ResponseWriter, r *http.Request)
 func (h *InterchangeHandler) DeleteRule(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -233,7 +233,7 @@ func (h *InterchangeHandler) ApplyRulesAndCreate(w http.ResponseWriter, r *http.
 	resourceType := chi.URLParam(r, "resourceType")
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -251,7 +251,7 @@ func (h *InterchangeHandler) CreateManyFromStaged(w http.ResponseWriter, r *http
 	resourceType := chi.URLParam(r, "resourceType")
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -275,7 +275,7 @@ func (h *InterchangeHandler) Export(w http.ResponseWriter, r *http.Request) {
 	resourceType := chi.URLParam(r, "resourceType")
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 

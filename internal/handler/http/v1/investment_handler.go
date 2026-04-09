@@ -59,7 +59,7 @@ func (h *InvestmentHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -91,7 +91,7 @@ func (h *InvestmentHandler) ListTrades(w http.ResponseWriter, r *http.Request) {
 func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -129,7 +129,7 @@ func (h *InvestmentHandler) CreateTrade(w http.ResponseWriter, r *http.Request) 
 func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -173,7 +173,7 @@ func (h *InvestmentHandler) UpdateTrade(w http.ResponseWriter, r *http.Request) 
 func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -207,7 +207,7 @@ func (h *InvestmentHandler) DeleteTrade(w http.ResponseWriter, r *http.Request) 
 func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -236,7 +236,7 @@ func (h *InvestmentHandler) ListHoldings(w http.ResponseWriter, r *http.Request)
 func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -255,7 +255,7 @@ func (h *InvestmentHandler) GetRealizedPNLReport(w http.ResponseWriter, r *http.
 func (h *InvestmentHandler) ListEligibleActions(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -274,7 +274,7 @@ func (h *InvestmentHandler) ListEligibleActions(w http.ResponseWriter, r *http.R
 func (h *InvestmentHandler) ClaimAction(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -305,7 +305,7 @@ func (h *InvestmentHandler) ClaimAction(w http.ResponseWriter, r *http.Request) 
 func (h *InvestmentHandler) BackfillCash(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))

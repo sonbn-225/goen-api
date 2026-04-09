@@ -77,7 +77,7 @@ func (h *MarketDataHandler) GetGlobalStatus(w http.ResponseWriter, r *http.Reque
 func (h *MarketDataHandler) MarketSync(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	var req dto.MarketSyncRequest
@@ -114,7 +114,7 @@ func (h *MarketDataHandler) MarketSync(w http.ResponseWriter, r *http.Request) {
 func (h *MarketDataHandler) SyncCatalog(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
  
@@ -149,7 +149,7 @@ func (h *MarketDataHandler) SyncCatalog(w http.ResponseWriter, r *http.Request) 
 func (h *MarketDataHandler) RefreshSymbols(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	var req dto.RefreshSymbolsRequest
@@ -192,7 +192,7 @@ func (h *MarketDataHandler) RefreshSymbols(w http.ResponseWriter, r *http.Reques
 func (h *MarketDataHandler) GetSecurityStatus(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -224,7 +224,7 @@ func (h *MarketDataHandler) GetSecurityStatus(w http.ResponseWriter, r *http.Req
 func (h *MarketDataHandler) RefreshPrices(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -275,7 +275,7 @@ func (h *MarketDataHandler) RefreshPrices(w http.ResponseWriter, r *http.Request
 func (h *MarketDataHandler) RefreshEvents(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))

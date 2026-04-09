@@ -53,7 +53,7 @@ func (h *RotatingSavingsHandler) RegisterRoutes(r chi.Router, cfg *config.Config
 func (h *RotatingSavingsHandler) ListRotatingGroups(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	groups, err := h.rotatingSvc.ListGroups(r.Context(), userID)
@@ -79,7 +79,7 @@ func (h *RotatingSavingsHandler) ListRotatingGroups(w http.ResponseWriter, r *ht
 func (h *RotatingSavingsHandler) CreateRotatingGroup(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	var req dto.CreateRotatingSavingsGroupRequest
@@ -108,7 +108,7 @@ func (h *RotatingSavingsHandler) CreateRotatingGroup(w http.ResponseWriter, r *h
 func (h *RotatingSavingsHandler) GetRotatingGroupDetail(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -144,7 +144,7 @@ func (h *RotatingSavingsHandler) GetRotatingGroupDetail(w http.ResponseWriter, r
 func (h *RotatingSavingsHandler) UpdateRotatingGroup(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -182,7 +182,7 @@ func (h *RotatingSavingsHandler) UpdateRotatingGroup(w http.ResponseWriter, r *h
 func (h *RotatingSavingsHandler) DeleteRotatingGroup(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -213,7 +213,7 @@ func (h *RotatingSavingsHandler) DeleteRotatingGroup(w http.ResponseWriter, r *h
 func (h *RotatingSavingsHandler) CreateContribution(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -248,7 +248,7 @@ func (h *RotatingSavingsHandler) CreateContribution(w http.ResponseWriter, r *ht
 func (h *RotatingSavingsHandler) DeleteContribution(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
