@@ -139,6 +139,53 @@ func (r *DebtRepo) ListPaymentLinksByTransactionTx(ctx context.Context, tx pgx.T
 	return results, nil
 }
 
+func (r *DebtRepo) ListDebtsByOriginatingTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) ([]entity.Debt, error) {
+	q, err := r.Queryer(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := q.Query(ctx, `
+		SELECT
+			d.id, d.user_id, d.account_id, d.direction, d.name, d.contact_id,
+			COALESCE(u.display_name, c.name) AS contact_name,
+			COALESCE(u.avatar_url, c.avatar_url) AS contact_avatar_url,
+			d.principal::text, a.currency,
+			to_char(d.start_date, 'YYYY-MM-DD'), to_char(d.due_date, 'YYYY-MM-DD'),
+			d.interest_rate::text, d.interest_rule,
+			d.outstanding_principal::text, d.accrued_interest::text,
+			d.status, d.closed_at, d.originating_transaction_id, d.created_at, d.updated_at, d.deleted_at
+			
+		FROM debts d
+		LEFT JOIN accounts a ON a.id = d.account_id
+		LEFT JOIN contacts c ON d.contact_id = c.id
+		LEFT JOIN users u ON c.linked_user_id = u.id
+		WHERE d.user_id = $1 AND d.originating_transaction_id = $2 AND d.deleted_at IS NULL
+		ORDER BY d.id ASC
+	`, userID, transactionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []entity.Debt
+	for rows.Next() {
+		var d entity.Debt
+		err := rows.Scan(
+			&d.ID, &d.UserID, &d.AccountID, &d.Direction, &d.Name, &d.ContactID,
+			&d.ContactName, &d.ContactAvatarURL, &d.Principal, &d.Currency,
+			&d.StartDate, &d.DueDate, &d.InterestRate, &d.InterestRule,
+			&d.OutstandingPrincipal, &d.AccruedInterest, &d.Status, &d.ClosedAt,
+			&d.OriginatingTransactionID, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, d)
+	}
+	return items, nil
+}
+
 func (r *DebtRepo) ListInstallmentsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtInstallment, error) {
 	q, err := r.Queryer(ctx, tx)
 	if err != nil {

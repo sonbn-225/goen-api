@@ -119,6 +119,8 @@ type TransactionResponse struct {
 	TagNames        []string                      `json:"tag_names,omitempty"`            // Enriched tag names
 	CategoryColors  []string                      `json:"category_colors,omitempty"`       // Enriched category UI colors
 	TagColors       []string                      `json:"tag_colors,omitempty"`           // Enriched tag UI colors
+	DebtLinks       []DebtPaymentLinkResponse     `json:"debt_links,omitempty"`            // Related debt payment links
+	GroupParticipants []DebtResponse              `json:"group_participants,omitempty"`     // Members of a shared expense (stored as debts)
 }
 
 

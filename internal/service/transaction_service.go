@@ -93,7 +93,22 @@ func (s *TransactionService) Get(ctx context.Context, userID, transactionID uuid
 	if it == nil {
 		return nil, nil
 	}
-	resp := dto.NewTransactionResponse(*it)
+
+	var debtLinks []dto.DebtPaymentLinkResponse
+	var groupParticipants []dto.DebtResponse
+
+	if s.debtSvc != nil {
+		// 1. Fetch payment links where this transaction is a payment for a debt
+		if links, err := s.debtSvc.ListPaymentLinksByTransaction(ctx, userID, transactionID); err == nil {
+			debtLinks = links
+		}
+		// 2. Fetch debts where this transaction is the originating one (shared expense)
+		if parts, err := s.debtSvc.ListDebtsByOriginatingTransaction(ctx, userID, transactionID); err == nil {
+			groupParticipants = parts
+		}
+	}
+
+	resp := dto.NewTransactionResponse(*it, debtLinks, groupParticipants)
 	return &resp, nil
 }
 
@@ -264,7 +279,7 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 		if it == nil {
 			return apperr.Internal("failed to retrieve created transaction")
 		}
-		tr := dto.NewTransactionResponse(*it)
+		tr := dto.NewTransactionResponse(*it, nil, nil)
 		resp = &tr
 
 		// Audit Logging
@@ -328,7 +343,7 @@ func (s *TransactionService) Patch(ctx context.Context, userID, transactionID uu
 	if it == nil {
 		return nil, nil
 	}
-	resp := dto.NewTransactionResponse(*it)
+	resp := dto.NewTransactionResponse(*it, nil, nil)
 
 	// Audit Logging
 	if it.AccountID != nil {

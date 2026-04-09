@@ -4,7 +4,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
-func NewTransactionResponse(t entity.Transaction) TransactionResponse {
+func NewTransactionResponse(t entity.Transaction, debtLinks []DebtPaymentLinkResponse, groupParticipants []DebtResponse) TransactionResponse {
 	lineItems := make([]TransactionLineItemResponse, len(t.LineItems))
 	for i, li := range t.LineItems {
 		lineItems[i] = TransactionLineItemResponse{
@@ -41,13 +41,15 @@ func NewTransactionResponse(t entity.Transaction) TransactionResponse {
 		TagNames:        t.TagNames,
 		CategoryColors:  t.CategoryColors,
 		TagColors:       t.TagColors,
+		DebtLinks:       debtLinks,
+		GroupParticipants: groupParticipants,
 	}
 }
 
 func NewTransactionResponses(items []entity.Transaction) []TransactionResponse {
 	out := make([]TransactionResponse, len(items))
 	for i, it := range items {
-		out[i] = NewTransactionResponse(it)
+		out[i] = NewTransactionResponse(it, nil, nil)
 	}
 	return out
 }
