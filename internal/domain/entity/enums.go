@@ -178,3 +178,43 @@ const (
 	CategoryTypeExpense CategoryType = "expense"
 	CategoryTypeIncome  CategoryType = "income"
 )
+
+// AuditResourceType defines the type of resource being audited.
+type AuditResourceType string
+
+// Resource types for auditing
+const (
+	ResourceAccount              AuditResourceType = "account"
+	ResourceTransaction          AuditResourceType = "transaction"
+	ResourceRotatingSavings      AuditResourceType = "rotating_savings_group"
+	ResourceBudget               AuditResourceType = "budget"
+	ResourceDebt                 AuditResourceType = "debt"
+	ResourceCategory             AuditResourceType = "category"
+	ResourceTag                  AuditResourceType = "tag"
+	ResourceContact              AuditResourceType = "contact"
+	ResourceUser                 AuditResourceType = "user"
+	ResourceRotatingContribution AuditResourceType = "rotating_contribution"
+	ResourceSavings              AuditResourceType = "savings"
+	ResourceInvestment           AuditResourceType = "investment"
+	ResourceTrade                AuditResourceType = "trade"
+	ResourceStagedImport        AuditResourceType = "staged_import"
+)
+
+// AuditAction defines the action performed on a resource.
+type AuditAction string
+
+// Common actions for auditing
+const (
+	ActionCreated         AuditAction = "created"
+	ActionUpdated         AuditAction = "updated"
+	ActionDeleted         AuditAction = "deleted"
+	ActionArchived        AuditAction = "archived"
+	ActionRestored        AuditAction = "restored"
+	ActionShared          AuditAction = "shared"
+	ActionRevoked         AuditAction = "revoked"
+	ActionPayout          AuditAction = "payout"
+	ActionContribution    AuditAction = "contribution"
+	ActionStatusChanged   AuditAction = "status_changed"
+	ActionLogin           AuditAction = "login"
+	ActionSettingsChanged AuditAction = "settings_changed"
+)

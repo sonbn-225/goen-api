@@ -17,10 +17,11 @@ import (
 type BudgetService struct {
 	repo         interfaces.BudgetRepository
 	categoryRepo interfaces.CategoryRepository
+	auditSvc     interfaces.AuditService
 }
 
-func NewBudgetService(repo interfaces.BudgetRepository, categoryRepo interfaces.CategoryRepository) *BudgetService {
-	return &BudgetService{repo: repo, categoryRepo: categoryRepo}
+func NewBudgetService(repo interfaces.BudgetRepository, categoryRepo interfaces.CategoryRepository, auditSvc interfaces.AuditService) *BudgetService {
+	return &BudgetService{repo: repo, categoryRepo: categoryRepo, auditSvc: auditSvc}
 }
 
 func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateBudgetRequest) (*dto.BudgetWithStatsResponse, error) {
@@ -84,6 +85,8 @@ func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, req dto.Cr
 		return nil, err
 	}
 
+	_ = s.auditSvc.Record(ctx, nil, userID, nil, entity.ResourceBudget, entity.ActionCreated, b.ID, nil, b)
+
 	return s.Get(ctx, userID, b.ID)
 }
 
@@ -133,6 +136,8 @@ func (s *BudgetService) Update(ctx context.Context, userID uuid.UUID, budgetID u
 	if err := s.repo.UpdateBudgetTx(ctx, nil, userID, *cur); err != nil {
 		return nil, err
 	}
+
+	_ = s.auditSvc.Record(ctx, nil, userID, nil, entity.ResourceBudget, entity.ActionUpdated, budgetID, nil, cur)
 	return s.Get(ctx, userID, budgetID)
 }
 

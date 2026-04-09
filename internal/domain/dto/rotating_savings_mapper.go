@@ -71,3 +71,19 @@ func NewRotatingSavingsAuditLogResponses(items []entity.RotatingSavingsAuditLog)
 	}
 	return out
 }
+
+func NewRotatingSavingsAuditLogResponsesFromUnified(items []entity.AuditLog) []RotatingSavingsAuditLogResponse {
+	out := make([]RotatingSavingsAuditLogResponse, len(items))
+	for i, l := range items {
+		resourceID := l.ResourceID
+		out[i] = RotatingSavingsAuditLogResponse{
+			ID:        l.ID,
+			UserID:    l.ActorUserID,
+			GroupID:   &resourceID,
+			Action:    entity.RotatingSavingsAuditAction(l.Action),
+			Details:   l.Metadata,
+			CreatedAt: l.OccurredAt,
+		}
+	}
+	return out
+}

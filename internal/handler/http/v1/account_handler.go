@@ -3,7 +3,6 @@ package v1
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
  
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -35,7 +34,6 @@ func (h *AccountHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 				r.Patch("/", h.Patch)
 				r.Delete("/", h.Delete)
 				r.Get("/shares", h.ListShares)
-				r.Get("/audit-events", h.ListAuditEvents)
 				r.Put("/shares", h.UpsertShare)
 				r.Delete("/shares/{userId}", h.RevokeShare)
 			})
@@ -261,50 +259,6 @@ func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
  
 	// 3. Danh sách những ai đang được chia sẻ quyền truy cập tài khoản này (chỉ chủ sở hữu mới xem được)
 	items, err := h.svc.ListShares(r.Context(), userID, accountID)
-	if err != nil {
-		response.HandleError(w, err)
-		return
-	}
- 
-	response.WriteSuccess(w, http.StatusOK, items)
-}
- 
-// ListAuditEvents godoc
-// @Summary List Account Audit Events
-// @Description List recent audit events for an account visible to the current user
-// @Tags Accounts
-// @Produce json
-// @Security BearerAuth
-// @Param accountId path string true "Account ID"
-// @Param limit query int false "Max number of events" default(50)
-// @Success 200 {object} response.SuccessEnvelope{data=[]dto.AccountAuditEventResponse}
-// @Failure 400 {object} response.ErrorEnvelope
-// @Failure 401 {object} response.ErrorEnvelope
-// @Router /accounts/{accountId}/audit-events [get]
-func (h *AccountHandler) ListAuditEvents(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
-		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
-		return
-	}
- 
-	accountID, err := uuid.Parse(chi.URLParam(r, "accountId"))
-	if err != nil {
-		response.WriteError(w, http.StatusBadRequest, "invalid_id", "invalid account id format", nil)
-		return
-	}
- 
-	limit := 50
-	if rawLimit := r.URL.Query().Get("limit"); rawLimit != "" {
-		parsedLimit, err := strconv.Atoi(rawLimit)
-		if err != nil {
-			response.WriteError(w, http.StatusBadRequest, "validation_error", "limit must be an integer", nil)
-			return
-		}
-		limit = parsedLimit
-	}
- 
-	items, err := h.svc.ListAuditEvents(r.Context(), userID, accountID, limit)
 	if err != nil {
 		response.HandleError(w, err)
 		return

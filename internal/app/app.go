@@ -11,11 +11,13 @@ import (
 	"github.com/rs/cors"
 	_ "github.com/sonbn-225/goen-api/docs"
 	v1 "github.com/sonbn-225/goen-api/internal/handler/http/v1"
+	"github.com/sonbn-225/goen-api/internal/app/jobs"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/storage"
 	"github.com/sonbn-225/goen-api/internal/repository/postgres"
 	"github.com/sonbn-225/goen-api/internal/service"
+	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
@@ -25,6 +27,7 @@ type App struct {
 	Redis  *database.Redis
 	S3     *storage.S3Client
 	Router *chi.Mux
+	AuditRepo interfaces.AuditRepository
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -73,23 +76,26 @@ func New(cfg *config.Config) (*App, error) {
 	savingsRepo := postgres.NewSavingsRepo(db)
 	rotatingSavingsRepo := postgres.NewRotatingSavingsRepo(db)
 	interchangeRepo := postgres.NewInterchangeRepo(db)
+	auditRepo := postgres.NewAuditRepo(db)
 
 	// Services
 	authSvc := service.NewAuthService(userRepo, refreshRepo, s3, cfg)
 	categorySvc := service.NewCategoryService(categoryRepo, rds)
-	tagSvc := service.NewTagService(tagRepo)
-	accountSvc := service.NewAccountService(accountRepo, userRepo, transactionRepo, db)
-	transactionSvc := service.NewTransactionService(transactionRepo, tagSvc, accountRepo, db)
-	contactSvc := service.NewContactService(contactRepo)
-	debtSvc := service.NewDebtService(debtRepo, transactionRepo, contactSvc, db)
-	budgetSvc := service.NewBudgetService(budgetRepo, categoryRepo)
+	auditSvc := service.NewAuditService(auditRepo)
+	tagSvc := service.NewTagService(tagRepo, auditSvc)
+
+	accountSvc := service.NewAccountService(accountRepo, userRepo, transactionRepo, auditSvc, db)
+	transactionSvc := service.NewTransactionService(transactionRepo, tagSvc, auditSvc, db)
+	contactSvc := service.NewContactService(contactRepo, auditSvc)
+	debtSvc := service.NewDebtService(debtRepo, transactionRepo, contactSvc, auditSvc, db)
+	budgetSvc := service.NewBudgetService(budgetRepo, categoryRepo, auditSvc)
 	reportSvc := service.NewReportService(reportRepo, accountRepo)
 	securitySvc := service.NewSecurityService(securityRepo)
-	investmentSvc := service.NewInvestmentService(investmentRepo, transactionRepo, accountRepo, transactionSvc, securitySvc, db)
+	investmentSvc := service.NewInvestmentService(investmentRepo, transactionRepo, accountRepo, transactionSvc, securitySvc, auditSvc, db)
 	marketDataSvc := service.NewMarketDataService(cfg, marketDataRepo, rds, securitySvc)
-	savingsSvc := service.NewSavingsService(savingsRepo, accountRepo, transactionRepo, transactionSvc, db)
-	rotatingSavingsSvc := service.NewRotatingSavingsService(rotatingSavingsRepo, transactionRepo, categoryRepo, accountSvc, transactionSvc, db)
-	interchangeSvc := service.NewInterchangeService(interchangeRepo, transactionSvc, db)
+	savingsSvc := service.NewSavingsService(savingsRepo, accountRepo, transactionRepo, transactionSvc, auditSvc, db)
+	rotatingSavingsSvc := service.NewRotatingSavingsService(rotatingSavingsRepo, transactionRepo, categoryRepo, accountSvc, transactionSvc, auditSvc, db)
+	interchangeSvc := service.NewInterchangeService(interchangeRepo, transactionSvc, auditSvc, db)
 	publicSvc := service.NewPublicService(userRepo, accountRepo, debtRepo)
 
 	// Cross-inject
@@ -116,6 +122,7 @@ func New(cfg *config.Config) (*App, error) {
 	rotatingSavingsHandler := v1.NewRotatingSavingsHandler(rotatingSavingsSvc)
 	interchangeHandler := v1.NewInterchangeHandler(interchangeSvc)
 	publicHandler := v1.NewPublicHandler(publicSvc)
+	auditHandler := v1.NewAuditHandler(auditSvc)
 
 	r := chi.NewRouter()
 
@@ -183,6 +190,7 @@ func New(cfg *config.Config) (*App, error) {
 		rotatingSavingsHandler.RegisterRoutes(r, cfg)
 		interchangeHandler.RegisterRoutes(r, cfg)
 		publicHandler.RegisterRoutes(r, cfg)
+		auditHandler.RegisterRoutes(r, cfg)
 	})
 
 	return &App{
@@ -191,7 +199,13 @@ func New(cfg *config.Config) (*App, error) {
 		Redis:  rds,
 		S3:     s3,
 		Router: r,
+		AuditRepo: auditRepo,
 	}, nil
+}
+
+func (a *App) StartJobs(ctx context.Context) {
+	cleanupJob := jobs.NewAuditCleanupJob(a.AuditRepo)
+	go cleanupJob.Start(ctx)
 }
 
 func (a *App) Close(ctx context.Context) {

@@ -34,15 +34,17 @@ type DebtService struct {
 	repo       interfaces.DebtRepository
 	txRepo     interfaces.TransactionRepository
 	contactSvc interfaces.ContactService
+	auditSvc   interfaces.AuditService
 	db         *database.Postgres
 }
 
 // NewDebtService khởi tạo một dịch vụ quản lý nợ mới.
-func NewDebtService(repo interfaces.DebtRepository, txRepo interfaces.TransactionRepository, contactSvc interfaces.ContactService, db *database.Postgres) *DebtService {
+func NewDebtService(repo interfaces.DebtRepository, txRepo interfaces.TransactionRepository, contactSvc interfaces.ContactService, auditSvc interfaces.AuditService, db *database.Postgres) *DebtService {
 	return &DebtService{
 		repo:       repo,
 		txRepo:     txRepo,
 		contactSvc: contactSvc,
+		auditSvc:   auditSvc,
 		db:         db,
 	}
 }
@@ -170,6 +172,8 @@ func (s *DebtService) CreateTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID,
 		return nil, err
 	}
 
+	_ = s.auditSvc.Record(ctx, tx, userID, d.AccountID, entity.ResourceDebt, entity.ActionCreated, d.ID, nil, d)
+
 	created, err := s.repo.GetDebtTx(ctx, tx, userID, d.ID)
 	if err != nil {
 		return nil, err
@@ -227,7 +231,12 @@ func (s *DebtService) Update(ctx context.Context, userID uuid.UUID, debtID uuid.
 	}
 
 	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return s.repo.UpdateDebtTx(ctx, tx, userID, *cur)
+		if err := s.repo.UpdateDebtTx(ctx, tx, userID, *cur); err != nil {
+			return err
+		}
+		
+		_ = s.auditSvc.Record(ctx, tx, userID, cur.AccountID, entity.ResourceDebt, entity.ActionUpdated, cur.ID, nil, cur)
+		return nil
 	})
 	if err != nil {
 		return nil, err

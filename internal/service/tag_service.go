@@ -13,11 +13,12 @@ import (
 )
  
 type TagService struct {
-	repo interfaces.TagRepository
+	repo     interfaces.TagRepository
+	auditSvc interfaces.AuditService
 }
  
-func NewTagService(repo interfaces.TagRepository) *TagService {
-	return &TagService{repo: repo}
+func NewTagService(repo interfaces.TagRepository, auditSvc interfaces.AuditService) *TagService {
+	return &TagService{repo: repo, auditSvc: auditSvc}
 }
  
 func (s *TagService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateTagRequest) (*dto.TagResponse, error) {
@@ -44,7 +45,9 @@ func (s *TagService) Create(ctx context.Context, userID uuid.UUID, req dto.Creat
 	if err := s.repo.CreateTagTx(ctx, nil, userID, t); err != nil {
 		return nil, err
 	}
- 
+
+	_ = s.auditSvc.Record(ctx, nil, userID, nil, entity.ResourceTag, entity.ActionCreated, t.ID, nil, t)
+
 	it, err := s.repo.GetTagTx(ctx, nil, userID, t.ID)
 	if err != nil {
 		return nil, err

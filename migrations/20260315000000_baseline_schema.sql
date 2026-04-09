@@ -530,22 +530,7 @@ CREATE INDEX IF NOT EXISTS idx_rotating_savings_contributions_group_occurred_at
 CREATE INDEX IF NOT EXISTS idx_rotating_savings_contributions_group_cycle_no
   ON rotating_savings_contributions(group_id, cycle_no);
 
-CREATE TABLE IF NOT EXISTS rotating_savings_audit_logs (
-  id uuid PRIMARY KEY,
-  user_id uuid NOT NULL,
-  group_id uuid,
-  action text NOT NULL,
-  details jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL,
-  updated_at timestamptz NOT NULL,
-  deleted_at timestamptz,
-
-  CONSTRAINT fk_rotating_savings_audit_logs_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_rotating_savings_audit_logs_group_id FOREIGN KEY (group_id) REFERENCES rotating_savings_groups(id) ON DELETE SET NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_rotating_savings_audit_logs_group_id ON rotating_savings_audit_logs(group_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_rotating_savings_audit_logs_user_id ON rotating_savings_audit_logs(user_id, created_at DESC);
+-- Unified audit logs table replaces feat-specific audit logs
 
 CREATE TABLE IF NOT EXISTS debts (
   id uuid PRIMARY KEY,
@@ -849,27 +834,25 @@ CREATE TABLE IF NOT EXISTS realized_trade_logs (
 CREATE INDEX IF NOT EXISTS idx_realized_trade_logs_account_security_sell
   ON realized_trade_logs(account_id, security_id, sell_trade_id);
 
-CREATE TABLE IF NOT EXISTS audit_events (
+CREATE TABLE IF NOT EXISTS audit_logs (
   id uuid NOT NULL,
-  account_id uuid NOT NULL,
-  actor_user_id uuid NOT NULL,
-  action varchar NOT NULL,
-  entity_type varchar NOT NULL,
-  entity_id uuid NOT NULL,
   occurred_at timestamptz NOT NULL,
-  diff jsonb,
+  actor_user_id uuid NOT NULL,
+  account_id uuid,
+  resource_type varchar NOT NULL,
+  resource_id uuid NOT NULL,
+  action varchar NOT NULL,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
 
   PRIMARY KEY (id, occurred_at),
 
-  CONSTRAINT fk_audit_events_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-  CONSTRAINT fk_audit_events_actor_user_id FOREIGN KEY (actor_user_id) REFERENCES users(id) ON UPDATE CASCADE
+  CONSTRAINT fk_audit_logs_actor_user_id FOREIGN KEY (actor_user_id) REFERENCES users(id) ON UPDATE CASCADE,
+  CONSTRAINT fk_audit_logs_account_id FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_audit_events_account_id_occurred_at
-  ON audit_events(account_id, occurred_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_audit_events_account_entity
-  ON audit_events(account_id, entity_type, entity_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_user_id ON audit_logs(actor_user_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_account_id ON audit_logs(account_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id, occurred_at DESC);
 
 CREATE TABLE IF NOT EXISTS staged_imports (
   id uuid PRIMARY KEY,
@@ -913,7 +896,7 @@ CREATE INDEX IF NOT EXISTS idx_staged_import_rules_lookup ON staged_import_rules
 -- Convert suitable time-series tables to hypertables.
 -- Requirements: any UNIQUE/PRIMARY KEY constraints must include the time column.
 SELECT public.create_hypertable('security_price_dailies', 'price_date', if_not_exists => TRUE);
-SELECT public.create_hypertable('audit_events', 'occurred_at', if_not_exists => TRUE);
+SELECT public.create_hypertable('audit_logs', 'occurred_at', if_not_exists => TRUE);
 
 
 -- Seed data (categories) moved to separate migration file.

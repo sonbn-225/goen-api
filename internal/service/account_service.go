@@ -19,6 +19,7 @@ type AccountService struct {
 	repo            interfaces.AccountRepository
 	userRepo        interfaces.UserRepository
 	transactionRepo interfaces.TransactionRepository
+	auditSvc        interfaces.AuditService
 	db              *database.Postgres
 }
 
@@ -26,12 +27,14 @@ func NewAccountService(
 	repo interfaces.AccountRepository,
 	userRepo interfaces.UserRepository,
 	transactionRepo interfaces.TransactionRepository,
+	auditSvc interfaces.AuditService,
 	db *database.Postgres,
 ) *AccountService {
 	return &AccountService{
 		repo:            repo,
 		userRepo:        userRepo,
 		transactionRepo: transactionRepo,
+		auditSvc:        auditSvc,
 		db:              db,
 	}
 }
@@ -113,6 +116,8 @@ func (s *AccountService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 		return nil, err
 	}
 
+	_ = s.auditSvc.Record(ctx, nil, userID, &account.ID, entity.ResourceAccount, entity.ActionCreated, account.ID, nil, account)
+
 	resp := dto.NewAccountResponse(account)
 	return &resp, nil
 }
@@ -148,7 +153,12 @@ func (s *AccountService) Patch(ctx context.Context, userID, accountID uuid.UUID,
 		}
 
 		it, err = s.repo.PatchAccountTx(ctx, tx, userID, accountID, patch)
-		return err
+		if err != nil {
+			return err
+		}
+
+		_ = s.auditSvc.Record(ctx, tx, userID, &accountID, entity.ResourceAccount, entity.ActionUpdated, accountID, cur, it)
+		return nil
 	})
 
 	if err != nil {
@@ -183,7 +193,11 @@ func (s *AccountService) Delete(ctx context.Context, userID, accountID uuid.UUID
 		}
 
 		// 2. Xóa tài khoản (cập nhật status thành 'deleted' và set deleted_at)
-		return s.repo.DeleteAccountTx(ctx, tx, userID, accountID)
+		if err := s.repo.DeleteAccountTx(ctx, tx, userID, accountID); err != nil {
+			return err
+		}
+
+		return s.auditSvc.Record(ctx, tx, userID, &accountID, entity.ResourceAccount, entity.ActionDeleted, accountID, acc, nil)
 	})
 }
 
@@ -241,24 +255,6 @@ func (s *AccountService) RevokeShare(ctx context.Context, userID, accountID, tar
 	})
 }
 
-func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID uuid.UUID, limit int) ([]dto.AccountAuditEventResponse, error) {
-	if _, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID); err != nil {
-		return nil, err
-	}
-
-	if limit <= 0 {
-		limit = 50
-	}
-	if limit > 200 {
-		limit = 200
-	}
-
-	items, err := s.repo.ListAccountAuditEventsTx(ctx, nil, userID, accountID, limit)
-	if err != nil {
-		return nil, err
-	}
-	return dto.NewAccountAuditEventResponses(items), nil
-}
 
 func (s *AccountService) defaultCurrencyForUser(ctx context.Context, userID uuid.UUID) string {
 	u, err := s.userRepo.FindUserByIDTx(ctx, nil, userID)

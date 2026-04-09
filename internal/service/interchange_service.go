@@ -17,20 +17,23 @@ import (
 )
 
 type InterchangeService struct {
-	repo  interfaces.InterchangeRepository
-	txSvc interfaces.TransactionService
-	db    *database.Postgres
+	repo     interfaces.InterchangeRepository
+	txSvc    interfaces.TransactionService
+	auditSvc interfaces.AuditService
+	db       *database.Postgres
 }
 
 func NewInterchangeService(
 	repo interfaces.InterchangeRepository,
 	txSvc interfaces.TransactionService,
+	auditSvc interfaces.AuditService,
 	db *database.Postgres,
 ) *InterchangeService {
 	return &InterchangeService{
-		repo:  repo,
-		txSvc: txSvc,
-		db:    db,
+		repo:     repo,
+		txSvc:    txSvc,
+		auditSvc: auditSvc,
+		db:       db,
 	}
 }
 
@@ -64,6 +67,10 @@ func (s *InterchangeService) StageImport(ctx context.Context, userID uuid.UUID, 
 	})
 	if err != nil {
 		return 0, 0, nil, err
+	}
+
+	for _, si := range staged {
+		_ = s.auditSvc.Record(ctx, nil, userID, nil, entity.ResourceStagedImport, entity.ActionCreated, si.ID, nil, si)
 	}
 
 	return len(staged), 0, nil, nil

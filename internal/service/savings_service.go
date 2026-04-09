@@ -21,6 +21,7 @@ type SavingsService struct {
 	accountRepo       interfaces.AccountRepository
 	transactionRepo interfaces.TransactionRepository
 	txSvc           interfaces.TransactionService
+	auditSvc        interfaces.AuditService
 	db              *database.Postgres
 }
 
@@ -30,6 +31,7 @@ func NewSavingsService(
 	accountRepo interfaces.AccountRepository,
 	transactionRepo interfaces.TransactionRepository,
 	txSvc interfaces.TransactionService,
+	auditSvc interfaces.AuditService,
 	db *database.Postgres,
 ) *SavingsService {
 	return &SavingsService{
@@ -37,6 +39,7 @@ func NewSavingsService(
 		accountRepo:     accountRepo,
 		transactionRepo: transactionRepo,
 		txSvc:           txSvc,
+		auditSvc:        auditSvc,
 		db:              db,
 	}
 }
@@ -113,6 +116,8 @@ func (s *SavingsService) CreateSavings(ctx context.Context, userID uuid.UUID, re
 				return err
 			}
 		}
+
+		_ = s.auditSvc.Record(ctx, tx, userID, nil, entity.ResourceSavings, entity.ActionCreated, savingsID, nil, created)
 
 		// 4. Fetch the enriched record (with calculated interest)
 		// Since we are in the same transaction, we should ideally have a GetSavingsTx
@@ -197,7 +202,12 @@ func (s *SavingsService) PatchSavings(ctx context.Context, userID, id uuid.UUID,
 	}
 
 	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		return s.repo.UpdateSavingsTx(ctx, tx, userID, *cur)
+		if err := s.repo.UpdateSavingsTx(ctx, tx, userID, *cur); err != nil {
+			return err
+		}
+		
+		_ = s.auditSvc.Record(ctx, tx, userID, nil, entity.ResourceSavings, entity.ActionUpdated, id, nil, cur)
+		return nil
 	})
 	if err != nil {
 		return nil, err

@@ -42,10 +42,6 @@ type AccountRepository interface {
 
 	// ListAccountBalancesForUserTx tổng hợp số dư hiện tại của tất cả tài khoản.
 	ListAccountBalancesForUserTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.AccountBalance, error)
-	// ListAccountAuditEventsTx trả về lịch sử thay đổi quản trị.
-	ListAccountAuditEventsTx(ctx context.Context, tx pgx.Tx, actorUserID, accountID uuid.UUID, limit int) ([]entity.AccountAuditEvent, error)
-	// RecordAccountAuditEventTx ghi lại sự kiện kiểm toán.
-	RecordAccountAuditEventTx(ctx context.Context, tx pgx.Tx, event entity.AccountAuditEvent) error
 }
 
 // AccountService định nghĩa lớp nghiệp vụ để quản lý các tài khoản tài chính và chia sẻ.
@@ -58,5 +54,4 @@ type AccountService interface {
 	ListShares(ctx context.Context, userID, accountID uuid.UUID) ([]dto.AccountShareResponse, error)
 	UpsertShare(ctx context.Context, userID, accountID uuid.UUID, login, permission string) (*dto.AccountShareResponse, error)
 	RevokeShare(ctx context.Context, userID, accountID, targetUserID uuid.UUID) error
-	ListAuditEvents(ctx context.Context, userID, accountID uuid.UUID, limit int) ([]dto.AccountAuditEventResponse, error)
 }

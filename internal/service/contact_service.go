@@ -12,11 +12,12 @@ import (
 )
 
 type ContactService struct {
-	repo interfaces.ContactRepository
+	repo     interfaces.ContactRepository
+	auditSvc interfaces.AuditService
 }
 
-func NewContactService(repo interfaces.ContactRepository) *ContactService {
-	return &ContactService{repo: repo}
+func NewContactService(repo interfaces.ContactRepository, auditSvc interfaces.AuditService) *ContactService {
+	return &ContactService{repo: repo, auditSvc: auditSvc}
 }
 
 func (s *ContactService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateContactRequest) (*dto.ContactResponse, error) {
@@ -50,6 +51,8 @@ func (s *ContactService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 	if err := s.repo.CreateContactTx(ctx, nil, c); err != nil {
 		return nil, err
 	}
+
+	_ = s.auditSvc.Record(ctx, nil, userID, nil, entity.ResourceContact, entity.ActionCreated, c.ID, nil, c)
 	return s.Get(ctx, userID, c.ID)
 }
 
@@ -119,6 +122,8 @@ func (s *ContactService) Update(ctx context.Context, userID, contactID uuid.UUID
 	if err := s.repo.UpdateContactTx(ctx, nil, userID, *cur); err != nil {
 		return nil, err
 	}
+
+	_ = s.auditSvc.Record(ctx, nil, userID, nil, entity.ResourceContact, entity.ActionUpdated, contactID, nil, cur)
 	return s.Get(ctx, userID, contactID)
 }
 
