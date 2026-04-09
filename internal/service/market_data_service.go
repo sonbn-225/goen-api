@@ -137,7 +137,7 @@ func (s *MarketDataService) EnqueueBySymbols(ctx context.Context, userID uuid.UU
 		}
 	}
 
-	idsBySymbol, err := s.repo.LoadSecurityIDsBySymbols(ctx, cleaned)
+	idsBySymbol, err := s.repo.LoadSecurityIDsBySymbolsTx(ctx, nil, cleaned)
 	if err != nil {
 		return dto.RefreshManyResponse{}, err
 	}
@@ -186,15 +186,15 @@ func (s *MarketDataService) GetSecurityStatus(ctx context.Context, userID, secur
 		return dto.SecurityStatus{}, err
 	}
 
-	prices, _ := s.repo.LoadSyncState(ctx, "vnstock.prices_daily:"+securityID.String())
-	events, _ := s.repo.LoadSyncState(ctx, "vnstock.security_events:"+securityID.String())
+	prices, _ := s.repo.LoadSyncStateTx(ctx, nil, "vnstock.prices_daily:"+securityID.String())
+	events, _ := s.repo.LoadSyncStateTx(ctx, nil, "vnstock.security_events:"+securityID.String())
 	rateLimit, _ := s.fetchRateLimit(ctx)
 
 	return dto.SecurityStatus{SecurityID: securityID, Prices: prices, Events: events, RateLimit: rateLimit}, nil
 }
 
 func (s *MarketDataService) GetGlobalStatus(ctx context.Context) (dto.GlobalStatus, error) {
-	marketSync, _ := s.repo.LoadSyncState(ctx, "vnstock.market_sync")
+	marketSync, _ := s.repo.LoadSyncStateTx(ctx, nil, "vnstock.market_sync")
 	rateLimit, _ := s.fetchRateLimit(ctx)
 	return dto.GlobalStatus{MarketSync: marketSync, RateLimit: rateLimit}, nil
 }

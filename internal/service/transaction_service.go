@@ -16,6 +16,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
+	"github.com/sonbn-225/goen-api/internal/pkg/validation"
 )
 
 // TransactionService xử lý logic cốt lõi của sổ cái ứng dụng.
@@ -75,7 +76,7 @@ func (s *TransactionService) List(ctx context.Context, userID uuid.UUID, req dto
 		}
 	}
 
-	items, cursor, total, err := s.repo.ListTransactions(ctx, userID, filter)
+	items, cursor, total, err := s.repo.ListTransactionsTx(ctx, nil, userID, filter)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -84,7 +85,7 @@ func (s *TransactionService) List(ctx context.Context, userID uuid.UUID, req dto
 
 // Get lấy thông tin một giao dịch duy nhất theo ID, đảm bảo nó thuộc về người dùng được chỉ định.
 func (s *TransactionService) Get(ctx context.Context, userID, transactionID uuid.UUID) (*dto.TransactionResponse, error) {
-	it, err := s.repo.GetTransaction(ctx, userID, transactionID)
+	it, err := s.repo.GetTransactionTx(ctx, nil, userID, transactionID)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +103,7 @@ func (s *TransactionService) Get(ctx context.Context, userID, transactionID uuid
 // Tất cả các thao tác được thực hiện trong một giao dịch cơ sở dữ liệu duy nhất để đảm bảo tính nguyên tử.
 func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateTransactionRequest) (*dto.TransactionResponse, error) {
 	kind := strings.TrimSpace(string(req.Type))
-	if kind != string(entity.TransactionTypeExpense) && kind != string(entity.TransactionTypeIncome) && kind != string(entity.TransactionTypeTransfer) {
+	if !validation.IsValidTransactionType(kind) {
 		return nil, apperr.BadRequest("invalid_type", "invalid transaction type")
 	}
 
@@ -427,7 +428,7 @@ func (s *TransactionService) Delete(ctx context.Context, userID, transactionID u
 func (s *TransactionService) ListForExport(ctx context.Context, userID uuid.UUID, filter entity.TransactionListFilter) ([]entity.ExportTransactionRow, error) {
 	// Reuse existing search/list logic but with a larger limit for direct export
 	filter.Limit = 10000
-	transactions, _, _, err := s.repo.ListTransactions(ctx, userID, filter)
+	transactions, _, _, err := s.repo.ListTransactionsTx(ctx, nil, userID, filter)
 	if err != nil {
 		return nil, err
 	}

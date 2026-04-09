@@ -12,15 +12,15 @@ import (
 )
 
 type ReportRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewReportRepo(db *database.Postgres) *ReportRepo {
-	return &ReportRepo{db: db}
+	return &ReportRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-func (r *ReportRepo) GetCashflow(ctx context.Context, userID uuid.UUID, months int) ([]entity.CashflowStat, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *ReportRepo) GetCashflowTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, months int) ([]entity.CashflowStat, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func (r *ReportRepo) GetCashflow(ctx context.Context, userID uuid.UUID, months i
 	startDate := utils.Now().AddDate(0, -months+1, 0)
 	startDate = time.Date(startDate.Year(), startDate.Month(), 1, 0, 0, 0, 0, time.UTC)
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		WITH RECURSIVE months AS (
 			SELECT date_trunc('month', $2::date) as m
 			UNION ALL
@@ -75,13 +75,13 @@ func (r *ReportRepo) GetCashflow(ctx context.Context, userID uuid.UUID, months i
 	return out, nil
 }
 
-func (r *ReportRepo) GetTopExpenses(ctx context.Context, userID uuid.UUID, year int, month int, limit int) ([]entity.CategoryExpenseStat, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *ReportRepo) GetTopExpensesTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, year int, month int, limit int) ([]entity.CategoryExpenseStat, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT
 			li.category_id,
 			SUM(li.amount)::text as amount

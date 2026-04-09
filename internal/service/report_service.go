@@ -19,12 +19,12 @@ func NewReportService(r interfaces.ReportRepository, a interfaces.AccountReposit
 }
 
 func (s *ReportService) GetDashboardReport(ctx context.Context, userID uuid.UUID) (*dto.DashboardReportResponse, error) {
-	balances, err := s.accountRepo.ListAccountBalancesForUser(ctx, userID)
+	balances, err := s.accountRepo.ListAccountBalancesForUserTx(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	cashflow, err := s.reportRepo.GetCashflow(ctx, userID, 6)
+	cashflow, err := s.reportRepo.GetCashflowTx(ctx, nil, userID, 6)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func (s *ReportService) GetDashboardReport(ctx context.Context, userID uuid.UUID
 	currentYear := now.Year()
 	currentMonth := int(now.Month())
 
-	topExpenses, err := s.reportRepo.GetTopExpenses(ctx, userID, currentYear, currentMonth, 5)
+	topExpenses, err := s.reportRepo.GetTopExpensesTx(ctx, nil, userID, currentYear, currentMonth, 5)
 	if err != nil {
 		return nil, err
 	}

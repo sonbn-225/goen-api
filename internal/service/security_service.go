@@ -17,7 +17,7 @@ func NewSecurityService(repo interfaces.SecurityRepository) *SecurityService {
 }
 
 func (s *SecurityService) GetSecurity(ctx context.Context, securityID uuid.UUID) (*dto.SecurityResponse, error) {
-	it, err := s.repo.GetSecurity(ctx, securityID)
+	it, err := s.repo.GetSecurityTx(ctx, nil, securityID)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func (s *SecurityService) GetSecurity(ctx context.Context, securityID uuid.UUID)
 }
 
 func (s *SecurityService) ListSecurities(ctx context.Context) ([]dto.SecurityResponse, error) {
-	items, err := s.repo.ListSecurities(ctx)
+	items, err := s.repo.ListSecuritiesTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (s *SecurityService) ListSecurities(ctx context.Context) ([]dto.SecurityRes
 }
 
 func (s *SecurityService) ListSecurityPrices(ctx context.Context, securityID uuid.UUID, from, to *string) ([]dto.SecurityPriceDailyResponse, error) {
-	items, err := s.repo.ListSecurityPrices(ctx, securityID, from, to)
+	items, err := s.repo.ListSecurityPricesTx(ctx, nil, securityID, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (s *SecurityService) ListSecurityPrices(ctx context.Context, securityID uui
 }
 
 func (s *SecurityService) ListSecurityEvents(ctx context.Context, securityID uuid.UUID, from, to *string) ([]dto.SecurityEventResponse, error) {
-	items, err := s.repo.ListSecurityEvents(ctx, securityID, from, to)
+	items, err := s.repo.ListSecurityEventsTx(ctx, nil, securityID, from, to)
 	if err != nil {
 		return nil, err
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
+	"github.com/sonbn-225/goen-api/internal/pkg/validation"
 )
 
 type AccountService struct {
@@ -36,7 +37,7 @@ func NewAccountService(
 }
 
 func (s *AccountService) List(ctx context.Context, userID uuid.UUID) ([]dto.AccountResponse, error) {
-	items, err := s.repo.ListAccountsForUser(ctx, userID)
+	items, err := s.repo.ListAccountsForUserTx(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +45,7 @@ func (s *AccountService) List(ctx context.Context, userID uuid.UUID) ([]dto.Acco
 }
 
 func (s *AccountService) Get(ctx context.Context, userID, accountID uuid.UUID) (*dto.AccountResponse, error) {
-	it, err := s.repo.GetAccountForUser(ctx, userID, accountID)
+	it, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +63,7 @@ func (s *AccountService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 	}
 
 	accountType := strings.TrimSpace(req.AccountType)
-	if !isValidAccountType(accountType) {
+	if !validation.IsValidAccountType(accountType) {
 		return nil, errors.New("invalid account type")
 	}
 
@@ -122,7 +123,7 @@ func (s *AccountService) Patch(ctx context.Context, userID, accountID uuid.UUID,
 
 	// We use db.WithTx here because PatchAccountTx requires a transaction
 	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		cur, err := s.repo.GetAccountForUser(ctx, userID, accountID)
+		cur, err := s.repo.GetAccountForUserTx(ctx, tx, userID, accountID)
 		if err != nil {
 			return err
 		}
@@ -155,7 +156,7 @@ func (s *AccountService) Patch(ctx context.Context, userID, accountID uuid.UUID,
 }
 
 func (s *AccountService) Delete(ctx context.Context, userID, accountID uuid.UUID) error {
-	acc, err := s.repo.GetAccountForUser(ctx, userID, accountID)
+	acc, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID)
 	if err != nil {
 		return err
 	}
@@ -181,10 +182,10 @@ func (s *AccountService) Delete(ctx context.Context, userID, accountID uuid.UUID
 }
 
 func (s *AccountService) ListShares(ctx context.Context, userID, accountID uuid.UUID) ([]dto.AccountShareResponse, error) {
-	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+	if _, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID); err != nil {
 		return nil, err
 	}
-	items, err := s.repo.ListAccountShares(ctx, userID, accountID)
+	items, err := s.repo.ListAccountSharesTx(ctx, nil, userID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -196,21 +197,16 @@ func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID uuid
 	var err error
 
 	err = s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+		if _, err := s.repo.GetAccountForUserTx(ctx, tx, userID, accountID); err != nil {
 			return err
 		}
 
-		var target *entity.UserWithPassword
-		if strings.Contains(login, "@") {
-			target, err = s.userRepo.FindUserByEmail(ctx, strings.ToLower(login))
-		} else if len(login) > 0 && login[0] != '+' && !strings.ContainsAny(login, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
-			target, err = s.userRepo.FindUserByPhone(ctx, login)
-		} else {
-			target, err = s.userRepo.FindUserByUsername(ctx, login)
-		}
-
+		target, err := ResolveUserByLoginTx(ctx, tx, s.userRepo, login)
 		if err != nil {
 			return err
+		}
+		if target == nil {
+			return errors.New("user not found")
 		}
 		if target.ID == userID {
 			return errors.New("cannot share with yourself")
@@ -232,7 +228,7 @@ func (s *AccountService) UpsertShare(ctx context.Context, userID, accountID uuid
 
 func (s *AccountService) RevokeShare(ctx context.Context, userID, accountID, targetUserID uuid.UUID) error {
 	return s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+		if _, err := s.repo.GetAccountForUserTx(ctx, tx, userID, accountID); err != nil {
 			return err
 		}
 		return s.repo.RevokeAccountShareTx(ctx, tx, userID, accountID, targetUserID)
@@ -240,7 +236,7 @@ func (s *AccountService) RevokeShare(ctx context.Context, userID, accountID, tar
 }
 
 func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID uuid.UUID, limit int) ([]dto.AccountAuditEventResponse, error) {
-	if _, err := s.repo.GetAccountForUser(ctx, userID, accountID); err != nil {
+	if _, err := s.repo.GetAccountForUserTx(ctx, nil, userID, accountID); err != nil {
 		return nil, err
 	}
 
@@ -251,7 +247,7 @@ func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID 
 		limit = 200
 	}
 
-	items, err := s.repo.ListAccountAuditEvents(ctx, userID, accountID, limit)
+	items, err := s.repo.ListAccountAuditEventsTx(ctx, nil, userID, accountID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +255,7 @@ func (s *AccountService) ListAuditEvents(ctx context.Context, userID, accountID 
 }
 
 func (s *AccountService) defaultCurrencyForUser(ctx context.Context, userID uuid.UUID) string {
-	u, err := s.userRepo.FindUserByID(ctx, userID)
+	u, err := s.userRepo.FindUserByIDTx(ctx, nil, userID)
 	if err != nil || u == nil || u.Settings == nil {
 		return "VND"
 	}
@@ -271,15 +267,6 @@ func (s *AccountService) defaultCurrencyForUser(ctx context.Context, userID uuid
 	return "VND"
 }
 
-func isValidAccountType(t string) bool {
-	switch entity.AccountType(t) {
-	case entity.AccountTypeBank, entity.AccountTypeWallet, entity.AccountTypeCash,
-		entity.AccountTypeBroker, entity.AccountTypeCard, entity.AccountTypeSavings:
-		return true
-	default:
-		return false
-	}
-}
 
 func mapAccountSettingsEntity(it *dto.AccountSettingsRequest) entity.AccountSettings {
 	if it == nil {

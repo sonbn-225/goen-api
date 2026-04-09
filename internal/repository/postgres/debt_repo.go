@@ -23,21 +23,23 @@ func NewDebtRepo(db *database.Postgres) *DebtRepo {
 
 // --- Nhóm 1: Truy vấn Nợ & Thanh toán (Read-only Optimized) ---
 
-func (r *DebtRepo) GetDebt(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entity.Debt, error) {
-	pool, err := r.db.Pool(ctx)
+// --- Nhóm 1: Truy vấn Nợ & Thanh toán (Flexible Tx) ---
+
+func (r *DebtRepo) GetDebtTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, id uuid.UUID) (*entity.Debt, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	return r.getDebt(ctx, pool, userID, id)
+	return r.getDebt(ctx, q, userID, id)
 }
 
-func (r *DebtRepo) ListDebts(ctx context.Context, userID uuid.UUID) ([]entity.Debt, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *DebtRepo) ListDebtsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.Debt, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT
 			d.id, d.user_id, d.account_id, d.direction, d.name, d.contact_id,
 			COALESCE(u.display_name, c.name) AS contact_name,
@@ -78,13 +80,13 @@ func (r *DebtRepo) ListDebts(ctx context.Context, userID uuid.UUID) ([]entity.De
 	return items, nil
 }
 
-func (r *DebtRepo) ListPaymentLinks(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtPaymentLink, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *DebtRepo) ListPaymentLinksTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtPaymentLink, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT l.id, l.debt_id, l.transaction_id, l.principal_paid::text, l.interest_paid::text, l.created_at
 		FROM debt_payment_links l
 		JOIN debts d ON d.id = l.debt_id
@@ -108,13 +110,13 @@ func (r *DebtRepo) ListPaymentLinks(ctx context.Context, userID uuid.UUID, debtI
 	return results, nil
 }
 
-func (r *DebtRepo) ListPaymentLinksByTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID) ([]entity.DebtPaymentLink, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *DebtRepo) ListPaymentLinksByTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) ([]entity.DebtPaymentLink, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT l.id, l.debt_id, l.transaction_id, l.principal_paid::text, l.interest_paid::text, l.created_at
 		FROM debt_payment_links l
 		JOIN debts d ON d.id = l.debt_id
@@ -137,13 +139,13 @@ func (r *DebtRepo) ListPaymentLinksByTransaction(ctx context.Context, userID uui
 	return results, nil
 }
 
-func (r *DebtRepo) ListInstallments(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtInstallment, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *DebtRepo) ListInstallmentsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtInstallment, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT i.id, i.debt_id, i.installment_no, to_char(i.due_date, 'YYYY-MM-DD'), i.amount_due::text, i.amount_paid::text, i.status
 		FROM debt_installments i
 		JOIN debts d ON d.id = i.debt_id
@@ -167,11 +169,75 @@ func (r *DebtRepo) ListInstallments(ctx context.Context, userID uuid.UUID, debtI
 	return results, nil
 }
 
+func (r *DebtRepo) ListPublicParticipantsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]string, error) {
+	q, err := r.Queryer(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := q.Query(ctx, `
+		SELECT DISTINCT COALESCE(u.display_name, c.name)
+		FROM debts d
+		JOIN contacts c ON d.contact_id = c.id
+		LEFT JOIN users u ON c.linked_user_id = u.id
+		WHERE d.user_id = $1 AND d.deleted_at IS NULL
+		ORDER BY 1
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, nil
+}
+
+func (r *DebtRepo) ListPublicDebtsByParticipantTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, participantName string) ([]entity.PublicDebt, error) {
+	q, err := r.Queryer(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := q.Query(ctx, `
+		SELECT d.id, 
+		       to_char(d.created_at, 'YYYY-MM-DD"T"HH24:MI:SSZ'),
+		       d.principal::text,
+		       d.status
+		FROM debts d
+		JOIN contacts c ON d.contact_id = c.id
+		LEFT JOIN users u ON c.linked_user_id = u.id
+		WHERE d.user_id = $1 AND COALESCE(u.display_name, c.name) = $2 AND d.deleted_at IS NULL
+		ORDER BY d.created_at DESC
+	`, userID, participantName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var debts []entity.PublicDebt
+	for rows.Next() {
+		var d entity.PublicDebt
+		var status string
+		if err := rows.Scan(&d.ID, &d.CreatedAt, &d.ShareAmount, &status); err != nil {
+			return nil, err
+		}
+		d.Status = &status
+		debts = append(debts, d)
+	}
+	return debts, nil
+}
 
 // --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
 
 func (r *DebtRepo) CreateDebtTx(ctx context.Context, tx pgx.Tx, debt entity.Debt) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -208,7 +274,7 @@ func (r *DebtRepo) CreateDebtTx(ctx context.Context, tx pgx.Tx, debt entity.Debt
 }
 
 func (r *DebtRepo) UpdateDebtTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, d entity.Debt) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -226,7 +292,7 @@ func (r *DebtRepo) UpdateDebtTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID
 }
 
 func (r *DebtRepo) DeleteDebtTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -236,7 +302,7 @@ func (r *DebtRepo) DeleteDebtTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID
 }
 
 func (r *DebtRepo) DeleteDebtsByOriginatingTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -250,7 +316,7 @@ func (r *DebtRepo) DeleteDebtsByOriginatingTransactionTx(ctx context.Context, tx
 }
 
 func (r *DebtRepo) CreatePaymentLinkTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, link entity.DebtPaymentLink, newPrincipal string, newOutstandingPrincipal string, newAccruedInterest string, newStatus entity.DebtStatus, closedAt *time.Time) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -282,7 +348,7 @@ func (r *DebtRepo) CreatePaymentLinkTx(ctx context.Context, tx pgx.Tx, userID uu
 }
 
 func (r *DebtRepo) DeletePaymentLinksByTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -299,7 +365,7 @@ func (r *DebtRepo) DeletePaymentLinksByTransactionTx(ctx context.Context, tx pgx
 }
 
 func (r *DebtRepo) CreateInstallmentTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, inst entity.DebtInstallment) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -310,15 +376,6 @@ func (r *DebtRepo) CreateInstallmentTx(ctx context.Context, tx pgx.Tx, userID uu
 		WHERE EXISTS (SELECT 1 FROM debts WHERE id = $2 AND user_id = $8 AND deleted_at IS NULL)
 	`, inst.ID, inst.DebtID, inst.InstallmentNo, inst.DueDate, inst.AmountDue, inst.AmountPaid, inst.Status, userID)
 	return err
-}
-
-// GetDebtTx lấy thông tin nợ trong transaction (cho mục đích nhất quán).
-func (r *DebtRepo) GetDebtTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, id uuid.UUID) (*entity.Debt, error) {
-	q, err := r.db.Queryer(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	return r.getDebt(ctx, q, userID, id)
 }
 
 // --- Internal Helpers ---

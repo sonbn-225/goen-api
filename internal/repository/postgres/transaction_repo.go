@@ -17,36 +17,24 @@ import (
 )
 
 type TransactionRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewTransactionRepo(db *database.Postgres) *TransactionRepo {
-	return &TransactionRepo{db: db}
+	return &TransactionRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
 
 func (r *TransactionRepo) CreateTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, txEntity entity.Transaction, lineItems []entity.TransactionLineItem, tagIDs []uuid.UUID) error {
-	var q database.Queryer = tx
-	if tx == nil {
-		pool, err := r.db.Pool(ctx)
-		if err != nil {
-			return err
-		}
-		q = pool
+	q, err := r.Queryer(ctx, tx)
+	if err != nil {
+		return err
 	}
 	return CreateTransactionTx(ctx, q, userID, txEntity, lineItems, tagIDs)
 }
 
-func (r *TransactionRepo) GetTransaction(ctx context.Context, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
-	pool, err := r.db.Pool(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return r.getTransaction(ctx, pool, userID, id)
-}
-
-func (r *TransactionRepo) GetTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
-	q, err := r.db.Queryer(ctx, tx)
+func (r *TransactionRepo) GetTransactionTx(ctx context.Context, tx pgx.Tx, userID, id uuid.UUID) (*entity.Transaction, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -54,45 +42,26 @@ func (r *TransactionRepo) GetTransactionTx(ctx context.Context, tx pgx.Tx, userI
 }
 
 func (r *TransactionRepo) getTransaction(ctx context.Context, q database.Queryer, userID uuid.UUID, id uuid.UUID) (*entity.Transaction, error) {
-	row := q.QueryRow(ctx, `
-		SELECT
-			t.id, t.external_ref, t.type, t.occurred_at,
-			to_char(t.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS occurred_date,
-			t.amount::text, t.from_amount::text, t.to_amount::text,
-			(SELECT li.note FROM transaction_line_items li WHERE li.transaction_id = t.id ORDER BY li.id LIMIT 1) AS description,
-			t.account_id, a.name AS account_name, t.from_account_id, t.to_account_id, t.exchange_rate::text,
-			a.currency AS account_currency, fa.currency AS from_currency, ta.currency AS to_currency,
-			t.status, t.created_at, t.updated_at, t.deleted_at,
-			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::uuid[]) AS tag_ids
+	row := q.QueryRow(ctx, fmt.Sprintf(`
+		SELECT %s
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN accounts fa ON fa.id = t.from_account_id
 		LEFT JOIN accounts ta ON ta.id = t.to_account_id
 		WHERE t.id = $1 AND t.deleted_at IS NULL
-		  AND (
-			(t.type IN ('expense','income') AND EXISTS (SELECT 1 FROM user_accounts ua WHERE ua.user_id = $2 AND ua.account_id = t.account_id AND ua.status = 'active'))
-			OR
-			(t.type = 'transfer' AND EXISTS (SELECT 1 FROM user_accounts ua WHERE ua.user_id = $2 AND ua.account_id = t.from_account_id AND ua.status = 'active')
-			                 AND EXISTS (SELECT 1 FROM user_accounts ua WHERE ua.user_id = $2 AND ua.account_id = t.to_account_id AND ua.status = 'active'))
-		  )
-	`, id, userID)
+		  AND %s
+	`, TransactionColumnsSQL, TransactionPermissionSQL), id, userID)
 
-	var t entity.Transaction
-	var catNames, catColors, tagNames, tagColors []string
-	err := row.Scan(
-		&t.ID, &t.ExternalRef, &t.Type, &t.OccurredAt, &t.OccurredDate,
-		&t.Amount, &t.FromAmount, &t.ToAmount, &t.Description, &t.AccountID, &t.AccountName, &t.FromAccountID, &t.ToAccountID,
-		&t.ExchangeRate, &t.AccountCurrency, &t.FromCurrency, &t.ToCurrency, &t.Status,
-		&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt, &t.TagIDs,
-	)
+	t, err := ScanTransaction(row, false)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.New("transaction not found")
-		}
 		return nil, err
+	}
+	if t == nil {
+		return nil, errors.New("transaction not found")
 	}
 
 	// Enrichment
+	var catNames, catColors, tagNames, tagColors []string
 	_ = q.QueryRow(ctx, `
 		SELECT 
 			COALESCE(array_agg(DISTINCT c.key), '{}'::text[]),
@@ -131,11 +100,11 @@ func (r *TransactionRepo) getTransaction(ctx context.Context, q database.Queryer
 		t.LineItems = append(t.LineItems, li)
 	}
 
-	return &t, nil
+	return t, nil
 }
 
-func (r *TransactionRepo) ListTransactions(ctx context.Context, userID uuid.UUID, filter entity.TransactionListFilter) ([]entity.Transaction, *string, int, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *TransactionRepo) ListTransactionsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, filter entity.TransactionListFilter) ([]entity.Transaction, *string, int, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -178,17 +147,13 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID uuid.UUID
 
 	countSQL := fmt.Sprintf(`
 		SELECT COUNT(*) FROM transactions t
-		WHERE t.deleted_at IS NULL %s
-		  AND (
-			(t.type IN ('expense','income') AND EXISTS (SELECT 1 FROM user_accounts ua WHERE ua.user_id = $1 AND ua.account_id = t.account_id AND ua.status = 'active'))
-			OR
-			(t.type = 'transfer' AND EXISTS (SELECT 1 FROM user_accounts ua WHERE ua.user_id = $1 AND ua.account_id = t.from_account_id AND ua.status = 'active')
-			                 AND EXISTS (SELECT 1 FROM user_accounts ua WHERE ua.user_id = $1 AND ua.account_id = t.to_account_id AND ua.status = 'active'))
-		  )
-	`, where)
+		WHERE t.deleted_at IS NULL %%s
+		  AND %s
+	`, TransactionPermissionSQL)
+	countSQL = fmt.Sprintf(countSQL, where)
 
 	var total int
-	if err := pool.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+	if err := q.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
 		return nil, nil, 0, err
 	}
 
@@ -205,32 +170,20 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID uuid.UUID
 	}
 
 	querySQL := fmt.Sprintf(`
-		SELECT
-			t.id, t.external_ref, t.type, t.occurred_at,
-			to_char(t.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS occurred_date,
-			t.amount::text, t.from_amount::text, t.to_amount::text,
-			(SELECT li.note FROM transaction_line_items li WHERE li.transaction_id = t.id ORDER BY li.id LIMIT 1) AS description,
-			t.account_id, a.name AS account_name, t.from_account_id, t.to_account_id, t.exchange_rate::text,
-			a.currency AS account_currency, fa.currency AS from_currency, ta.currency AS to_currency,
-			t.status, t.created_at, t.updated_at, t.deleted_at,
-			COALESCE((SELECT array_agg(tt.tag_id ORDER BY tt.tag_id) FROM transaction_tags tt WHERE tt.transaction_id = t.id), '{}'::uuid[]) AS tag_ids,
+		SELECT %s,
 			COALESCE((SELECT array_agg(DISTINCT tli.category_id ORDER BY tli.category_id) FROM transaction_line_items tli WHERE tli.transaction_id = t.id AND tli.category_id IS NOT NULL), '{}'::uuid[]) AS category_ids
 		FROM transactions t
 		LEFT JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN accounts fa ON fa.id = t.from_account_id
 		LEFT JOIN accounts ta ON ta.id = t.to_account_id
-		WHERE t.deleted_at IS NULL %s
-		  AND (
-			(t.type IN ('expense','income') AND EXISTS (SELECT 1 FROM user_accounts ua WHERE ua.user_id = $1 AND ua.account_id = t.account_id AND ua.status = 'active'))
-			OR
-			(t.type = 'transfer' AND EXISTS (SELECT 1 FROM user_accounts ua WHERE ua.user_id = $1 AND ua.account_id = t.from_account_id AND ua.status = 'active')
-			                 AND EXISTS (SELECT 1 FROM user_accounts ua WHERE ua.user_id = $1 AND ua.account_id = t.to_account_id AND ua.status = 'active'))
-		  )
+		WHERE t.deleted_at IS NULL %%s
+		  AND %s
 		ORDER BY t.occurred_at DESC, t.id DESC
-		LIMIT %d %s
-	`, where, limit+1, pagination)
+		LIMIT %%d %%s
+	`, TransactionColumnsSQL, TransactionPermissionSQL)
+	querySQL = fmt.Sprintf(querySQL, where, limit+1, pagination)
 
-	rows, err := pool.Query(ctx, querySQL, args...)
+	rows, err := q.Query(ctx, querySQL, args...)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -238,19 +191,13 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID uuid.UUID
 
 	var results []entity.Transaction
 	for rows.Next() {
-		var t entity.Transaction
-		err := rows.Scan(
-			&t.ID, &t.ExternalRef, &t.Type, &t.OccurredAt, &t.OccurredDate,
-			&t.Amount, &t.FromAmount, &t.ToAmount, &t.Description, &t.AccountID, &t.AccountName, &t.FromAccountID, &t.ToAccountID,
-			&t.ExchangeRate, &t.AccountCurrency, &t.FromCurrency, &t.ToCurrency, &t.Status,
-			&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt, &t.TagIDs, &t.CategoryIDs,
-		)
+		t, err := ScanTransaction(rows, true)
 		if err != nil {
 			return nil, nil, 0, err
 		}
 
 		// Quick enrichment join per item (or could use a larger join above, but array_agg per item is safer for complex many-to-many)
-		_ = pool.QueryRow(ctx, `
+		_ = q.QueryRow(ctx, `
 			SELECT 
 				COALESCE(array_agg(DISTINCT c.key), '{}'::text[]),
 				COALESCE(array_agg(DISTINCT c.color), '{}'::text[]),
@@ -263,7 +210,7 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID uuid.UUID
 			WHERE li.transaction_id = $1
 		`, t.ID).Scan(&t.CategoryNames, &t.CategoryColors, &t.TagNames, &t.TagColors)
 
-		results = append(results, t)
+		results = append(results, *t)
 	}
 
 	var nextCursor *string
@@ -278,7 +225,7 @@ func (r *TransactionRepo) ListTransactions(ctx context.Context, userID uuid.UUID
 }
 
 func (r *TransactionRepo) PatchTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID, patch entity.TransactionPatch) (*entity.Transaction, error) {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +399,7 @@ func (r *TransactionRepo) BatchPatchTransactionsTx(ctx context.Context, tx pgx.T
 
 
 func (r *TransactionRepo) DeleteTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -469,7 +416,7 @@ func (r *TransactionRepo) DeleteTransactionTx(ctx context.Context, tx pgx.Tx, us
 }
 
 func (r *TransactionRepo) DeleteTransactionsByAccountTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, accountID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -484,16 +431,16 @@ func (r *TransactionRepo) DeleteTransactionsByAccountTx(ctx context.Context, tx 
 	return err
 }
 
-func (r *TransactionRepo) ListTransactionsByIDs(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) ([]entity.Transaction, error) {
+func (r *TransactionRepo) ListTransactionsByIDsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, ids []uuid.UUID) ([]entity.Transaction, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	pool, err := r.db.Pool(ctx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT 
 			t.id, t.external_ref, t.type::text, t.occurred_at, t.occurred_date, t.amount::text,
 			t.from_amount::text, t.to_amount::text, t.description, t.account_id,
@@ -521,15 +468,6 @@ func (r *TransactionRepo) ListTransactionsByIDs(ctx context.Context, userID uuid
 		out = append(out, t)
 	}
 	return out, nil
-}
-
-// Helper: requireAccountPermission
-func (r *TransactionRepo) requireAccountPermission(ctx context.Context, tx pgx.Tx, userID, accountID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
-	if err != nil {
-		return err
-	}
-	return requireAccountPermission(ctx, q, userID, accountID)
 }
 
 // Cursor Encoding/Decoding

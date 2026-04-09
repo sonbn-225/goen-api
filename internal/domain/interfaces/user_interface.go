@@ -46,8 +46,6 @@ type RefreshTokenRepository interface {
 	CreateTx(ctx context.Context, tx pgx.Tx, token *entity.RefreshToken) error
 	// DeleteByTokenTx xóa một token làm mới cụ thể.
 	DeleteByTokenTx(ctx context.Context, tx pgx.Tx, token string) error
-	// DeleteAllByUserIDTx xóa tất cả các phiên làm việc của một người dùng.
-	DeleteAllByUserIDTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error
 }
 
 // AuthService định nghĩa lớp nghiệp vụ cho xác thực, quản lý phiên và cài đặt hồ sơ.

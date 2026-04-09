@@ -13,7 +13,6 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
-	"github.com/sonbn-225/goen-api/internal/repository/postgres"
 )
 
 // RotatingSavingsService quản lý các nhóm "Hụi/Họ" (Rotating Savings and Credit Associations - ROSCA).
@@ -21,6 +20,7 @@ import (
 // Tất cả các biến động tài chính đều được ghi lại dưới dạng giao dịch sổ cái trong TransactionService trung tâm.
 type RotatingSavingsService struct {
 	repo         interfaces.RotatingSavingsRepository
+	txRepo       interfaces.TransactionRepository
 	categoryRepo interfaces.CategoryRepository
 	accountSvc   interfaces.AccountService
 	txSvc        interfaces.TransactionService
@@ -30,6 +30,7 @@ type RotatingSavingsService struct {
 // NewRotatingSavingsService khởi tạo một dịch vụ quản lý hụi/họ mới.
 func NewRotatingSavingsService(
 	repo interfaces.RotatingSavingsRepository,
+	txRepo interfaces.TransactionRepository,
 	categoryRepo interfaces.CategoryRepository,
 	accountSvc interfaces.AccountService,
 	txSvc interfaces.TransactionService,
@@ -37,6 +38,7 @@ func NewRotatingSavingsService(
 ) *RotatingSavingsService {
 	return &RotatingSavingsService{
 		repo:         repo,
+		txRepo:       txRepo,
 		categoryRepo: categoryRepo,
 		accountSvc:   accountSvc,
 		txSvc:        txSvc,
@@ -97,7 +99,7 @@ func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID uuid.UU
 		return nil, err
 	}
 
-	created, err := s.repo.GetRotatingGroup(ctx, userID, g.ID)
+	created, err := s.repo.GetRotatingGroupTx(ctx, nil, userID, g.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +113,7 @@ func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID uuid.UU
 
 // GetGroup lấy thông tin cơ bản về một nhóm.
 func (s *RotatingSavingsService) GetGroup(ctx context.Context, userID, groupID uuid.UUID) (*dto.RotatingSavingsGroupResponse, error) {
-	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
+	g, err := s.repo.GetRotatingGroupTx(ctx, nil, userID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +126,7 @@ func (s *RotatingSavingsService) GetGroup(ctx context.Context, userID, groupID u
 
 // UpdateGroup cập nhật thông tin cấu hình nhóm.
 func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupID uuid.UUID, req dto.UpdateRotatingSavingsGroupRequest) (*dto.RotatingSavingsGroupResponse, error) {
-	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
+	g, err := s.repo.GetRotatingGroupTx(ctx, nil, userID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +175,7 @@ func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupI
 		return nil, err
 	}
 
-	updated, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
+	updated, err := s.repo.GetRotatingGroupTx(ctx, nil, userID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +189,7 @@ func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupI
 
 // GetGroupDetail lấy đầy đủ thông tin chi tiết nhóm bao gồm lịch trình và lịch sử.
 func (s *RotatingSavingsService) GetGroupDetail(ctx context.Context, userID, groupID uuid.UUID) (*dto.RotatingSavingsGroupDetailResponse, error) {
-	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
+	g, err := s.repo.GetRotatingGroupTx(ctx, nil, userID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -195,12 +197,12 @@ func (s *RotatingSavingsService) GetGroupDetail(ctx context.Context, userID, gro
 		return nil, errors.New("group not found")
 	}
 
-	contributions, err := s.repo.ListContributions(ctx, groupID)
+	contributions, err := s.repo.ListContributionsTx(ctx, nil, groupID)
 	if err != nil {
 		return nil, err
 	}
 
-	auditLogs, _ := s.repo.ListAuditLogs(ctx, groupID)
+	auditLogs, _ := s.repo.ListAuditLogsTx(ctx, nil, groupID)
 
 	schedule := s.generateSchedule(*g, contributions)
 
@@ -339,14 +341,14 @@ func (s *RotatingSavingsService) generateSchedule(g entity.RotatingSavingsGroup,
 
 // ListGroups liệt kê tất cả các nhóm kèm theo tóm tắt tiến độ.
 func (s *RotatingSavingsService) ListGroups(ctx context.Context, userID uuid.UUID) ([]dto.RotatingSavingsGroupSummary, error) {
-	groups, err := s.repo.ListRotatingGroups(ctx, userID)
+	groups, err := s.repo.ListRotatingGroupsTx(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	summaries := make([]dto.RotatingSavingsGroupSummary, 0, len(groups))
 	for _, g := range groups {
-		contributions, _ := s.repo.ListContributions(ctx, g.ID)
+		contributions, _ := s.repo.ListContributionsTx(ctx, nil, g.ID)
 		totalPaid := 0.0
 		totalReceived := 0.0
 		completedCycles := make(map[int]bool)
@@ -385,7 +387,7 @@ func (s *RotatingSavingsService) ListGroups(ctx context.Context, userID uuid.UUI
 // Nó tạo ra một giao dịch sổ cái một cách nguyên tử trong tài khoản được chỉ định và
 // liên kết nó với bản ghi của nhóm.
 func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID, groupID uuid.UUID, req dto.RotatingSavingsContributionRequest) (*dto.RotatingSavingsContributionResponse, error) {
-	g, err := s.repo.GetRotatingGroup(ctx, userID, groupID)
+	g, err := s.repo.GetRotatingGroupTx(ctx, nil, userID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -409,7 +411,7 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 		catKey = "cat_sys_rotating_savings_payout"
 	}
 
-	cat, err := s.categoryRepo.GetCategoryByKey(ctx, catKey)
+	cat, err := s.categoryRepo.GetCategoryByKeyTx(ctx, nil, catKey)
 	if err != nil {
 		return nil, err
 	}
@@ -440,7 +442,7 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 			{BaseEntity: entity.BaseEntity{ID: utils.NewID()}, Amount: req.Amount, CategoryID: &catID, Note: &desc},
 		}
 
-		if err := postgres.CreateTransactionTx(ctx, tx, userID, ledgerTx, ledgerLine, nil); err != nil {
+		if err := s.txRepo.CreateTransactionTx(ctx, tx, userID, ledgerTx, ledgerLine, nil); err != nil {
 			return err
 		}
 
@@ -495,7 +497,7 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 // DeleteContribution xóa một bản ghi đóng/lĩnh hụi.
 func (s *RotatingSavingsService) DeleteContribution(ctx context.Context, userID, groupID, id uuid.UUID) error {
 	// Tìm kiếm đóng góp trong nhóm vì GetContribution đã bị gỡ bỏ khỏi interface để hợp nhất
-	conts, err := s.repo.ListContributions(ctx, groupID)
+	conts, err := s.repo.ListContributionsTx(ctx, nil, groupID)
 	if err != nil {
 		return err
 	}
@@ -524,7 +526,7 @@ func (s *RotatingSavingsService) DeleteContribution(ctx context.Context, userID,
 // DeleteGroup xóa toàn bộ nhóm và các giao dịch liên quan.
 func (s *RotatingSavingsService) DeleteGroup(ctx context.Context, userID, groupID uuid.UUID) error {
 	return s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		conts, _ := s.repo.ListContributions(ctx, groupID)
+		conts, _ := s.repo.ListContributionsTx(ctx, tx, groupID)
 		for _, c := range conts {
 			if c.TransactionID != uuid.Nil {
 				_ = s.txSvc.Delete(ctx, userID, c.TransactionID)

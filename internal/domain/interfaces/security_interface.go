@@ -4,24 +4,25 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 )
 
 // SecurityRepository định nghĩa lớp truy cập dữ liệu cho thông tin gốc về đầu tư (mã niêm yết, giá cả, sự kiện).
 type SecurityRepository interface {
-	// --- Nhóm 1: Truy vấn Metadata Toàn cầu (Read-only Optimized) ---
+	// --- Nhóm 1: Truy vấn Metadata Toàn cầu (Flexible Tx) ---
 
-	// GetSecurity lấy thông tin metadata của một mã chứng khoán (tên, mã niêm yết, loại).
-	GetSecurity(ctx context.Context, securityID uuid.UUID) (*entity.Security, error)
-	// ListSecurities trả về tất cả các mã chứng khoán được hỗ trợ bởi nền tảng.
-	ListSecurities(ctx context.Context) ([]entity.Security, error)
-	// ListSecurityPrices trả về dữ liệu giá hàng ngày lịch sử.
-	ListSecurityPrices(ctx context.Context, securityID uuid.UUID, from *string, to *string) ([]entity.SecurityPriceDaily, error)
-	// ListSecurityEvents trả về lịch sử các sự kiện doanh nghiệp (chia tách, cổ tức).
-	ListSecurityEvents(ctx context.Context, securityID uuid.UUID, from *string, to *string) ([]entity.SecurityEvent, error)
-	// GetSecurityEvent lấy chi tiết cho một sự kiện doanh nghiệp cụ thể.
-	GetSecurityEvent(ctx context.Context, securityEventID uuid.UUID) (*entity.SecurityEvent, error)
+	// GetSecurityTx lấy thông tin metadata của một mã chứng khoán (tên, mã niêm yết, loại).
+	GetSecurityTx(ctx context.Context, tx pgx.Tx, securityID uuid.UUID) (*entity.Security, error)
+	// ListSecuritiesTx trả về tất cả các mã chứng khoán được hỗ trợ bởi nền tảng.
+	ListSecuritiesTx(ctx context.Context, tx pgx.Tx) ([]entity.Security, error)
+	// ListSecurityPricesTx trả về dữ liệu giá hàng ngày lịch xử.
+	ListSecurityPricesTx(ctx context.Context, tx pgx.Tx, securityID uuid.UUID, from *string, to *string) ([]entity.SecurityPriceDaily, error)
+	// ListSecurityEventsTx trả về lịch sử các sự kiện doanh nghiệp (chia tách, cổ tức).
+	ListSecurityEventsTx(ctx context.Context, tx pgx.Tx, securityID uuid.UUID, from *string, to *string) ([]entity.SecurityEvent, error)
+	// GetSecurityEventTx lấy chi tiết cho một sự kiện doanh nghiệp cụ thể.
+	GetSecurityEventTx(ctx context.Context, tx pgx.Tx, securityEventID uuid.UUID) (*entity.SecurityEvent, error)
 }
 
 // SecurityService định nghĩa lớp nghiệp vụ để truy cập dữ liệu gốc đầu tư toàn cầu.

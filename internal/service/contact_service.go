@@ -36,12 +36,12 @@ func (s *ContactService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 
 	// Try auto-linking by email or phone
 	if req.Email != nil && strings.TrimSpace(*req.Email) != "" {
-		u, _ := s.repo.FindUserByEmail(ctx, strings.TrimSpace(*req.Email))
+		u, _ := s.repo.FindUserByEmailTx(ctx, nil, strings.TrimSpace(*req.Email))
 		if u != nil {
 			c.LinkedUserID = &u.ID
 		}
 	} else if req.Phone != nil && strings.TrimSpace(*req.Phone) != "" {
-		u, _ := s.repo.FindUserByPhone(ctx, strings.TrimSpace(*req.Phone))
+		u, _ := s.repo.FindUserByPhoneTx(ctx, nil, strings.TrimSpace(*req.Phone))
 		if u != nil {
 			c.LinkedUserID = &u.ID
 		}
@@ -54,7 +54,7 @@ func (s *ContactService) Create(ctx context.Context, userID uuid.UUID, req dto.C
 }
 
 func (s *ContactService) Get(ctx context.Context, userID, contactID uuid.UUID) (*dto.ContactResponse, error) {
-	it, err := s.repo.GetContact(ctx, userID, contactID)
+	it, err := s.repo.GetContactTx(ctx, nil, userID, contactID)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (s *ContactService) Get(ctx context.Context, userID, contactID uuid.UUID) (
 }
 
 func (s *ContactService) List(ctx context.Context, userID uuid.UUID) ([]dto.ContactResponse, error) {
-	items, err := s.repo.ListContacts(ctx, userID)
+	items, err := s.repo.ListContactsTx(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (s *ContactService) List(ctx context.Context, userID uuid.UUID) ([]dto.Cont
 }
 
 func (s *ContactService) Update(ctx context.Context, userID, contactID uuid.UUID, req dto.UpdateContactRequest) (*dto.ContactResponse, error) {
-	cur, err := s.repo.GetContact(ctx, userID, contactID)
+	cur, err := s.repo.GetContactTx(ctx, nil, userID, contactID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,14 +98,14 @@ func (s *ContactService) Update(ctx context.Context, userID, contactID uuid.UUID
 	// Re-check linking if email/phone changed
 	if req.Email != nil || req.Phone != nil {
 		if cur.Email != nil && strings.TrimSpace(*cur.Email) != "" {
-			u, _ := s.repo.FindUserByEmail(ctx, strings.TrimSpace(*cur.Email))
+			u, _ := s.repo.FindUserByEmailTx(ctx, nil, strings.TrimSpace(*cur.Email))
 			if u != nil {
 				cur.LinkedUserID = &u.ID
 			} else {
 				cur.LinkedUserID = nil
 			}
 		} else if cur.Phone != nil && strings.TrimSpace(*cur.Phone) != "" {
-			u, _ := s.repo.FindUserByPhone(ctx, strings.TrimSpace(*cur.Phone))
+			u, _ := s.repo.FindUserByPhoneTx(ctx, nil, strings.TrimSpace(*cur.Phone))
 			if u != nil {
 				cur.LinkedUserID = &u.ID
 			} else {
@@ -132,9 +132,9 @@ func (s *ContactService) GetOrCreateByName(ctx context.Context, userID uuid.UUID
 		return uuid.Nil, nil
 	}
 
-	contacts, err := s.repo.ListContacts(ctx, userID)
+	items, err := s.repo.ListContactsTx(ctx, nil, userID)
 	if err == nil {
-		for _, c := range contacts {
+		for _, c := range items {
 			if strings.EqualFold(c.Name, name) {
 				return c.ID, nil
 			}

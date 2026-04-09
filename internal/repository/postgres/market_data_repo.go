@@ -13,20 +13,20 @@ import (
 )
 
 type MarketDataRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewMarketDataRepo(db *database.Postgres) *MarketDataRepo {
-	return &MarketDataRepo{db: db}
+	return &MarketDataRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
-func (r *MarketDataRepo) LoadSecurityIDsBySymbols(ctx context.Context, symbols []string) (map[string]uuid.UUID, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *MarketDataRepo) LoadSecurityIDsBySymbolsTx(ctx context.Context, tx pgx.Tx, symbols []string) (map[string]uuid.UUID, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT symbol, id
 		FROM securities
 		WHERE symbol = ANY($1)
@@ -48,8 +48,8 @@ func (r *MarketDataRepo) LoadSecurityIDsBySymbols(ctx context.Context, symbols [
 	return out, nil
 }
 
-func (r *MarketDataRepo) LoadSyncState(ctx context.Context, syncKey string) (*entity.SyncState, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *MarketDataRepo) LoadSyncStateTx(ctx context.Context, tx pgx.Tx, syncKey string) (*entity.SyncState, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (r *MarketDataRepo) LoadSyncState(ctx context.Context, syncKey string) (*en
 	var st entity.SyncState
 	st.SyncKey = syncKey
 
-	err = pool.QueryRow(ctx, `
+	err = q.QueryRow(ctx, `
 		SELECT min_interval_seconds, last_started_at, last_success_at, last_failure_at, last_status, last_error
 		FROM market_data_sync_states
 		WHERE sync_key = $1

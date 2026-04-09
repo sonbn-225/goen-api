@@ -15,34 +15,34 @@ import (
 )
 
 type UserRepo struct {
-	db *database.Postgres
+	BaseRepo
 }
 
 func NewUserRepo(db *database.Postgres) *UserRepo {
-	return &UserRepo{db: db}
+	return &UserRepo{BaseRepo: *NewBaseRepo(db)}
 }
 
 // --- Nhóm 1: Truy vấn Người dùng (Read-only Optimized) ---
 
-func (r *UserRepo) FindUserByEmail(ctx context.Context, email string) (*entity.UserWithPassword, error) {
-	return r.findOneUser(ctx, "email = $1", email)
+func (r *UserRepo) FindUserByEmailTx(ctx context.Context, tx pgx.Tx, email string) (*entity.UserWithPassword, error) {
+	return r.findOneUserTx(ctx, tx, "email = $1", email)
 }
 
-func (r *UserRepo) FindUserByPhone(ctx context.Context, phone string) (*entity.UserWithPassword, error) {
-	return r.findOneUser(ctx, "phone = $1", phone)
+func (r *UserRepo) FindUserByPhoneTx(ctx context.Context, tx pgx.Tx, phone string) (*entity.UserWithPassword, error) {
+	return r.findOneUserTx(ctx, tx, "phone = $1", phone)
 }
 
-func (r *UserRepo) FindUserByUsername(ctx context.Context, username string) (*entity.UserWithPassword, error) {
-	return r.findOneUser(ctx, "username = $1", username)
+func (r *UserRepo) FindUserByUsernameTx(ctx context.Context, tx pgx.Tx, username string) (*entity.UserWithPassword, error) {
+	return r.findOneUserTx(ctx, tx, "username = $1", username)
 }
 
-func (r *UserRepo) FindUserByID(ctx context.Context, id uuid.UUID) (*entity.User, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *UserRepo) FindUserByIDTx(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*entity.User, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		SELECT id, email, phone, display_name, avatar_url, username, settings, status, created_at, updated_at
 		FROM users WHERE id = $1
 	`, id)
@@ -66,7 +66,7 @@ func (r *UserRepo) FindUserByID(ctx context.Context, id uuid.UUID) (*entity.User
 // --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
 
 func (r *UserRepo) CreateUserWithRefreshTokenTx(ctx context.Context, tx pgx.Tx, u entity.UserWithPassword, refreshToken entity.RefreshToken) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (r *UserRepo) CreateUserWithRefreshTokenTx(ctx context.Context, tx pgx.Tx, 
 }
 
 func (r *UserRepo) UpdateUserSettingsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, patch map[string]any) (*entity.User, error) {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func (r *UserRepo) UpdateUserSettingsTx(ctx context.Context, tx pgx.Tx, userID u
 }
 
 func (r *UserRepo) UpdateUserProfileTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, params entity.UpdateUserParams) (*entity.User, error) {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -205,8 +205,8 @@ func (r *UserRepo) UpdateUserProfileTx(ctx context.Context, tx pgx.Tx, userID uu
 }
 
 // Internal Helper
-func (r *UserRepo) findOneUser(ctx context.Context, where string, args ...any) (*entity.UserWithPassword, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *UserRepo) findOneUserTx(ctx context.Context, tx pgx.Tx, where string, args ...any) (*entity.UserWithPassword, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +216,7 @@ func (r *UserRepo) findOneUser(ctx context.Context, where string, args ...any) (
 		FROM users WHERE %s
 	`, where)
 
-	row := pool.QueryRow(ctx, query, args...)
+	row := q.QueryRow(ctx, query, args...)
 
 	var u entity.UserWithPassword
 	var settingsJSON []byte

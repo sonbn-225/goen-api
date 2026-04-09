@@ -59,7 +59,7 @@ func (s *CategoryService) List(ctx context.Context, userID uuid.UUID, txType str
 	}
 
 	// Cache miss or Redis not configured
-	cats, err := s.repo.ListCategories(ctx, userID)
+	cats, err := s.repo.ListCategoriesTx(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}

@@ -43,7 +43,7 @@ func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, req dto.Cr
 		return nil, errors.New("invalid category ID")
 	}
 
-	cat, err := s.categoryRepo.GetCategory(ctx, userID, categoryID)
+	cat, err := s.categoryRepo.GetCategoryTx(ctx, nil, userID, categoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, req dto.Cr
 }
 
 func (s *BudgetService) Get(ctx context.Context, userID uuid.UUID, budgetID uuid.UUID) (*dto.BudgetWithStatsResponse, error) {
-	b, err := s.repo.GetBudget(ctx, userID, budgetID)
+	b, err := s.repo.GetBudgetTx(ctx, nil, userID, budgetID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *BudgetService) Get(ctx context.Context, userID uuid.UUID, budgetID uuid
 }
 
 func (s *BudgetService) List(ctx context.Context, userID uuid.UUID) ([]dto.BudgetWithStatsResponse, error) {
-	items, err := s.repo.ListBudgets(ctx, userID)
+	items, err := s.repo.ListBudgetsTx(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (s *BudgetService) List(ctx context.Context, userID uuid.UUID) ([]dto.Budge
 }
 
 func (s *BudgetService) Update(ctx context.Context, userID uuid.UUID, budgetID uuid.UUID, req dto.UpdateBudgetRequest) (*dto.BudgetWithStatsResponse, error) {
-	cur, err := s.repo.GetBudget(ctx, userID, budgetID)
+	cur, err := s.repo.GetBudgetTx(ctx, nil, userID, budgetID)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (s *BudgetService) normalizeBudgetPeriod(period string, startIn, endIn *str
 func (s *BudgetService) withStats(ctx context.Context, userID uuid.UUID, b entity.Budget) (*dto.BudgetWithStatsResponse, error) {
 	spent := "0"
 	if b.CategoryID != nil && b.PeriodStart != nil && b.PeriodEnd != nil {
-		v, err := s.repo.ComputeSpent(ctx, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
+		v, err := s.repo.ComputeSpentTx(ctx, nil, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
 		if err == nil {
 			spent = v
 		}

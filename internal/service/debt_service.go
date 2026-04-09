@@ -32,13 +32,19 @@ import (
 // khi tính toán, nhưng lưu trữ dạng chuỗi) để tránh lỗi số dấu phẩy động.
 type DebtService struct {
 	repo       interfaces.DebtRepository
+	txRepo     interfaces.TransactionRepository
 	contactSvc interfaces.ContactService
 	db         *database.Postgres
 }
 
 // NewDebtService khởi tạo một dịch vụ quản lý nợ mới.
-func NewDebtService(repo interfaces.DebtRepository, contactSvc interfaces.ContactService, db *database.Postgres) *DebtService {
-	return &DebtService{repo: repo, contactSvc: contactSvc, db: db}
+func NewDebtService(repo interfaces.DebtRepository, txRepo interfaces.TransactionRepository, contactSvc interfaces.ContactService, db *database.Postgres) *DebtService {
+	return &DebtService{
+		repo:       repo,
+		txRepo:     txRepo,
+		contactSvc: contactSvc,
+		db:         db,
+	}
 }
 
 // Create ghi nhận một khoản nợ mới. Nó bao bọc CreateTx trong một giao dịch cơ sở dữ liệu.
@@ -160,7 +166,7 @@ func (s *DebtService) CreateTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID,
 		return nil, err
 	}
 
-	created, err := s.repo.GetDebt(ctx, userID, d.ID)
+	created, err := s.repo.GetDebtTx(ctx, tx, userID, d.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +178,7 @@ func (s *DebtService) CreateTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID,
 }
 
 func (s *DebtService) Get(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) (*dto.DebtResponse, error) {
-	it, err := s.repo.GetDebt(ctx, userID, debtID)
+	it, err := s.repo.GetDebtTx(ctx, nil, userID, debtID)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +190,7 @@ func (s *DebtService) Get(ctx context.Context, userID uuid.UUID, debtID uuid.UUI
 }
 
 func (s *DebtService) List(ctx context.Context, userID uuid.UUID) ([]dto.DebtResponse, error) {
-	items, err := s.repo.ListDebts(ctx, userID)
+	items, err := s.repo.ListDebtsTx(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +199,7 @@ func (s *DebtService) List(ctx context.Context, userID uuid.UUID) ([]dto.DebtRes
 
 // Update chỉnh sửa thông tin khoản nợ.
 func (s *DebtService) Update(ctx context.Context, userID uuid.UUID, debtID uuid.UUID, req dto.UpdateDebtRequest) (*dto.DebtResponse, error) {
-	cur, err := s.repo.GetDebt(ctx, userID, debtID)
+	cur, err := s.repo.GetDebtTx(ctx, nil, userID, debtID)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +229,7 @@ func (s *DebtService) Update(ctx context.Context, userID uuid.UUID, debtID uuid.
 		return nil, err
 	}
 
-	updated, err := s.repo.GetDebt(ctx, userID, debtID)
+	updated, err := s.repo.GetDebtTx(ctx, nil, userID, debtID)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +264,7 @@ func (s *DebtService) AddPayment(ctx context.Context, userID uuid.UUID, debtID u
 // 2. Số tiền còn lại được áp dụng vào nợ gốc chưa thanh toán.
 // 3. Nếu mọi thứ đã được trả hết, trạng thái được cập nhật thành 'paid'.
 func (s *DebtService) AddPaymentTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID, req dto.DebtPaymentRequest) (*dto.DebtResponse, error) {
-	debt, err := s.repo.GetDebt(ctx, userID, debtID)
+	debt, err := s.repo.GetDebtTx(ctx, tx, userID, debtID)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +340,7 @@ func (s *DebtService) AddPaymentTx(ctx context.Context, tx pgx.Tx, userID uuid.U
 		return nil, err
 	}
 
-	updated, err := s.repo.GetDebt(ctx, userID, debtID)
+	updated, err := s.repo.GetDebtTx(ctx, tx, userID, debtID)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +353,7 @@ func (s *DebtService) Repay(ctx context.Context, userID uuid.UUID, debtID uuid.U
 	// Start transaction
 	var resp *dto.DebtResponse
 	err := s.db.WithTx(ctx, func(tx pgx.Tx) error {
-		debt, err := s.repo.GetDebt(ctx, userID, debtID)
+		debt, err := s.repo.GetDebtTx(ctx, tx, userID, debtID)
 		if err != nil {
 			return err
 		}
@@ -413,7 +419,7 @@ func (s *DebtService) Repay(ctx context.Context, userID uuid.UUID, debtID uuid.U
 }
 
 func (s *DebtService) ListPayments(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) ([]dto.DebtPaymentLinkResponse, error) {
-	links, err := s.repo.ListPaymentLinks(ctx, userID, debtID)
+	links, err := s.repo.ListPaymentLinksTx(ctx, nil, userID, debtID)
 	if err != nil {
 		return nil, err
 	}
@@ -431,13 +437,13 @@ func (s *DebtService) CleanupTransactionLinksTx(ctx context.Context, tx pgx.Tx, 
 	// nhưng hiện tại chúng ta chỉ xóa các liên kết và bên gọi xử lý trạng thái nợ nếu cần)
 	// Thực tế, nếu chúng ta xóa một giao dịch trả nợ, chúng ta nên hoàn trả nợ gốc còn thiếu của khoản nợ.
 	
-	links, err := s.repo.ListPaymentLinksByTransaction(ctx, userID, transactionID)
+	links, err := s.repo.ListPaymentLinksByTransactionTx(ctx, tx, userID, transactionID)
 	if err != nil {
 		return err
 	}
 
 	for _, link := range links {
-		debt, err := s.repo.GetDebt(ctx, userID, link.DebtID)
+		debt, err := s.repo.GetDebtTx(ctx, tx, userID, link.DebtID)
 		if err != nil {
 			return err
 		}

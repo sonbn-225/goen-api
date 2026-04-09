@@ -45,7 +45,7 @@ func (s *TagService) Create(ctx context.Context, userID uuid.UUID, req dto.Creat
 		return nil, err
 	}
  
-	it, err := s.repo.GetTag(ctx, userID, t.ID)
+	it, err := s.repo.GetTagTx(ctx, nil, userID, t.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (s *TagService) Create(ctx context.Context, userID uuid.UUID, req dto.Creat
 }
  
 func (s *TagService) Get(ctx context.Context, userID, tagID uuid.UUID) (*dto.TagResponse, error) {
-	it, err := s.repo.GetTag(ctx, userID, tagID)
+	it, err := s.repo.GetTagTx(ctx, nil, userID, tagID)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (s *TagService) Get(ctx context.Context, userID, tagID uuid.UUID) (*dto.Tag
 }
  
 func (s *TagService) List(ctx context.Context, userID uuid.UUID) ([]dto.TagResponse, error) {
-	items, err := s.repo.ListTags(ctx, userID)
+	items, err := s.repo.ListTagsTx(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (s *TagService) GetOrCreateByName(ctx context.Context, userID uuid.UUID, na
 		return uuid.Nil, errors.New("tag name cannot be empty")
 	}
  
-	tags, err := s.repo.ListTags(ctx, userID)
+	tags, err := s.repo.ListTagsTx(ctx, nil, userID)
 	if err != nil {
 		return uuid.Nil, err
 	}

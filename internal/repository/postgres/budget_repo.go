@@ -22,21 +22,23 @@ func NewBudgetRepo(db *database.Postgres) *BudgetRepo {
 
 // --- Nhóm 1: Truy vấn Thống kê & Danh sách (Read-only Optimized) ---
 
-func (r *BudgetRepo) GetBudget(ctx context.Context, userID uuid.UUID, budgetID uuid.UUID) (*entity.Budget, error) {
-	pool, err := r.db.Pool(ctx)
+// --- Nhóm 1: Truy vấn Thống kê & Danh sách (Flexible Tx) ---
+
+func (r *BudgetRepo) GetBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, budgetID uuid.UUID) (*entity.Budget, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	return r.getBudget(ctx, pool, userID, budgetID)
+	return r.getBudgetTx(ctx, q, userID, budgetID)
 }
 
-func (r *BudgetRepo) ListBudgets(ctx context.Context, userID uuid.UUID) ([]entity.Budget, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *BudgetRepo) ListBudgetsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]entity.Budget, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := pool.Query(ctx, `
+	rows, err := q.Query(ctx, `
 		SELECT
 			id, user_id, name, period,
 			CASE WHEN period_start IS NULL THEN NULL ELSE to_char(period_start, 'YYYY-MM-DD') END,
@@ -64,7 +66,7 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID uuid.UUID) ([]entit
 		}
 
 		if b.CategoryID != nil && b.PeriodStart != nil && b.PeriodEnd != nil {
-			s, _ := r.ComputeSpent(ctx, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
+			s, _ := r.ComputeSpentTx(ctx, tx, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
 			b.Spent = s
 		} else {
 			b.Spent = "0"
@@ -76,8 +78,8 @@ func (r *BudgetRepo) ListBudgets(ctx context.Context, userID uuid.UUID) ([]entit
 	return results, nil
 }
 
-func (r *BudgetRepo) ComputeSpent(ctx context.Context, userID uuid.UUID, categoryID uuid.UUID, startDate string, endDate string) (string, error) {
-	pool, err := r.db.Pool(ctx)
+func (r *BudgetRepo) ComputeSpentTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, categoryID uuid.UUID, startDate string, endDate string) (string, error) {
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return "", err
 	}
@@ -87,7 +89,7 @@ func (r *BudgetRepo) ComputeSpent(ctx context.Context, userID uuid.UUID, categor
 	startExclusive := startT.UTC()
 	endExclusive := endT.UTC().Add(24 * time.Hour)
 
-	row := pool.QueryRow(ctx, `
+	row := q.QueryRow(ctx, `
 		WITH RECURSIVE cat_tree AS (
 			SELECT id FROM categories WHERE id = $2 AND deleted_at IS NULL
 			UNION ALL
@@ -116,7 +118,7 @@ func (r *BudgetRepo) ComputeSpent(ctx context.Context, userID uuid.UUID, categor
 // --- Nhóm 2: Thao tác ghi & Nhất quán (Transactional) ---
 
 func (r *BudgetRepo) CreateBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, b entity.Budget) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -134,7 +136,7 @@ func (r *BudgetRepo) CreateBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.
 }
 
 func (r *BudgetRepo) UpdateBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, b entity.Budget) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -148,7 +150,7 @@ func (r *BudgetRepo) UpdateBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.
 }
 
 func (r *BudgetRepo) DeleteBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, budgetID uuid.UUID) error {
-	q, err := r.db.Queryer(ctx, tx)
+	q, err := r.Queryer(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -157,18 +159,9 @@ func (r *BudgetRepo) DeleteBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.
 	return err
 }
 
-// GetBudgetTx lấy thông tin ngân sách trong transaction (cho mục đích nhất quán hoặc audit).
-func (r *BudgetRepo) GetBudgetTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, budgetID uuid.UUID) (*entity.Budget, error) {
-	q, err := r.db.Queryer(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	return r.getBudget(ctx, q, userID, budgetID)
-}
-
 // --- Internal Helpers ---
 
-func (r *BudgetRepo) getBudget(ctx context.Context, q database.Queryer, userID uuid.UUID, budgetID uuid.UUID) (*entity.Budget, error) {
+func (r *BudgetRepo) getBudgetTx(ctx context.Context, q database.Queryer, userID uuid.UUID, budgetID uuid.UUID) (*entity.Budget, error) {
 	row := q.QueryRow(ctx, `
 		SELECT
 			id, user_id, name, period, 
@@ -194,11 +187,46 @@ func (r *BudgetRepo) getBudget(ctx context.Context, q database.Queryer, userID u
 
 	// Compute spent (simplified)
 	if b.CategoryID != nil && b.PeriodStart != nil && b.PeriodEnd != nil {
-		s, _ := r.ComputeSpent(ctx, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
+		// Pass q as tx if it's a transaction, but Queryer doesn't easily convert back to pgx.Tx
+		// For now, we'll just use the ComputeSpentTx with nil tx if we can't easily get it.
+		// Actually, let's just make ComputeSpentTx accept Queryer instead.
+		s, _ := r.computeSpentWithQueryer(ctx, q, userID, *b.CategoryID, *b.PeriodStart, *b.PeriodEnd)
 		b.Spent = s
 	} else {
 		b.Spent = "0"
 	}
 	b.Remaining = "0" // Placeholder
 	return &b, nil
+}
+
+func (r *BudgetRepo) computeSpentWithQueryer(ctx context.Context, q database.Queryer, userID uuid.UUID, categoryID uuid.UUID, startDate string, endDate string) (string, error) {
+	startT, _ := time.Parse("2006-01-02", startDate)
+	endT, _ := time.Parse("2006-01-02", endDate)
+	startExclusive := startT.UTC()
+	endExclusive := endT.UTC().Add(24 * time.Hour)
+
+	row := q.QueryRow(ctx, `
+		WITH RECURSIVE cat_tree AS (
+			SELECT id FROM categories WHERE id = $2 AND deleted_at IS NULL
+			UNION ALL
+			SELECT c.id FROM categories c JOIN cat_tree ct ON c.parent_category_id = ct.id WHERE c.deleted_at IS NULL
+		)
+		SELECT COALESCE(SUM(li.amount), 0)::text
+		FROM transaction_line_items li
+		JOIN transactions t ON t.id = li.transaction_id
+		WHERE t.deleted_at IS NULL
+		  AND t.type = 'expense'
+		  AND t.occurred_at >= $3 AND t.occurred_at < $4
+		  AND li.category_id IN (SELECT id FROM cat_tree)
+		  AND EXISTS (
+			SELECT 1 FROM user_accounts ua
+			WHERE ua.account_id = t.account_id AND ua.user_id = $1 AND ua.status = 'active'
+		  )
+	`, userID, categoryID, startExclusive, endExclusive)
+
+	var spent string
+	if err := row.Scan(&spent); err != nil {
+		return "", err
+	}
+	return spent, nil
 }

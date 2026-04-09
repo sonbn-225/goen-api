@@ -69,7 +69,7 @@ func (s *InterchangeService) StageImport(ctx context.Context, userID uuid.UUID, 
 }
 
 func (s *InterchangeService) ListStaged(ctx context.Context, userID uuid.UUID, resourceType string) ([]dto.StagedImportResponse, error) {
-	items, err := s.repo.ListStagedImports(ctx, userID, resourceType)
+	items, err := s.repo.ListStagedImportsTx(ctx, nil, userID, resourceType)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (s *InterchangeService) UpsertRules(ctx context.Context, userID uuid.UUID, 
 }
 
 func (s *InterchangeService) ListRules(ctx context.Context, userID uuid.UUID, resourceType string) ([]dto.ImportMappingRuleResponse, error) {
-	items, err := s.repo.ListImportRules(ctx, userID, resourceType)
+	items, err := s.repo.ListImportRulesTx(ctx, nil, userID, resourceType)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func (s *InterchangeService) CreateManyFromStaged(ctx context.Context, userID uu
 
 	result := &dto.BatchImportResult{Errors: []string{}}
 	for _, id := range ids {
-		staged, err := s.repo.GetStagedImport(ctx, userID, id)
+		staged, err := s.repo.GetStagedImportTx(ctx, nil, userID, id)
 		if err != nil || staged == nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("ID %s: not found", id))
 			continue
@@ -219,11 +219,11 @@ func (s *InterchangeService) ApplyRulesAndCreate(ctx context.Context, userID uui
 		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
 	}
 
-	stagedItems, err := s.repo.ListStagedImports(ctx, userID, resourceType)
+	stagedItems, err := s.repo.ListStagedImportsTx(ctx, nil, userID, resourceType)
 	if err != nil {
 		return nil, err
 	}
-	rules, err := s.repo.ListImportRules(ctx, userID, resourceType)
+	rules, err := s.repo.ListImportRulesTx(ctx, nil, userID, resourceType)
 	if err != nil {
 		return nil, err
 	}
