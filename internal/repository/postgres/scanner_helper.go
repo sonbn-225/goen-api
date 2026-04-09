@@ -41,7 +41,7 @@ func ScanTransaction(s RowScanner, includeCategoryIDs bool) (*entity.Transaction
 		&t.ID, &t.ExternalRef, &t.Type, &t.OccurredAt, &t.OccurredDate,
 		&t.Amount, &t.FromAmount, &t.ToAmount, &t.Description, &t.AccountID, &t.AccountName, &t.FromAccountID, &t.ToAccountID,
 		&t.ExchangeRate, &t.AccountCurrency, &t.FromCurrency, &t.ToCurrency, &t.Status,
-		&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt, &t.TagIDs,
+		&t.CreatedAt, &t.UpdatedAt, &t.DeletedAt,
 	}
 	if includeCategoryIDs {
 		dest = append(dest, &t.CategoryIDs)
