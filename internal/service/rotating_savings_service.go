@@ -24,6 +24,7 @@ type RotatingSavingsService struct {
 	categoryRepo interfaces.CategoryRepository
 	accountSvc   interfaces.AccountService
 	txSvc        interfaces.TransactionService
+	auditSvc     interfaces.AuditService
 	db           *database.Postgres
 }
 
@@ -34,6 +35,7 @@ func NewRotatingSavingsService(
 	categoryRepo interfaces.CategoryRepository,
 	accountSvc interfaces.AccountService,
 	txSvc interfaces.TransactionService,
+	auditSvc interfaces.AuditService,
 	db *database.Postgres,
 ) *RotatingSavingsService {
 	return &RotatingSavingsService{
@@ -42,6 +44,7 @@ func NewRotatingSavingsService(
 		categoryRepo: categoryRepo,
 		accountSvc:   accountSvc,
 		txSvc:        txSvc,
+		auditSvc:     auditSvc,
 		db:           db,
 	}
 }
@@ -82,17 +85,7 @@ func (s *RotatingSavingsService) CreateGroup(ctx context.Context, userID uuid.UU
 			return err
 		}
 
-		return s.repo.AddAuditLogTx(ctx, tx, entity.RotatingSavingsAuditLog{
-			BaseEntity: entity.BaseEntity{
-				ID: utils.NewID(),
-			},
-			UserID:    userID,
-			GroupID:   &g.ID,
-			Action:    entity.RotatingSavingsAuditActionGroupCreated,
-			Details:   map[string]any{"name": g.Name},
-			CreatedAt: utils.Now(),
-			UpdatedAt: utils.Now(),
-		})
+		return s.auditSvc.Record(ctx, tx, userID, &g.AccountID, entity.ResourceRotatingSavings, entity.ActionCreated, g.ID, nil, g)
 	})
 
 	if err != nil {
@@ -158,17 +151,7 @@ func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupI
 			return err
 		}
 
-		return s.repo.AddAuditLogTx(ctx, tx, entity.RotatingSavingsAuditLog{
-			BaseEntity: entity.BaseEntity{
-				ID: utils.NewID(),
-			},
-			UserID:    userID,
-			GroupID:   &g.ID,
-			Action:    entity.RotatingSavingsAuditActionGroupUpdated,
-			Details:   map[string]any{"status": g.Status},
-			CreatedAt: utils.Now(),
-			UpdatedAt: utils.Now(),
-		})
+		return s.auditSvc.Record(ctx, tx, userID, &g.AccountID, entity.ResourceRotatingSavings, entity.ActionUpdated, g.ID, nil, g)
 	})
 
 	if err != nil {
@@ -202,7 +185,10 @@ func (s *RotatingSavingsService) GetGroupDetail(ctx context.Context, userID, gro
 		return nil, err
 	}
 
-	auditLogs, _ := s.repo.ListAuditLogsTx(ctx, nil, groupID)
+	auditLogs, _ := s.auditSvc.List(ctx, userID, entity.AuditLogFilter{
+		ResourceID: &groupID,
+		Limit:      50,
+	})
 
 	schedule := s.generateSchedule(*g, contributions)
 
@@ -240,7 +226,7 @@ func (s *RotatingSavingsService) GetGroupDetail(ctx context.Context, userID, gro
 		CurrentPayoutValue:     payoutValue,
 		CurrentAccruedInterest: accruedInterest,
 		Contributions:          dto.NewRotatingSavingsContributionResponses(contributions),
-		AuditLogs:              dto.NewRotatingSavingsAuditLogResponses(auditLogs),
+		AuditLogs:              dto.NewRotatingSavingsAuditLogResponsesFromUnified(auditLogs),
 		TotalPaid:              totalPaid,
 		TotalReceived:          totalReceived,
 		NextPayment:            nextPayment,
@@ -469,18 +455,10 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 			return err
 		}
 
-		// 3. Add Audit Log
-		_ = s.repo.AddAuditLogTx(ctx, tx, entity.RotatingSavingsAuditLog{
-			BaseEntity: entity.BaseEntity{
-				ID: utils.NewID(),
-			},
-			UserID:    userID,
-			GroupID:   &groupID,
-			Action:    entity.RotatingSavingsAuditActionContributionCreated,
-			Details:   map[string]any{"kind": c.Kind, "amount": req.Amount},
-			CreatedAt: utils.Now(),
-			UpdatedAt: utils.Now(),
-		})
+		// 3. Record Audit
+		if err := s.auditSvc.Record(ctx, tx, userID, &g.AccountID, entity.ResourceRotatingContribution, entity.ActionCreated, c.ID, nil, c); err != nil {
+			return err
+		}
 
 		tr := dto.NewRotatingSavingsContributionResponse(c)
 		resp = &tr

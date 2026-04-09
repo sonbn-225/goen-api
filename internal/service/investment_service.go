@@ -24,6 +24,7 @@ type InvestmentService struct {
 	accRepo interfaces.AccountRepository
 	txSvc   interfaces.TransactionService
 	secSvc  interfaces.SecurityService
+	auditSvc interfaces.AuditService
 	db      *database.Postgres
 }
 
@@ -34,6 +35,7 @@ func NewInvestmentService(
 	accRepo interfaces.AccountRepository,
 	txSvc interfaces.TransactionService,
 	secSvc interfaces.SecurityService,
+	auditSvc interfaces.AuditService,
 	db *database.Postgres,
 ) *InvestmentService {
 	return &InvestmentService{
@@ -42,6 +44,7 @@ func NewInvestmentService(
 		accRepo: accRepo,
 		txSvc:   txSvc,
 		secSvc:  secSvc,
+		auditSvc: auditSvc,
 		db:      db,
 	}
 }
@@ -383,6 +386,8 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, accountID u
 		// E. Finalize Response
 		tr := dto.NewTradeResponse(trade)
 		resp = &tr
+
+		_ = s.auditSvc.Record(ctx, tx, userID, &accountID, entity.ResourceTrade, entity.ActionCreated, tradeID, nil, trade)
 		return nil
 	})
 

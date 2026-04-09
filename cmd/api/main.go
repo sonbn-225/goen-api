@@ -50,6 +50,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	a.StartJobs(context.Background())
+
 	srv := &http.Server{
 		Addr:         cfg.HTTPAddr(),
 		Handler:      a.Router,

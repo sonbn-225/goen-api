@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -28,14 +27,14 @@ type TransactionService struct {
 	repo        interfaces.TransactionRepository
 	tagSvc      interfaces.TagService
 	debtSvc     interfaces.DebtService
-	accountRepo        interfaces.AccountRepository
 	rotatingSavingsSvc interfaces.RotatingSavingsService
+	auditSvc           interfaces.AuditService
 	db                 *database.Postgres
 }
 
 // NewTransactionService khởi tạo một thực thể mới của dịch vụ sổ cái trung tâm.
-func NewTransactionService(repo interfaces.TransactionRepository, tagSvc interfaces.TagService, accountRepo interfaces.AccountRepository, db *database.Postgres) *TransactionService {
-	return &TransactionService{repo: repo, tagSvc: tagSvc, accountRepo: accountRepo, db: db}
+func NewTransactionService(repo interfaces.TransactionRepository, tagSvc interfaces.TagService, auditSvc interfaces.AuditService, db *database.Postgres) *TransactionService {
+	return &TransactionService{repo: repo, tagSvc: tagSvc, auditSvc: auditSvc, db: db}
 }
 
 // SetDebtService được sử dụng để tiêm phụ thuộc nhằm giải quyết vòng lặp phụ thuộc với DebtService.
@@ -244,7 +243,10 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 			return err
 		}
 
-		// 2. Create Debts for Shared Expenses
+		// 2. Record Audit
+		_ = s.auditSvc.Record(ctx, txConn, userID, tx.AccountID, entity.ResourceTransaction, entity.ActionCreated, tx.ID, nil, tx)
+
+		// 3. Create Debts for Shared Expenses
 		if len(req.GroupParticipants) > 0 {
 			shares := s.allocateGroupParticipants(userID, id, tx.Amount, req.OwnerOriginalAmount, req.GroupParticipants)
 			if s.debtSvc != nil && tx.AccountID != nil {
@@ -281,19 +283,6 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 		}
 		tr := dto.NewTransactionResponse(*it, nil, nil)
 		resp = &tr
-
-		// Audit Logging
-		if it.AccountID != nil {
-			_ = s.accountRepo.RecordAccountAuditEventTx(ctx, txConn, entity.AccountAuditEvent{
-				BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
-				AccountID:   *it.AccountID,
-				ActorUserID: userID,
-				Action:      "transaction_created",
-				EntityType:  "transaction",
-				EntityID:    it.ID,
-				OccurredAt:  utils.Now(),
-			})
-		}
 
 		return nil
 	})
@@ -347,21 +336,7 @@ func (s *TransactionService) Patch(ctx context.Context, userID, transactionID uu
 
 	// Audit Logging
 	if it.AccountID != nil {
-		var diff map[string]any
-		if patchBytes, err := json.Marshal(patch); err == nil {
-			_ = json.Unmarshal(patchBytes, &diff)
-		}
-
-		_ = s.accountRepo.RecordAccountAuditEventTx(ctx, nil, entity.AccountAuditEvent{
-			BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
-			AccountID:   *it.AccountID,
-			ActorUserID: userID,
-			Action:      "transaction_updated",
-			EntityType:  "transaction",
-			EntityID:    it.ID,
-			OccurredAt:  utils.Now(),
-			Diff:        diff,
-		})
+		_ = s.auditSvc.Record(ctx, nil, userID, it.AccountID, entity.ResourceTransaction, entity.ActionUpdated, it.ID, nil, it)
 	}
 
 	return &resp, nil
@@ -441,15 +416,7 @@ func (s *TransactionService) Delete(ctx context.Context, userID, transactionID u
 
 		// 4. Ghi nhật ký kiểm toán
 		if tx != nil && tx.AccountID != nil {
-			_ = s.accountRepo.RecordAccountAuditEventTx(ctx, txConn, entity.AccountAuditEvent{
-				BaseEntity:  entity.BaseEntity{ID: utils.NewID()},
-				AccountID:   *tx.AccountID,
-				ActorUserID: userID,
-				Action:      "transaction_deleted",
-				EntityType:  "transaction",
-				EntityID:    transactionID,
-				OccurredAt:  utils.Now(),
-			})
+			_ = s.auditSvc.Record(ctx, txConn, userID, tx.AccountID, entity.ResourceTransaction, entity.ActionDeleted, transactionID, nil, tx)
 		}
 		return nil
 	})

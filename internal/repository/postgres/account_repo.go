@@ -336,61 +336,6 @@ func (r *AccountRepo) RevokeAccountShareTx(ctx context.Context, tx pgx.Tx, actor
 	return err
 }
 
-func (r *AccountRepo) ListAccountAuditEventsTx(ctx context.Context, tx pgx.Tx, actorUserID uuid.UUID, accountID uuid.UUID, limit int) ([]entity.AccountAuditEvent, error) {
-	q, err := r.Queryer(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err := q.Query(ctx, `
-		SELECT id, account_id, actor_user_id, action, entity_type, entity_id, occurred_at, diff
-		FROM audit_events
-		WHERE account_id = $1
-		ORDER BY occurred_at DESC
-		LIMIT $2
-	`, accountID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := make([]entity.AccountAuditEvent, 0)
-	for rows.Next() {
-		var it entity.AccountAuditEvent
-		var rawDiff []byte
-
-		if err := rows.Scan(
-			&it.ID, &it.AccountID, &it.ActorUserID, &it.Action, &it.EntityType, &it.EntityID, &it.OccurredAt, &rawDiff,
-		); err != nil {
-			return nil, err
-		}
-
-		if len(rawDiff) > 0 {
-			_ = json.Unmarshal(rawDiff, &it.Diff)
-		}
-
-		out = append(out, it)
-	}
-	return out, rows.Err()
-}
-
-func (r *AccountRepo) RecordAccountAuditEventTx(ctx context.Context, tx pgx.Tx, event entity.AccountAuditEvent) error {
-	q, err := r.Queryer(ctx, tx)
-	if err != nil {
-		return err
-	}
-
-	var diffJSON []byte
-	if event.Diff != nil {
-		diffJSON, _ = json.Marshal(event.Diff)
-	}
-
-	_, err = q.Exec(ctx, `
-		INSERT INTO audit_events (id, account_id, actor_user_id, action, entity_type, entity_id, occurred_at, diff)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, event.ID, event.AccountID, event.ActorUserID, event.Action, event.EntityType, event.ID, event.OccurredAt, diffJSON)
-	return err
-}
 
 func (r *AccountRepo) requireAccountOwner(ctx context.Context, q database.Queryer, userID uuid.UUID, accountID uuid.UUID) error {
 	var one int
