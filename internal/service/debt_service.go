@@ -486,3 +486,23 @@ func (s *DebtService) CleanupTransactionLinksTx(ctx context.Context, tx pgx.Tx, 
 	// 3. Xóa các khoản nợ bắt nguồn từ giao dịch này
 	return s.repo.DeleteDebtsByOriginatingTransactionTx(ctx, tx, userID, transactionID)
 }
+
+func (s *DebtService) ListPaymentLinksByTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID) ([]dto.DebtPaymentLinkResponse, error) {
+	links, err := s.repo.ListPaymentLinksByTransactionTx(ctx, nil, userID, transactionID)
+	if err != nil {
+		return nil, err
+	}
+	resps := make([]dto.DebtPaymentLinkResponse, 0, len(links))
+	for _, l := range links {
+		resps = append(resps, dto.NewDebtPaymentLinkResponse(l))
+	}
+	return resps, nil
+}
+
+func (s *DebtService) ListDebtsByOriginatingTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID) ([]dto.DebtResponse, error) {
+	items, err := s.repo.ListDebtsByOriginatingTransactionTx(ctx, nil, userID, transactionID)
+	if err != nil {
+		return nil, err
+	}
+	return dto.NewDebtResponses(items), nil
+}

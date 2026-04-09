@@ -22,6 +22,8 @@ type DebtRepository interface {
 	ListPaymentLinksTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtPaymentLink, error)
 	// ListPaymentLinksByTransactionTx trả về các khoản nợ được thanh toán bởi một giao dịch cụ thể.
 	ListPaymentLinksByTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) ([]entity.DebtPaymentLink, error)
+	// ListDebtsByOriginatingTransactionTx trả về các khoản nợ bắt nguồn từ một giao dịch cụ thể.
+	ListDebtsByOriginatingTransactionTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) ([]entity.Debt, error)
 	// ListInstallmentsTx trả về lịch thanh toán của một khoản nợ.
 	ListInstallmentsTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, debtID uuid.UUID) ([]entity.DebtInstallment, error)
 	// ListPublicParticipantsTx trả về danh sách tên người tham gia cho các hồ sơ công khai.
@@ -71,4 +73,8 @@ type DebtService interface {
 	ListPayments(ctx context.Context, userID uuid.UUID, debtID uuid.UUID) ([]dto.DebtPaymentLinkResponse, error)
 	// CleanupTransactionLinksTx reverts debt states when an originating transaction is deleted.
 	CleanupTransactionLinksTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, transactionID uuid.UUID) error
+	// ListPaymentLinksByTransaction returns the payment history for a specific transaction.
+	ListPaymentLinksByTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID) ([]dto.DebtPaymentLinkResponse, error)
+	// ListDebtsByOriginatingTransaction returns the debts created by a specific transaction (e.g., group participants).
+	ListDebtsByOriginatingTransaction(ctx context.Context, userID uuid.UUID, transactionID uuid.UUID) ([]dto.DebtResponse, error)
 }
