@@ -48,9 +48,9 @@ func (r *TransactionRepo) getTransaction(ctx context.Context, q database.Queryer
 		LEFT JOIN accounts a ON a.id = t.account_id
 		LEFT JOIN accounts fa ON fa.id = t.from_account_id
 		LEFT JOIN accounts ta ON ta.id = t.to_account_id
-		WHERE t.id = $1 AND t.deleted_at IS NULL
+		WHERE t.id = $2 AND t.deleted_at IS NULL
 		  AND %s
-	`, TransactionColumnsSQL, TransactionPermissionSQL), id, userID)
+	`, TransactionColumnsSQL, TransactionPermissionSQL), userID, id)
 
 	t, err := ScanTransaction(row, false)
 	if err != nil {
