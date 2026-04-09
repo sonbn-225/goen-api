@@ -10,23 +10,23 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/cors"
 	_ "github.com/sonbn-225/goen-api/docs"
-	v1 "github.com/sonbn-225/goen-api/internal/handler/http/v1"
 	"github.com/sonbn-225/goen-api/internal/app/jobs"
+	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	v1 "github.com/sonbn-225/goen-api/internal/handler/http/v1"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/storage"
 	"github.com/sonbn-225/goen-api/internal/repository/postgres"
 	"github.com/sonbn-225/goen-api/internal/service"
-	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 type App struct {
-	Config *config.Config
-	DB     *database.Postgres
-	Redis  *database.Redis
-	S3     *storage.S3Client
-	Router *chi.Mux
+	Config    *config.Config
+	DB        *database.Postgres
+	Redis     *database.Redis
+	S3        *storage.S3Client
+	Router    *chi.Mux
 	AuditRepo interfaces.AuditRepository
 }
 
@@ -91,7 +91,8 @@ func New(cfg *config.Config) (*App, error) {
 	budgetSvc := service.NewBudgetService(budgetRepo, categoryRepo, auditSvc)
 	reportSvc := service.NewReportService(reportRepo, accountRepo)
 	securitySvc := service.NewSecurityService(securityRepo)
-	investmentSvc := service.NewInvestmentService(investmentRepo, transactionRepo, accountRepo, transactionSvc, securitySvc, auditSvc, db)
+	investmentSvc := service.NewInvestmentService(investmentRepo)
+	tradeSvc := service.NewTradeService(investmentRepo, transactionRepo, accountRepo, auditSvc, db)
 	marketDataSvc := service.NewMarketDataService(cfg, marketDataRepo, rds, securitySvc)
 	savingsSvc := service.NewSavingsService(savingsRepo, accountRepo, transactionRepo, transactionSvc, auditSvc, db)
 	rotatingSavingsSvc := service.NewRotatingSavingsService(rotatingSavingsRepo, transactionRepo, categoryRepo, accountSvc, transactionSvc, auditSvc, db)
@@ -117,6 +118,7 @@ func New(cfg *config.Config) (*App, error) {
 	reportHandler := v1.NewReportHandler(reportSvc)
 	securityHandler := v1.NewSecurityHandler(securitySvc)
 	investmentHandler := v1.NewInvestmentHandler(investmentSvc)
+	tradeHandler := v1.NewTradeHandler(tradeSvc)
 	marketDataHandler := v1.NewMarketDataHandler(marketDataSvc)
 	savingsHandler := v1.NewSavingsHandler(savingsSvc)
 	rotatingSavingsHandler := v1.NewRotatingSavingsHandler(rotatingSavingsSvc)
@@ -184,6 +186,7 @@ func New(cfg *config.Config) (*App, error) {
 		budgetHandler.RegisterRoutes(r, cfg)
 		reportHandler.RegisterRoutes(r, cfg)
 		securityHandler.RegisterRoutes(r, cfg)
+		tradeHandler.RegisterRoutes(r, cfg)
 		investmentHandler.RegisterRoutes(r, cfg)
 		marketDataHandler.RegisterRoutes(r, cfg)
 		savingsHandler.RegisterRoutes(r, cfg)
@@ -194,11 +197,11 @@ func New(cfg *config.Config) (*App, error) {
 	})
 
 	return &App{
-		Config: cfg,
-		DB:     db,
-		Redis:  rds,
-		S3:     s3,
-		Router: r,
+		Config:    cfg,
+		DB:        db,
+		Redis:     rds,
+		S3:        s3,
+		Router:    r,
 		AuditRepo: auditRepo,
 	}, nil
 }
