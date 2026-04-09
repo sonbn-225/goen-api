@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -104,18 +105,24 @@ func (s *TransactionService) Get(ctx context.Context, userID, transactionID uuid
 func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateTransactionRequest) (*dto.TransactionResponse, error) {
 	kind := strings.TrimSpace(string(req.Type))
 	if !validation.IsValidTransactionType(kind) {
-		return nil, apperr.BadRequest("invalid_type", "invalid transaction type")
+		return nil, apperr.BadRequest("invalid_type", "invalid transaction type").
+			WithDetail("field", "type").
+			WithDetail("value", kind)
 	}
 
 	amount := strings.TrimSpace(req.Amount)
 	if !utils.IsValidDecimal(amount) {
-		return nil, apperr.BadRequest("invalid_amount", "invalid decimal amount")
+		return nil, apperr.BadRequest("invalid_amount", "invalid decimal amount").
+			WithDetail("field", "amount").
+			WithDetail("value", amount)
 	}
 
 	fromAmount := utils.NormalizeOptionalString(req.FromAmount)
 	toAmount := utils.NormalizeOptionalString(req.ToAmount)
 	if (fromAmount != nil) != (toAmount != nil) {
-		return nil, apperr.BadRequest("invalid_fx", "from_amount and to_amount must be provided together for FX transfers")
+		return nil, apperr.BadRequest("invalid_fx", "from_amount and to_amount must be provided together for FX transfers").
+			WithDetail("field", "from_amount").
+			WithDetail("field2", "to_amount")
 	}
 
 	occurredAt, occurredDate, err := utils.NormalizeOccurredAt(req.OccurredAt, req.OccurredDate, req.OccurredTime)
@@ -125,10 +132,14 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 
 	lineItems := make([]entity.TransactionLineItem, 0, len(req.LineItems))
 	if kind == "income" && len(req.LineItems) > 1 {
-		return nil, apperr.BadRequest("invalid_line_items", "income transactions support a single line item only")
+		return nil, apperr.BadRequest("invalid_line_items", "income transactions support a single line item only").
+			WithDetail("field", "line_items").
+			WithDetail("count", len(req.LineItems))
 	}
 	if kind == "income" && len(req.GroupParticipants) > 0 {
-		return nil, apperr.BadRequest("invalid_participants", "group participants are only supported for expense transactions")
+		return nil, apperr.BadRequest("invalid_participants", "group participants are only supported for expense transactions").
+			WithDetail("field", "group_participants").
+			WithDetail("transaction_type", kind)
 	}
 
 	// If CategoryID is top-level and no line items, create a default one.
@@ -148,9 +159,12 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 	// Sum line items if present (except transfer)
 	if kind != "transfer" && len(req.LineItems) > 0 {
 		sum := big.NewRat(0, 1)
-		for _, li := range req.LineItems {
-			if !utils.IsValidDecimal(li.Amount) {
-				return nil, apperr.BadRequest("invalid_amount", "invalid line item amount")
+		for i, li := range req.LineItems {
+			liAmt := strings.TrimSpace(li.Amount)
+			if !utils.IsValidDecimal(liAmt) {
+				return nil, apperr.BadRequest("invalid_amount", "invalid line item amount").
+					WithDetail("field", fmt.Sprintf("line_items[%d].amount", i)).
+					WithDetail("value", liAmt)
 			}
 			r, _ := new(big.Rat).SetString(li.Amount)
 			sum.Add(sum, r)
@@ -209,7 +223,8 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 		if err := s.repo.CreateTransactionTx(ctx, txConn, userID, tx, lineItems, tagIDs); err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "fk_tli_category" {
-				return apperr.BadRequest("invalid_category", "invalid category_id")
+				return apperr.BadRequest("invalid_category", "invalid category_id in line items").
+					WithDetail("field", "line_items")
 			}
 			return err
 		}
@@ -247,7 +262,7 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, req d
 			return err
 		}
 		if it == nil {
-			return errors.New("failed to retrieve created transaction")
+			return apperr.Internal("failed to retrieve created transaction")
 		}
 		tr := dto.NewTransactionResponse(*it)
 		resp = &tr

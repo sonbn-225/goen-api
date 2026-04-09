@@ -124,13 +124,13 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*dto.Au
 	// 1. Verify refresh token exists in DB
 	rt, err := s.refreshRepo.GetByTokenTx(ctx, nil, refreshToken)
 	if err != nil {
-		return nil, apperr.Unauthorized("invalid refresh token")
+		return nil, apperr.Unauthorized("invalid_token", "invalid refresh token")
 	}
 
 	// 2. Check expiry
 	if utils.Now().After(rt.ExpiresAt) {
 		_ = s.refreshRepo.DeleteByTokenTx(ctx, nil, refreshToken)
-		return nil, apperr.Unauthorized("refresh token expired")
+		return nil, apperr.Unauthorized("token_expired", "refresh token expired")
 	}
 
 	// 3. Get user

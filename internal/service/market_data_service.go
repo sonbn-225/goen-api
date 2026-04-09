@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/pkg/config"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
 
 type MarketDataService struct {
@@ -39,7 +39,7 @@ func NewMarketDataService(
 
 func (s *MarketDataService) EnqueueSecurityPricesDaily(ctx context.Context, userID uuid.UUID, req dto.RefreshPriceRequest) (dto.RefreshOneResponse, error) {
 	if s.redis == nil {
-		return dto.RefreshOneResponse{}, errors.New("redis is not configured")
+		return dto.RefreshOneResponse{}, apperr.Internal("redis is not configured")
 	}
 
 	if _, err := s.secSvc.GetSecurity(ctx, req.SecurityID); err != nil {
@@ -74,7 +74,7 @@ func (s *MarketDataService) EnqueueSecurityPricesDaily(ctx context.Context, user
 
 func (s *MarketDataService) EnqueueSecurityEvents(ctx context.Context, userID uuid.UUID, req dto.RefreshEventRequest) (dto.RefreshOneResponse, error) {
 	if s.redis == nil {
-		return dto.RefreshOneResponse{}, errors.New("redis is not configured")
+		return dto.RefreshOneResponse{}, apperr.Internal("redis is not configured")
 	}
 
 	if _, err := s.secSvc.GetSecurity(ctx, req.SecurityID); err != nil {
@@ -100,7 +100,7 @@ func (s *MarketDataService) EnqueueSecurityEvents(ctx context.Context, userID uu
 
 func (s *MarketDataService) EnqueueMarketSync(ctx context.Context, userID uuid.UUID, req dto.MarketSyncRequest) (dto.RefreshOneResponse, error) {
 	if s.redis == nil {
-		return dto.RefreshOneResponse{}, errors.New("redis is not configured")
+		return dto.RefreshOneResponse{}, apperr.Internal("redis is not configured")
 	}
 
 	stream := "goen:market_data:jobs"
@@ -126,7 +126,7 @@ func (s *MarketDataService) EnqueueMarketSync(ctx context.Context, userID uuid.U
 
 func (s *MarketDataService) EnqueueBySymbols(ctx context.Context, userID uuid.UUID, req dto.RefreshSymbolsRequest) (dto.RefreshManyResponse, error) {
 	if s.redis == nil {
-		return dto.RefreshManyResponse{}, errors.New("redis is not configured")
+		return dto.RefreshManyResponse{}, apperr.Internal("redis is not configured")
 	}
 
 	cleaned := []string{}

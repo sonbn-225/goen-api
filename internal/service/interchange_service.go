@@ -11,6 +11,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/dto"
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
 )
@@ -182,7 +183,7 @@ func (s *InterchangeService) DeleteRule(ctx context.Context, userID, id uuid.UUI
 
 func (s *InterchangeService) CreateManyFromStaged(ctx context.Context, userID uuid.UUID, resourceType string, ids []uuid.UUID) (*dto.BatchImportResult, error) {
 	if resourceType != "transaction" {
-		return nil, fmt.Errorf("unsupported resource type for promotion: %s", resourceType)
+		return nil, apperr.BadRequest("invalid_resource", fmt.Sprintf("unsupported resource type for promotion: %s", resourceType))
 	}
 
 	result := &dto.BatchImportResult{Errors: []string{}}
@@ -216,7 +217,7 @@ func (s *InterchangeService) CreateManyFromStaged(ctx context.Context, userID uu
 
 func (s *InterchangeService) ApplyRulesAndCreate(ctx context.Context, userID uuid.UUID, resourceType string) (*dto.BatchImportResult, error) {
 	if resourceType != "transaction" {
-		return nil, fmt.Errorf("unsupported resource type: %s", resourceType)
+		return nil, apperr.BadRequest("invalid_resource", fmt.Sprintf("unsupported resource type: %s", resourceType))
 	}
 
 	stagedItems, err := s.repo.ListStagedImportsTx(ctx, nil, userID, resourceType)
@@ -321,7 +322,7 @@ func (s *InterchangeService) ExportToCSV(ctx context.Context, userID uuid.UUID, 
 		}
 
 	default:
-		return nil, "", fmt.Errorf("unsupported resource type for export: %s", resourceType)
+		return nil, "", apperr.BadRequest("invalid_resource", fmt.Sprintf("unsupported resource type for export: %s", resourceType))
 	}
 
 	var buf bytes.Buffer

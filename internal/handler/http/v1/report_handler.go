@@ -42,7 +42,7 @@ func (h *ReportHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *ReportHandler) GetDashboard(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 

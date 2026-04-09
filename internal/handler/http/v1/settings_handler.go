@@ -46,7 +46,7 @@ func (h *SettingsHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *SettingsHandler) PatchMySettings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 

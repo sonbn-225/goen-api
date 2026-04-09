@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"strings"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
 
 // InvestmentService manages trading and holdings of securities (stocks, crypto, etc.).
@@ -72,10 +72,10 @@ func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, accountID, 
 		return err
 	}
 	if tr == nil {
-		return errors.New("trade not found")
+		return apperr.NotFound("trade not found")
 	}
 	if tr.AccountID != accountID {
-		return errors.New("forbidden: trade does not belong to this account")
+		return apperr.Forbidden("trade_access_denied", "forbidden: trade does not belong to this account")
 	}
 
 	return s.db.WithTx(ctx, func(tx pgx.Tx) error {
@@ -88,7 +88,7 @@ func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, accountID, 
 			for _, l := range lots {
 				if l.BuyTradeID != nil && *l.BuyTradeID == tr.ID {
 					if l.Status != entity.ShareLotStatusActive || l.Quantity != tr.Quantity {
-						return errors.New("cannot delete buy trade because some shares are already sold or modified")
+						return apperr.BadRequest("trade_modified", "cannot delete buy trade because some shares are already sold or modified")
 					}
 				}
 			}
@@ -113,7 +113,7 @@ func (s *InvestmentService) DeleteTrade(ctx context.Context, userID, accountID, 
 					}
 				}
 				if targetLot == nil {
-					return errors.New("source lot not found for restoration")
+					return apperr.Internal("source lot not found for restoration")
 				}
 				oldQ, _ := new(big.Rat).SetString(targetLot.Quantity)
 				soldQ, _ := new(big.Rat).SetString(l.Quantity)
@@ -169,7 +169,7 @@ func (s *InvestmentService) CreateTrade(ctx context.Context, userID, accountID u
 		return nil, err
 	}
 	if acc == nil {
-		return nil, errors.New("account not found")
+		return nil, apperr.NotFound("account not found")
 	}
 
 	sid := req.SecurityID
@@ -403,7 +403,7 @@ func (s *InvestmentService) ListEligibleCorporateActions(ctx context.Context, us
 }
 
 func (s *InvestmentService) ClaimCorporateAction(ctx context.Context, userID, brokerAccountID, eventID uuid.UUID, req dto.ClaimCorporateActionRequest) (*dto.TradeResponse, error) {
-	return nil, errors.New("not implemented")
+	return nil, apperr.Internal("not implemented")
 }
 
 func (s *InvestmentService) GetRealizedPNLReport(ctx context.Context, userID, accountID uuid.UUID) (*dto.RealizedPNLReport, error) {
@@ -484,7 +484,7 @@ func (s *InvestmentService) planFIFOSell(lots []entity.ShareLot, sellQty string)
 	}
 
 	if remaining.Sign() > 0 {
-		return nil, "0", errors.New("insufficient quantity to sell")
+		return nil, "0", apperr.BadRequest("insufficient_quantity", "insufficient quantity to sell")
 	}
 
 	return plan, "0", nil

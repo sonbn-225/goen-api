@@ -50,7 +50,7 @@ func (h *BudgetHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *BudgetHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -77,7 +77,7 @@ func (h *BudgetHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *BudgetHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -109,7 +109,7 @@ func (h *BudgetHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *BudgetHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -147,7 +147,7 @@ func (h *BudgetHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *BudgetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 
@@ -188,7 +188,7 @@ func (h *BudgetHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *BudgetHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 

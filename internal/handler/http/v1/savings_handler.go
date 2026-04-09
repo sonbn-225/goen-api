@@ -54,7 +54,7 @@ func (h *SavingsHandler) RegisterRoutes(r chi.Router, cfg *config.Config) {
 func (h *SavingsHandler) ListSavings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	items, err := h.savingsSvc.ListSavings(r.Context(), userID)
@@ -80,7 +80,7 @@ func (h *SavingsHandler) ListSavings(w http.ResponseWriter, r *http.Request) {
 func (h *SavingsHandler) CreateSavings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	var req dto.CreateSavingsRequest
@@ -109,7 +109,7 @@ func (h *SavingsHandler) CreateSavings(w http.ResponseWriter, r *http.Request) {
 func (h *SavingsHandler) GetSavings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -145,7 +145,7 @@ func (h *SavingsHandler) GetSavings(w http.ResponseWriter, r *http.Request) {
 func (h *SavingsHandler) PatchSavings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
@@ -183,7 +183,7 @@ func (h *SavingsHandler) PatchSavings(w http.ResponseWriter, r *http.Request) {
 func (h *SavingsHandler) DeleteSavings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
 	id, err := uuid.Parse(chi.URLParam(r, "id"))

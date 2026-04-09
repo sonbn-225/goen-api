@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"strings"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/entity"
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
 
 type BudgetService struct {
@@ -26,21 +26,28 @@ func NewBudgetService(repo interfaces.BudgetRepository, categoryRepo interfaces.
 func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, req dto.CreateBudgetRequest) (*dto.BudgetWithStatsResponse, error) {
 	period := entity.BudgetPeriod(strings.TrimSpace(string(req.Period)))
 	if period != entity.BudgetPeriodMonth && period != entity.BudgetPeriodWeek && period != entity.BudgetPeriodCustom {
-		return nil, errors.New("invalid period")
+		return nil, apperr.BadRequest("invalid_period", "invalid period").
+			WithDetail("field", "period").
+			WithDetail("value", req.Period)
 	}
 
 	amount := strings.TrimSpace(req.Amount)
 	if !utils.IsValidDecimal(amount) {
-		return nil, errors.New("invalid amount")
+		return nil, apperr.BadRequest("invalid_amount", "invalid amount").
+			WithDetail("field", "amount").
+			WithDetail("value", amount)
 	}
 
 	if req.CategoryID == nil || *req.CategoryID == "" {
-		return nil, errors.New("category_id is required")
+		return nil, apperr.BadRequest("missing_category", "category_id is required").
+			WithDetail("field", "category_id")
 	}
 
 	categoryID, err := uuid.Parse(*req.CategoryID)
 	if err != nil {
-		return nil, errors.New("invalid category ID")
+		return nil, apperr.BadRequest("invalid_category_id", "invalid category ID").
+			WithDetail("field", "category_id").
+			WithDetail("value", *req.CategoryID)
 	}
 
 	cat, err := s.categoryRepo.GetCategoryTx(ctx, nil, userID, categoryID)
@@ -48,7 +55,7 @@ func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, req dto.Cr
 		return nil, err
 	}
 	if cat == nil || !cat.IsActive {
-		return nil, errors.New("category is invalid or inactive")
+		return nil, apperr.BadRequest("invalid_category", "category is invalid or inactive")
 	}
 
 	start, end, err := s.normalizeBudgetPeriod(string(period), req.PeriodStart, req.PeriodEnd)
@@ -145,13 +152,13 @@ func (s *BudgetService) normalizeBudgetPeriod(period string, startIn, endIn *str
 
 	if period == "custom" {
 		if startStr == "" || endStr == "" {
-			return "", "", errors.New("period_start and period_end are required for custom period")
+			return "", "", apperr.BadRequest("missing_custom_dates", "period_start and period_end are required for custom period")
 		}
 		return startStr, endStr, nil
 	}
 
 	if startStr == "" {
-		return "", "", errors.New("period_start is required")
+		return "", "", apperr.BadRequest("missing_start_date", "period_start is required")
 	}
 
 	start, err := time.Parse("2006-01-02", startStr)
@@ -167,7 +174,7 @@ func (s *BudgetService) normalizeBudgetPeriod(period string, startIn, endIn *str
 	case entity.BudgetPeriodWeek:
 		end = start.AddDate(0, 0, 6)
 	default:
-		return "", "", errors.New("invalid period")
+		return "", "", apperr.BadRequest("invalid_period", "invalid period")
 	}
 
 	return startStr, end.Format("2006-01-02"), nil

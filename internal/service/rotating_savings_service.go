@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/sonbn-225/goen-api/internal/domain/interfaces"
 	"github.com/sonbn-225/goen-api/internal/pkg/database"
 	"github.com/sonbn-225/goen-api/internal/pkg/utils"
+	"github.com/sonbn-225/goen-api/internal/pkg/apperr"
 )
 
 // RotatingSavingsService quản lý các nhóm "Hụi/Họ" (Rotating Savings and Credit Associations - ROSCA).
@@ -131,7 +131,7 @@ func (s *RotatingSavingsService) UpdateGroup(ctx context.Context, userID, groupI
 		return nil, err
 	}
 	if g == nil {
-		return nil, errors.New("group not found")
+		return nil, apperr.NotFound("group not found")
 	}
 
 	if req.AccountID != nil {
@@ -194,7 +194,7 @@ func (s *RotatingSavingsService) GetGroupDetail(ctx context.Context, userID, gro
 		return nil, err
 	}
 	if g == nil {
-		return nil, errors.New("group not found")
+		return nil, apperr.NotFound("group not found")
 	}
 
 	contributions, err := s.repo.ListContributionsTx(ctx, nil, groupID)
@@ -392,7 +392,7 @@ func (s *RotatingSavingsService) CreateContribution(ctx context.Context, userID,
 		return nil, err
 	}
 	if g == nil {
-		return nil, errors.New("group not found")
+		return nil, apperr.NotFound("group not found")
 	}
 
 	txType := entity.TransactionTypeExpense
@@ -511,7 +511,7 @@ func (s *RotatingSavingsService) DeleteContribution(ctx context.Context, userID,
 	}
 
 	if target == nil {
-		return errors.New("contribution not found")
+		return apperr.NotFound("contribution not found")
 	}
 
 	return s.db.WithTx(ctx, func(tx pgx.Tx) error {

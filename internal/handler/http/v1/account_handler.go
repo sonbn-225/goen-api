@@ -56,7 +56,7 @@ func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
 	// 1. Trích xuất ID của người dùng đang đăng nhập từ Context (được gài vào bởi AuthMiddleware)
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
  
@@ -86,7 +86,7 @@ func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// 1. Xác thực người dùng đang request
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
  
@@ -123,7 +123,7 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// 1. Xác thực User
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
  
@@ -166,7 +166,7 @@ func (h *AccountHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	// 1. Xác định User đang request
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
  
@@ -213,7 +213,7 @@ func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	// 1. Xác minh định danh user
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
  
@@ -248,7 +248,7 @@ func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
 	// 1. Phân quyền API
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
  
@@ -284,7 +284,7 @@ func (h *AccountHandler) ListShares(w http.ResponseWriter, r *http.Request) {
 func (h *AccountHandler) ListAuditEvents(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
  
@@ -329,7 +329,7 @@ func (h *AccountHandler) ListAuditEvents(w http.ResponseWriter, r *http.Request)
 func (h *AccountHandler) UpsertShare(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
  
@@ -367,7 +367,7 @@ func (h *AccountHandler) UpsertShare(w http.ResponseWriter, r *http.Request) {
 func (h *AccountHandler) RevokeShare(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		response.HandleError(w, apperr.Unauthorized("user not found in context"))
+		response.HandleError(w, apperr.Unauthorized("unauthorized", "user not found in context"))
 		return
 	}
  
