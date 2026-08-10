@@ -32,16 +32,17 @@ services:
       - sunflower_data
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=${TRAEFIK_NETWORK:-proxy_network}"
-      - "traefik.http.routers.goen-api.rule=Host(`${GOEN_DOMAIN:-api.localhost}`) && (PathPrefix(`/api`) || PathPrefix(`/swagger`))"
-      - "traefik.http.routers.goen-api.entrypoints=web"
-      - "traefik.http.routers.goen-api.priority=10"
-      - "traefik.http.services.goen-api.loadbalancer.server.port=8080"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik_network}"
+      - "traefik.http.routers.goen-api-service.rule=Host(`${GOEN_DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.goen-api-service.entrypoints=web"
+      - "traefik.http.routers.goen-api-service.priority=10"
+      - "traefik.http.routers.goen-api-service.service=goen-api-service"
+      - "traefik.http.services.goen-api-service.loadbalancer.server.port=8080"
     restart: unless-stopped
 
 networks:
   traefik_network:
-    name: ${TRAEFIK_NETWORK:-proxy_network}
+    name: ${TRAEFIK_NETWORK:-traefik_network}
     external: true
   sunflower_data:
     name: ${DATA_NETWORK:-sunflower-data}
