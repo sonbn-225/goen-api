@@ -56,6 +56,7 @@ pipeline {
                         export MARKET_DATA_STATUS_URL="http://${GOEN_MARKET_DATA_CONTAINER_NAME}:${GOEN_MARKET_DATA_STATUS_PORT}/status"
 
                         echo "Using GOEN_DOMAIN=$GOEN_DOMAIN"
+                        docker rm -f ${CONTAINER_NAME} 2>/dev/null || true
                         docker compose -f docker-compose.prod.yml config | grep -E 'traefik.http.routers.*rule' || true
                         docker compose -f docker-compose.prod.yml up -d --build --force-recreate --remove-orphans
                     '''
