@@ -5,26 +5,34 @@ def vaultConfig = [
 ]
 
 def vaultSecrets = [
-    [path: 'secret/data/jenkins', engineVersion: 2, secretValues: [
-        [envVar: 'CONTAINER_NAME', vaultKey: 'GOEN_API_CONTAINER_NAME'],
+    [path: 'secret/common', engineVersion: 2, secretValues: [
         [envVar: 'PLATFORM', vaultKey: 'PLATFORM'],
         [envVar: 'SUNFLOWER_TZ', vaultKey: 'SUNFLOWER_TZ'],
-        [envVar: 'GOEN_V2_DOMAIN', vaultKey: 'GOEN_V2_DOMAIN'],
         [envVar: 'TRAEFIK_NETWORK', vaultKey: 'TRAEFIK_NETWORK'],
-        [envVar: 'DATA_NETWORK', vaultKey: 'DATA_NETWORK'],
-        [envVar: 'JWT_SECRET', vaultKey: 'GOEN_API_JWT_SECRET'],
+        [envVar: 'DATA_NETWORK', vaultKey: 'DATA_NETWORK']
+    ]],
+    [path: 'secret/postgresql', engineVersion: 2, secretValues: [
         [envVar: 'POSTGRES_CONTAINER_NAME', vaultKey: 'POSTGRES_CONTAINER_NAME'],
         [envVar: 'POSTGRES_PORT', vaultKey: 'POSTGRES_PORT'],
         [envVar: 'POSTGRES_DEFAULT', vaultKey: 'POSTGRES_DEFAULT'],
-        [envVar: 'POSTGRES_PASSWORD', vaultKey: 'POSTGRES_PASSWORD'],
+        [envVar: 'POSTGRES_PASSWORD', vaultKey: 'POSTGRES_PASSWORD']
+    ]],
+    [path: 'secret/redis', engineVersion: 2, secretValues: [
         [envVar: 'REDIS_CONTAINER_NAME', vaultKey: 'REDIS_CONTAINER_NAME'],
         [envVar: 'REDIS_PORT', vaultKey: 'REDIS_PORT'],
         [envVar: 'REDIS_USERNAME', vaultKey: 'REDIS_USERNAME'],
-        [envVar: 'REDIS_PASSWORD', vaultKey: 'REDIS_PASSWORD'],
-        [envVar: 'GOEN_MARKET_DATA_CONTAINER_NAME', vaultKey: 'GOEN_MARKET_DATA_CONTAINER_NAME'],
-        [envVar: 'GOEN_MARKET_DATA_STATUS_PORT', vaultKey: 'GOEN_MARKET_DATA_STATUS_PORT'],
+        [envVar: 'REDIS_PASSWORD', vaultKey: 'REDIS_PASSWORD']
+    ]],
+    [path: 'secret/seaweedfs', engineVersion: 2, secretValues: [
         [envVar: 'SEAWEEDFS_ACCESS_KEY_ID', vaultKey: 'SEAWEEDFS_ACCESS_KEY_ID'],
         [envVar: 'SEAWEEDFS_SECRET_ACCESS_KEY', vaultKey: 'SEAWEEDFS_SECRET_ACCESS_KEY']
+    ]],
+    [path: 'secret/goen', engineVersion: 2, secretValues: [
+        [envVar: 'CONTAINER_NAME', vaultKey: 'GOEN_API_CONTAINER_NAME'],
+        [envVar: 'GOEN_V2_DOMAIN', vaultKey: 'GOEN_V2_DOMAIN'],
+        [envVar: 'JWT_SECRET', vaultKey: 'GOEN_API_JWT_SECRET'],
+        [envVar: 'GOEN_MARKET_DATA_CONTAINER_NAME', vaultKey: 'GOEN_MARKET_DATA_CONTAINER_NAME'],
+        [envVar: 'GOEN_MARKET_DATA_STATUS_PORT', vaultKey: 'GOEN_MARKET_DATA_STATUS_PORT']
     ]]
 ]
 
